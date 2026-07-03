@@ -4,7 +4,7 @@ import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import { crearProyecto, getMiembros, actualizarLinks, completarTarea } from '../../data/api'
 import { generarMensajeInicio } from '../../data/mensajes'
-import { getPlantillas } from '../../data/plantillas'
+import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../../data/paquetes'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, AlertCircle } from 'lucide-react'
@@ -104,17 +104,24 @@ export default function NuevoProyecto() {
     setErrorCrear('')
     setCreando(true)
     try {
+      const plantilla = getPlantilla(proyectoData.plantillaId)
+      const tareas = copiarTareasDesde(proyectoData.plantillaId, condiciones, proyectoData.extras)
+
       const p = await crearProyecto({
         cliente,
-        paquete: proyectoData.paquete,
-        plantillaId: proyectoData.plantillaId,
-        extras: proyectoData.extras,
-        fechaInicio: proyectoData.fechaInicio,
-        fechaEstimadaEntrega: proyectoData.fechaEstimadaEntrega,
-        anticipoConfirmado: proyectoData.anticipoConfirmado,
+        proyecto: {
+          paquete: proyectoData.paquete,
+          plantillaId: proyectoData.plantillaId,
+          fases: plantilla?.fases || FASES_WEB,
+          extras: proyectoData.extras,
+          fechaInicio: proyectoData.fechaInicio,
+          fechaEstimadaEntrega: proyectoData.fechaEstimadaEntrega,
+          anticipoConfirmado: proyectoData.anticipoConfirmado,
+        },
         condicionesTecnicas: condiciones,
         equipo,
         passwordCliente,
+        tareas,
         creadoPor: user?.nombre,
       })
       setProyectoCreado(p)
