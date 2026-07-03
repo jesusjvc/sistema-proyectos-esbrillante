@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  ADMIN
+  EQUIPO
+}
+
+model User {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  password String
+  nombre   String
+  rol      Rol     @default(EQUIPO)
+  esKarla  Boolean @default(false)
+  activo   Boolean @default(true)
+
+  creadoEn DateTime @default(now())
+
+  @@map("users")
+}
+
+model Proyecto {
+  id     String @id @default(cuid())
+  slug   String @unique
+  status String @default("pendiente_anticipo")
+
+  cliente             Json
+  proyecto            Json
+  condicionesTecnicas Json
+  equipo              Json
+  linksCliente        Json     @default("{}")
+  tiempos             Json     @default("{}")
+  passwordCliente     String
+
+  tareas Tarea[]
+  log    LogEntry[]
+
+  creadoEn DateTime @default(now())
+
+  @@map("proyectos")
+}
+
+model Tarea {
+  id         String   @id
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  fase             Int
+  titulo           String
+  responsable      String   @default("equipo")
+  dependencias     String[]
+  condicion        String?
+  descripcion      String   @default("")
+  queHacer         String   @default("")
+  necesitasAntes   String   @default("")
+  plantillaMensaje String   @default("")
+  queEntregas      String   @default("")
+  linkTipo         String?
+
+  esCliente            Boolean @default(false)
+  instruccionesCliente String  @default("")
+  plazoHoras           Int?
+  esRutaCritica        Boolean @default(false)
+  soloAdmin            Boolean @default(false)
+  soloKarlaOAdmin      Boolean @default(false)
+  opcional             Boolean @default(false)
+  custom               Boolean @default(false)
+
+  estado        String    @default("pendiente")
+  completadaPor String?
+  completadaEn  DateTime?
+  asignadoA     String?
+
+  @@map("tareas")
+}
+
+model LogEntry {
+  id         String   @id @default(cuid())
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  fecha    DateTime @default(now())
+  usuario  String
+  accion   String
+  detalle  String   @default("")
+
+  @@map("log_entries")
+}
