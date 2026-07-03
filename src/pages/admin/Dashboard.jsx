@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
-import { getProyectos, calcularAvance, getFaseActual, formatFecha, confirmarAnticipo, getSession } from '../../data/storage'
+import { useAuth } from '../../context/AuthContext'
+import { getProyectos, confirmarAnticipo } from '../../data/api'
+import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES } from '../../data/paquetes'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight } from 'lucide-react'
 
@@ -14,19 +16,28 @@ const STATUS_CONFIG = {
 }
 
 export default function AdminDashboard() {
-  const [proyectos, setProyectos] = useState(getProyectos)
+  const { user } = useAuth()
+  const [proyectos, setProyectos] = useState([])
   const [filtro, setFiltro] = useState('todos')
-  const session = getSession()
+  const [cargando, setCargando] = useState(true)
 
-  function handleConfirmarAnticipo(id) {
-    confirmarAnticipo(id, session.nombre)
-    setProyectos(getProyectos())
+  async function cargar() {
+    try {
+      const data = await getProyectos()
+      setProyectos(data)
+    } finally {
+      setCargando(false)
+    }
   }
 
-  const filtrados = proyectos.filter((p) => {
-    if (filtro === 'todos') return true
-    return p.status === filtro
-  })
+  useEffect(() => { cargar() }, [])
+
+  async function handleConfirmarAnticipo(slug) {
+    await confirmarAnticipo(slug)
+    cargar()
+  }
+
+  const filtrados = proyectos.filter((p) => filtro === 'todos' || p.status === filtro)
 
   const counts = {
     activo: proyectos.filter((p) => p.status === 'activo').length,
@@ -37,7 +48,6 @@ export default function AdminDashboard() {
 
   return (
     <Layout titulo="Proyectos">
-      {/* Métricas rápidas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricaCard label="Activos" valor={counts.activo} color="text-emerald-600" />
         <MetricaCard label="En pausa" valor={counts.en_pausa} color="text-amber-600" />
@@ -45,7 +55,6 @@ export default function AdminDashboard() {
         <MetricaCard label="Completados" valor={counts.completado} color="text-slate-500" />
       </div>
 
-      {/* Filtros + Nuevo */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex gap-2">
           {['todos', 'activo', 'en_pausa', 'pendiente_anticipo', 'completado'].map((f) => (
@@ -60,7 +69,6 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
-
         <Link
           to="/admin/proyecto/nuevo"
           className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -70,25 +78,18 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      {/* Lista de proyectos */}
-      {filtrados.length === 0 ? (
+      {cargando ? (
+        <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : filtrados.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <div className="text-4xl mb-3">📋</div>
           <div className="font-medium">No hay proyectos</div>
-          <div className="text-sm mt-1">
-            {filtro === 'todos'
-              ? 'Crea el primer proyecto para comenzar'
-              : `No hay proyectos con estado "${STATUS_CONFIG[filtro]?.label}"`}
-          </div>
+          <div className="text-sm mt-1">{filtro === 'todos' ? 'Crea el primer proyecto para comenzar' : `No hay proyectos con estado "${STATUS_CONFIG[filtro]?.label}"`}</div>
         </div>
       ) : (
         <div className="space-y-3">
           {filtrados.map((p) => (
-            <ProyectoCard
-              key={p.id}
-              proyecto={p}
-              onConfirmarAnticipo={handleConfirmarAnticipo}
-            />
+            <ProyectoCard key={p.id} proyecto={p} onConfirmarAnticipo={handleConfirmarAnticipo} />
           ))}
         </div>
       )}
@@ -115,30 +116,22 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-semibold text-slate-800 truncate">{p.cliente.nombreComercial}</h3>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${cfg.color}`}>
-              {cfg.icon}
-              {cfg.label}
+              {cfg.icon}{cfg.label}
             </span>
           </div>
-
           <div className="text-sm text-slate-500 mb-3">
             {p.proyecto.paquete}
-            {p.proyecto.extras.length > 0 && ` · ${p.proyecto.extras.length} extra${p.proyecto.extras.length > 1 ? 's' : ''}`}
+            {p.proyecto.extras?.length > 0 && ` · ${p.proyecto.extras.length} extra${p.proyecto.extras.length > 1 ? 's' : ''}`}
           </div>
-
-          {/* Barra de progreso */}
           <div className="mb-2">
             <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
               <span>Fase {faseActual} — {faseNombre}</span>
               <span className="font-semibold text-slate-700">{avance}%</span>
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-violet-500 rounded-full transition-all"
-                style={{ width: `${avance}%` }}
-              />
+              <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
             </div>
           </div>
-
           <div className="flex items-center gap-4 text-xs text-slate-400">
             <span className="flex items-center gap-1">
               <Clock size={12} />
@@ -151,11 +144,10 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
             )}
           </div>
         </div>
-
         <div className="flex flex-col items-end gap-2 shrink-0">
           {p.status === 'pendiente_anticipo' && (
             <button
-              onClick={() => onConfirmarAnticipo(p.id)}
+              onClick={() => onConfirmarAnticipo(p.slug)}
               className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
             >
               Confirmar anticipo

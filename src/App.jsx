@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { getSession } from './data/storage'
+import { useAuth } from './context/AuthContext'
 
 import Login from './pages/Login'
 import AdminDashboard from './pages/admin/Dashboard'
@@ -14,8 +14,9 @@ import AccesoCliente from './pages/cliente/AccesoCliente'
 import VistaCliente from './pages/cliente/VistaCliente'
 
 function RequireAuth({ rol, children }) {
-  const session = getSession()
-  if (!session || session.rol !== rol) return <Navigate to="/" replace />
+  const { user } = useAuth()
+  if (user === undefined) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (!user || user.rol !== rol) return <Navigate to="/" replace />
   return children
 }
 
@@ -24,75 +25,16 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Login />} />
 
-      {/* Rutas Admin */}
-      <Route
-        path="/admin"
-        element={
-          <RequireAuth rol="admin">
-            <AdminDashboard />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin/proyecto/nuevo"
-        element={
-          <RequireAuth rol="admin">
-            <NuevoProyecto />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin/proyecto/:id"
-        element={
-          <RequireAuth rol="admin">
-            <DetalleProyecto />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin/equipo"
-        element={
-          <RequireAuth rol="admin">
-            <Equipo />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin/paquetes"
-        element={
-          <RequireAuth rol="admin">
-            <Paquetes />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/admin/paquetes/:id"
-        element={
-          <RequireAuth rol="admin">
-            <EditarPaquete />
-          </RequireAuth>
-        }
-      />
+      <Route path="/admin" element={<RequireAuth rol="admin"><AdminDashboard /></RequireAuth>} />
+      <Route path="/admin/proyecto/nuevo" element={<RequireAuth rol="admin"><NuevoProyecto /></RequireAuth>} />
+      <Route path="/admin/proyecto/:id" element={<RequireAuth rol="admin"><DetalleProyecto /></RequireAuth>} />
+      <Route path="/admin/equipo" element={<RequireAuth rol="admin"><Equipo /></RequireAuth>} />
+      <Route path="/admin/paquetes" element={<RequireAuth rol="admin"><Paquetes /></RequireAuth>} />
+      <Route path="/admin/paquetes/:id" element={<RequireAuth rol="admin"><EditarPaquete /></RequireAuth>} />
 
-      {/* Rutas Equipo */}
-      <Route
-        path="/equipo"
-        element={
-          <RequireAuth rol="equipo">
-            <MisTareas />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/equipo/proyecto/:id"
-        element={
-          <RequireAuth rol="equipo">
-            <ProyectoEquipo />
-          </RequireAuth>
-        }
-      />
+      <Route path="/equipo" element={<RequireAuth rol="equipo"><MisTareas /></RequireAuth>} />
+      <Route path="/equipo/proyecto/:id" element={<RequireAuth rol="equipo"><ProyectoEquipo /></RequireAuth>} />
 
-      {/* Rutas Cliente */}
       <Route path="/cliente" element={<AccesoCliente />} />
       <Route path="/cliente/:id" element={<VistaCliente />} />
 

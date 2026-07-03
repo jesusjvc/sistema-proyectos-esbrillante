@@ -1,22 +1,26 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getProyectos, autenticarCliente } from '../../data/storage'
+import { loginCliente } from '../../data/api'
 
 export default function AccesoCliente() {
   const navigate = useNavigate()
-  const [proyectoId, setProyectoId] = useState('')
+  const [slug, setSlug] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const proyectos = getProyectos()
+  const [cargando, setCargando] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (!proyectoId) { setError('Selecciona tu proyecto'); return }
-    if (autenticarCliente(proyectoId, password)) {
-      navigate(`/cliente/${proyectoId}`) // proyectoId ya es el slug
-    } else {
-      setError('Contraseña incorrecta')
+    if (!slug.trim()) { setError('Ingresa el identificador de tu proyecto'); return }
+    setCargando(true)
+    try {
+      const proyecto = await loginCliente(slug.trim(), password)
+      navigate(`/cliente/${proyecto.slug}`)
+    } catch (err) {
+      setError(err.status === 401 ? 'Proyecto no encontrado o contraseña incorrecta' : err.message)
+    } finally {
+      setCargando(false)
     }
   }
 
@@ -35,20 +39,16 @@ export default function AccesoCliente() {
           <h2 className="font-semibold text-slate-800 mb-5">Accede a tu proyecto</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Tu empresa</label>
-              <select
-                value={proyectoId}
-                onChange={(e) => { setProyectoId(e.target.value); setError('') }}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400"
-              >
-                <option value="">Selecciona tu empresa...</option>
-                {proyectos
-                  .filter((p) => p.status !== 'cancelado')
-                  .map((p) => (
-                    <option key={p.id} value={p.slug}>{p.cliente.nombreComercial}</option>
-                  ))
-                }
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Identificador del proyecto</label>
+              <input
+                type="text"
+                value={slug}
+                onChange={(e) => { setSlug(e.target.value); setError('') }}
+                placeholder="Ej: mi-empresa-k7x2"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400"
+                autoFocus
+              />
+              <p className="text-xs text-slate-400 mt-1">El equipo de EsBrillante te compartió este identificador.</p>
             </div>
 
             <div>
@@ -60,24 +60,23 @@ export default function AccesoCliente() {
                 placeholder="Tu contraseña de acceso"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400"
               />
-              <p className="text-xs text-slate-400 mt-1">La contraseña te la compartió el equipo de EsBrillante.</p>
             </div>
 
             {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
 
             <button
               type="submit"
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg text-sm font-semibold transition-colors"
+              disabled={cargando}
+              className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white py-3 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
+              {cargando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
               Ver mi proyecto
             </button>
           </form>
         </div>
 
         <div className="text-center mt-6">
-          <a href="/" className="text-violet-300 hover:text-white text-sm transition-colors">
-            ← Volver al inicio
-          </a>
+          <a href="/" className="text-violet-300 hover:text-white text-sm transition-colors">← Volver al inicio</a>
         </div>
       </div>
     </div>
