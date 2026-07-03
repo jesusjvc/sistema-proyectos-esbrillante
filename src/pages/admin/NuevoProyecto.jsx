@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
-import { crearProyecto, getSession, getMiembros, actualizarLinksCliente, completarTarea } from '../../data/storage'
+import { useAuth } from '../../context/AuthContext'
+import { crearProyecto, getMiembros, actualizarLinks, completarTarea } from '../../data/api'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { getPlantillas } from '../../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../../data/paquetes'
@@ -22,17 +23,18 @@ const COND_DEFAULT = {
 
 export default function NuevoProyecto() {
   const navigate = useNavigate()
-  const session = getSession()
-  const miembros = getMiembros()
+  const { user } = useAuth()
   const plantillas = getPlantillas()
 
+  const [miembros, setMiembros] = useState([])
   const [paso, setPaso] = useState(1)
   const [mensajeCopiado, setMensajeCopiado] = useState(false)
   const [proyectoCreado, setProyectoCreado] = useState(null)
   const [driveEstado, setDriveEstado] = useState(null) // null | 'cargando' | 'ok' | 'error'
   const [driveError, setDriveError] = useState('')
+  const [creando, setCreando] = useState(false)
+  const [errorCrear, setErrorCrear] = useState('')
 
-  // Formulario
   const [cliente, setCliente] = useState({
     nombreComercial: '',
     contactoPrincipal: '',
@@ -53,9 +55,19 @@ export default function NuevoProyecto() {
     copy: 'Por asignar',
     disenador: 'Por asignar',
     programador: 'No aplica',
-    adminProyecto: session?.nombre || '',
+    adminProyecto: '',
   })
   const [passwordCliente, setPasswordCliente] = useState(generarPasswordSimple())
+
+  useEffect(() => {
+    getMiembros().then(setMiembros).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (user?.nombre) {
+      setEquipo((prev) => ({ ...prev, adminProyecto: prev.adminProyecto || user.nombre }))
+    }
+  }, [user])
 
   function toggleExtra(extra) {
     setProyectoData((prev) => ({
@@ -89,35 +101,42 @@ export default function NuevoProyecto() {
   }
 
   async function handleCrear() {
-    const p = crearProyecto({
-      cliente,
-      paquete: proyectoData.paquete,
-      plantillaId: proyectoData.plantillaId,
-      extras: proyectoData.extras,
-      fechaInicio: proyectoData.fechaInicio,
-      fechaEstimadaEntrega: proyectoData.fechaEstimadaEntrega,
-      anticipoConfirmado: proyectoData.anticipoConfirmado,
-      condicionesTecnicas: condiciones,
-      equipo,
-      passwordCliente,
-      creadoPor: session?.nombre,
-    })
-    setProyectoCreado(p)
-    setPaso(4)
+    setErrorCrear('')
+    setCreando(true)
+    try {
+      const p = await crearProyecto({
+        cliente,
+        paquete: proyectoData.paquete,
+        plantillaId: proyectoData.plantillaId,
+        extras: proyectoData.extras,
+        fechaInicio: proyectoData.fechaInicio,
+        fechaEstimadaEntrega: proyectoData.fechaEstimadaEntrega,
+        anticipoConfirmado: proyectoData.anticipoConfirmado,
+        condicionesTecnicas: condiciones,
+        equipo,
+        passwordCliente,
+        creadoPor: user?.nombre,
+      })
+      setProyectoCreado(p)
+      setPaso(4)
 
-    if (driveConfigurado()) {
-      setDriveEstado('cargando')
-      try {
-        const links = await crearCarpetasCliente(cliente.nombreComercial)
-        actualizarLinksCliente(p.id, { drive: links.drive })
-        // Auto-completar la tarea de Drive si existe
-        const tareaDrive = p.tareas.find((t) => t.linkTipo === 'drive')
-        if (tareaDrive) completarTarea(p.id, tareaDrive.id, 'Sistema (Drive API)')
-        setDriveEstado('ok')
-      } catch (err) {
-        setDriveEstado('error')
-        setDriveError(err.message || 'Error desconocido')
+      if (driveConfigurado()) {
+        setDriveEstado('cargando')
+        try {
+          const links = await crearCarpetasCliente(cliente.nombreComercial)
+          await actualizarLinks(p.slug, { drive: links.drive })
+          const tareaDrive = p.tareas.find((t) => t.linkTipo === 'drive')
+          if (tareaDrive) await completarTarea(p.slug, tareaDrive.id)
+          setDriveEstado('ok')
+        } catch (err) {
+          setDriveEstado('error')
+          setDriveError(err.message || 'Error desconocido')
+        }
       }
+    } catch (err) {
+      setErrorCrear(err.message || 'Error al crear el proyecto')
+    } finally {
+      setCreando(false)
     }
   }
 
@@ -176,7 +195,6 @@ export default function NuevoProyecto() {
               </Campo>
             </div>
 
-            {/* Participantes adicionales */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-slate-700">Participantes adicionales</label>
@@ -231,7 +249,6 @@ export default function NuevoProyecto() {
             <h2 className="font-semibold text-slate-800">Datos del proyecto</h2>
 
             <Campo label="Paquete base *">
-              {/* Agrupar por área */}
               {Object.entries(
                 plantillas.reduce((acc, p) => { if (!acc[p.area]) acc[p.area] = []; acc[p.area].push(p); return acc }, {})
               ).map(([area, pqs]) => (
@@ -394,12 +411,18 @@ export default function NuevoProyecto() {
               <p className="text-xs text-slate-400 mt-1">Esta contraseña se compartirá con el cliente para que vea su progreso.</p>
             </Campo>
 
+            {errorCrear && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{errorCrear}</p>
+            )}
+
             <div className="flex justify-between pt-2">
               <button onClick={() => setPaso(2)} className="text-slate-500 hover:text-slate-700 text-sm px-4 py-2">← Atrás</button>
               <button
                 onClick={handleCrear}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                disabled={creando}
+                className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
               >
+                {creando && <Loader2 size={14} className="animate-spin" />}
                 Crear proyecto ✓
               </button>
             </div>
@@ -422,7 +445,6 @@ export default function NuevoProyecto() {
               )}
             </div>
 
-            {/* Estado Drive */}
             {driveEstado === 'cargando' && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-blue-700">
                 <Loader2 size={16} className="animate-spin shrink-0" />
@@ -445,7 +467,6 @@ export default function NuevoProyecto() {
               </div>
             )}
 
-            {/* Acceso cliente */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <h3 className="font-semibold text-slate-800 mb-3">Acceso del cliente</h3>
               <div className="space-y-2 text-sm">
@@ -474,7 +495,6 @@ export default function NuevoProyecto() {
               </div>
             </div>
 
-            {/* Mensaje de WhatsApp */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-slate-800">Mensaje de inicio (WhatsApp)</h3>

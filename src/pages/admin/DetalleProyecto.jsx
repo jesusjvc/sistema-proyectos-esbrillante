@@ -1,122 +1,134 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
+import { useAuth } from '../../context/AuthContext'
 import {
-  getProyectoPorSlug, completarTarea, reabrirTarea, omitirTarea, calcularAvance,
-  getFaseActual, calcularTiempos, iniciarPausa, terminarPausa, cerrarProyecto,
-  confirmarAnticipo, getSession, formatFecha, formatFechaHora,
-  editarTarea, agregarTareaCustom, eliminarTareaCustom, actualizarLinksCliente,
-} from '../../data/storage'
+  getProyecto, completarTarea, reabrirTarea, omitirTarea,
+  iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
+  editarTarea, agregarTarea, eliminarTarea, actualizarLinks,
+} from '../../data/api'
+import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause,
-  ChevronDown, ChevronUp, Clock, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
+  ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const session = getSession()
-  const [proyecto, setProyecto] = useState(() => getProyectoPorSlug(id))
+  const { user } = useAuth()
+  const [proyecto, setProyecto] = useState(null)
   const [faseAbierta, setFaseAbierta] = useState(null)
-  const [tab, setTab] = useState('tareas') // tareas | info | log
+  const [tab, setTab] = useState('tareas')
   const [copiado, setCopiado] = useState(false)
-  const [modalEditar, setModalEditar] = useState(null) // tarea a editar
-  const [modalNueva, setModalNueva] = useState(null)   // número de fase donde agregar
-  const [modalLink, setModalLink] = useState(null)     // { tareaId, linkTipo }
-  const [driveEstado, setDriveEstado] = useState(null) // null | 'cargando' | 'ok' | 'error'
+  const [modalEditar, setModalEditar] = useState(null)
+  const [modalNueva, setModalNueva] = useState(null)
+  const [modalLink, setModalLink] = useState(null)
+  const [driveEstado, setDriveEstado] = useState(null)
   const [driveError, setDriveError] = useState('')
 
   useEffect(() => {
-    if (!proyecto) navigate('/admin')
-  }, [proyecto])
+    getProyecto(id).then(setProyecto).catch(() => navigate('/admin'))
+  }, [id])
 
-  if (!proyecto) return null
+  async function refresh() {
+    const p = await getProyecto(id)
+    setProyecto(p)
+  }
+
+  if (!proyecto) {
+    return (
+      <Layout titulo="Proyecto" volver="/admin">
+        <div className="flex justify-center py-12">
+          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </Layout>
+    )
+  }
 
   const faseActual = getFaseActual(proyecto)
   const avance = calcularAvance(proyecto)
   const tiempos = calcularTiempos(proyecto)
-  const pausaActiva = proyecto.tiempos.pausas.find((p) => !p.fin)
+  const pausaActiva = proyecto.tiempos?.pausas?.find((p) => !p.fin)
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
-
-  function refresh() { setProyecto(getProyectoPorSlug(id)) }
 
   async function handleCrearDrive() {
     setDriveEstado('cargando')
     setDriveError('')
     try {
       const links = await crearCarpetasCliente(proyecto.cliente.nombreComercial)
-      actualizarLinksCliente(proyecto.id, { drive: links.drive })
+      await actualizarLinks(proyecto.slug, { drive: links.drive })
       const tareaDrive = proyecto.tareas.find((t) => t.linkTipo === 'drive' && t.estado !== 'completada')
-      if (tareaDrive) completarTarea(proyecto.id, tareaDrive.id, 'Sistema (Drive API)')
+      if (tareaDrive) await completarTarea(proyecto.slug, tareaDrive.id)
       setDriveEstado('ok')
-      refresh()
+      await refresh()
     } catch (err) {
       setDriveEstado('error')
       setDriveError(err.message || 'Error desconocido')
     }
   }
 
-  function marcarCompleta(tareaId) {
+  async function marcarCompleta(tareaId) {
     const tarea = proyecto.tareas.find((t) => t.id === tareaId)
     if (tarea?.linkTipo) {
       setModalLink({ tareaId, linkTipo: tarea.linkTipo, titulo: tarea.titulo })
       return
     }
-    completarTarea(proyecto.id, tareaId, session.nombre)
-    refresh()
+    await completarTarea(proyecto.slug, tareaId)
+    await refresh()
   }
 
-  function handleCompletarConLink(tareaId, linkTipo, url) {
-    actualizarLinksCliente(proyecto.id, { [linkTipo]: url })
-    completarTarea(proyecto.id, tareaId, session.nombre)
+  async function handleCompletarConLink(tareaId, linkTipo, url) {
+    await actualizarLinks(proyecto.slug, { [linkTipo]: url })
+    await completarTarea(proyecto.slug, tareaId)
     setModalLink(null)
-    refresh()
+    await refresh()
   }
 
-  function reabrir(tareaId) {
-    reabrirTarea(proyecto.id, tareaId, session.nombre)
-    refresh()
+  async function reabrir(tareaId) {
+    await reabrirTarea(proyecto.slug, tareaId)
+    await refresh()
   }
 
-  function omitir(tareaId) {
-    omitirTarea(proyecto.id, tareaId, session.nombre)
-    refresh()
+  async function omitir(tareaId) {
+    await omitirTarea(proyecto.slug, tareaId)
+    await refresh()
   }
 
-  function handleGuardarEdicion(tareaId, cambios) {
-    editarTarea(proyecto.id, tareaId, cambios, session.nombre)
+  async function handleGuardarEdicion(tareaId, cambios) {
+    await editarTarea(proyecto.slug, tareaId, cambios)
     setModalEditar(null)
-    refresh()
+    await refresh()
   }
 
-  function handleAgregarTarea(datos) {
-    agregarTareaCustom(proyecto.id, datos, session.nombre)
+  async function handleAgregarTarea(datos) {
+    await agregarTarea(proyecto.slug, datos)
     setModalNueva(null)
-    refresh()
+    await refresh()
   }
 
-  function handleEliminarTarea(tareaId) {
-    eliminarTareaCustom(proyecto.id, tareaId, session.nombre)
-    refresh()
+  async function handleEliminarTarea(tareaId) {
+    await eliminarTarea(proyecto.slug, tareaId)
+    await refresh()
   }
 
-  function togglePausa() {
+  async function togglePausa() {
     if (pausaActiva) {
-      terminarPausa(proyecto.id, session.nombre)
+      await terminarPausa(proyecto.slug)
     } else {
-      iniciarPausa(proyecto.id, faseActual, session.nombre)
+      await iniciarPausa(proyecto.slug, faseActual)
     }
-    refresh()
+    await refresh()
   }
 
-  function handleCerrar() {
+  async function handleCerrar() {
     if (confirm('¿Cerrar el proyecto como completado?')) {
-      cerrarProyecto(proyecto.id, session.nombre)
-      refresh()
+      await cerrarProyecto(proyecto.slug)
+      await refresh()
     }
   }
 
@@ -160,7 +172,7 @@ export default function DetalleProyecto() {
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {proyecto.status === 'pendiente_anticipo' && (
               <button
-                onClick={() => { confirmarAnticipo(proyecto.id, session.nombre); refresh() }}
+                onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
                 className="text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 Confirmar anticipo
@@ -307,7 +319,6 @@ export default function DetalleProyecto() {
                         />
                       )
                     })}
-                    {/* Agregar tarea a esta fase */}
                     <div className="px-5 py-2.5 border-t border-slate-50">
                       <button
                         onClick={() => setModalNueva(fase.numero)}
@@ -360,7 +371,7 @@ export default function DetalleProyecto() {
           <InfoCard titulo="Links del cliente" fullWidth>
             <LinksClienteEditor
               links={proyecto.linksCliente || {}}
-              onGuardar={(cambios) => { actualizarLinksCliente(proyecto.id, cambios); refresh() }}
+              onGuardar={async (cambios) => { await actualizarLinks(proyecto.slug, cambios); await refresh() }}
               onCrearDrive={driveConfigurado() ? handleCrearDrive : null}
               driveEstado={driveEstado}
               driveError={driveError}
@@ -399,9 +410,9 @@ export default function DetalleProyecto() {
           </InfoCard>
 
           <InfoCard titulo="Participantes del cliente">
-            {proyecto.cliente.participantes?.length === 0
+            {!proyecto.cliente.participantes?.length
               ? <p className="text-sm text-slate-400">Solo el contacto principal</p>
-              : proyecto.cliente.participantes?.map((p, i) => (
+              : proyecto.cliente.participantes.map((p, i) => (
                 <div key={i} className="text-sm">
                   <span className="font-medium text-slate-700">{p.nombre}</span>
                   <span className="text-slate-400"> · {p.rol}</span>
@@ -500,7 +511,6 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
           )}
         </div>
 
-        {/* Acciones */}
         {esAdmin && (
           <div className="flex items-center gap-1 shrink-0">
             {estado === 'disponible' && (
@@ -519,7 +529,6 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
               </button>
             )}
 
-            {/* Editar siempre disponible para admin */}
             {estado !== 'omitida' && (
               <button
                 onClick={onEditar}
@@ -530,7 +539,6 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
               </button>
             )}
 
-            {/* Omitir o eliminar */}
             {estado !== 'completada' && estado !== 'omitida' && !confirmarEliminar && (
               onEliminar ? (
                 <button
@@ -585,10 +593,7 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
   function handleSubmit(e) {
     e.preventDefault()
     if (!form.titulo.trim()) return
-    onGuardar({
-      ...form,
-      plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null,
-    })
+    onGuardar({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null })
   }
 
   return (
@@ -601,12 +606,7 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Título *</label>
-            <input
-              value={form.titulo}
-              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              className={inputCls}
-              autoFocus
-            />
+            <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} autoFocus />
           </div>
 
           <div>
@@ -619,26 +619,14 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
           {!form.esCliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Descripción interna</label>
-              <textarea
-                value={form.descripcion}
-                onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-                className={inputCls + ' resize-none'}
-                rows={3}
-                placeholder="Instrucciones para el equipo..."
-              />
+              <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} className={inputCls + ' resize-none'} rows={3} placeholder="Instrucciones para el equipo..." />
             </div>
           )}
 
           {form.esCliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Instrucciones para el cliente</label>
-              <textarea
-                value={form.instruccionesCliente}
-                onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })}
-                className={inputCls + ' resize-none'}
-                rows={4}
-                placeholder="Texto que verá el cliente..."
-              />
+              <textarea value={form.instruccionesCliente} onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })} className={inputCls + ' resize-none'} rows={4} placeholder="Texto que verá el cliente..." />
             </div>
           )}
 
@@ -712,13 +700,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Título *</label>
-            <input
-              value={form.titulo}
-              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              className={inputCls}
-              placeholder="Nombre de la tarea..."
-              autoFocus
-            />
+            <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} placeholder="Nombre de la tarea..." autoFocus />
           </div>
 
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -736,13 +718,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Descripción interna</label>
-                <textarea
-                  value={form.descripcion}
-                  onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-                  className={inputCls + ' resize-none'}
-                  rows={3}
-                  placeholder="¿Qué hay que hacer exactamente?"
-                />
+                <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} className={inputCls + ' resize-none'} rows={3} placeholder="¿Qué hay que hacer exactamente?" />
               </div>
             </>
           )}
@@ -751,13 +727,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Instrucciones para el cliente</label>
-                <textarea
-                  value={form.instruccionesCliente}
-                  onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })}
-                  className={inputCls + ' resize-none'}
-                  rows={4}
-                  placeholder="Texto que verá el cliente en su portal..."
-                />
+                <textarea value={form.instruccionesCliente} onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })} className={inputCls + ' resize-none'} rows={4} placeholder="Texto que verá el cliente en su portal..." />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Plazo sugerido (horas)</label>
@@ -802,14 +772,13 @@ function LinksClienteEditor({ links, onGuardar, onCrearDrive, driveEstado, drive
   const [form, setForm] = useState({ drive: links.drive || '', brief: links.brief || '', boceto: links.boceto || '', diseno: links.diseno || '' })
   const [guardado, setGuardado] = useState(false)
 
-  // Sync cuando cambian los links externos (ej. después de crear Drive)
-  useState(() => {
+  useEffect(() => {
     setForm({ drive: links.drive || '', brief: links.brief || '', boceto: links.boceto || '', diseno: links.diseno || '' })
   }, [links])
 
-  function handleGuardar(e) {
+  async function handleGuardar(e) {
     e.preventDefault()
-    onGuardar(form)
+    await onGuardar(form)
     setGuardado(true)
     setTimeout(() => setGuardado(false), 2000)
   }
@@ -891,20 +860,10 @@ function ModalLink({ tareaId, linkTipo, titulo, valorActual, onCompletar, onCerr
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">{info.label} *</label>
-            <input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder={info.placeholder}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400"
-              autoFocus
-            />
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={info.placeholder} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400" autoFocus />
           </div>
           <div className="flex gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={!url.trim()}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
-            >
+            <button type="submit" disabled={!url.trim()} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Completar y guardar link
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">

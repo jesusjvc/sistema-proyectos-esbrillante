@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
-import { getProyectoPorSlug, completarTarea, calcularAvance, getFaseActual, getSession, formatFechaHora } from '../../data/storage'
+import { useAuth } from '../../context/AuthContext'
+import { getProyecto, completarTarea } from '../../data/api'
+import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle,
@@ -11,25 +13,40 @@ import {
 export default function ProyectoEquipo() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const session = getSession()
-  const [proyecto, setProyecto] = useState(() => getProyectoPorSlug(id))
+  const { user } = useAuth()
+  const [proyecto, setProyecto] = useState(null)
   const [faseAbierta, setFaseAbierta] = useState(null)
   const [tareaExpandida, setTareaExpandida] = useState(null)
   const [copiado, setCopiado] = useState(null)
 
-  if (!proyecto) { navigate('/equipo'); return null }
+  useEffect(() => {
+    getProyecto(id).then(setProyecto).catch(() => navigate('/equipo'))
+  }, [id])
+
+  async function refresh() {
+    const p = await getProyecto(id)
+    setProyecto(p)
+  }
+
+  if (!proyecto) {
+    return (
+      <Layout titulo="Proyecto" volver="/equipo">
+        <div className="flex justify-center py-12">
+          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </Layout>
+    )
+  }
 
   const fases = proyecto.proyecto?.fases || FASES_WEB
   const faseActual = getFaseActual(proyecto)
   const avance = calcularAvance(proyecto)
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
 
-  function refresh() { setProyecto(getProyectoPorSlug(id)) }
-
-  function marcarCompleta(tareaId) {
-    completarTarea(proyecto.id, tareaId, session.nombre)
+  async function marcarCompleta(tareaId) {
+    await completarTarea(proyecto.slug, tareaId)
     setTareaExpandida(null)
-    refresh()
+    await refresh()
   }
 
   function toggleExpandida(tareaId) {
@@ -106,7 +123,7 @@ export default function ProyectoEquipo() {
                 <div className="border-t border-slate-100">
                   {fase.tareas.map((t) => {
                     const est = estadoCalculado(t)
-                    const puedoCompletar = est === 'disponible' && !t.soloAdmin && (!t.soloKarlaOAdmin || session.esKarla)
+                    const puedoCompletar = est === 'disponible' && !t.soloAdmin && (!t.soloKarlaOAdmin || user?.esKarla)
                     const expandida = tareaExpandida === t.id
                     const hayDetalle = tieneDetalle(t)
 
