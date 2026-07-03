@@ -21,7 +21,7 @@ export default function VistaCliente() {
       setProyecto(p)
       setEstado('ok')
     } catch (err) {
-      if (err.status === 403) setEstado('login')
+      if (err.status === 401 || err.status === 403) setEstado('login')
       else navigate('/cliente')
     }
   }
