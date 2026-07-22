@@ -32,16 +32,19 @@ async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
-// Decide en qué fase y en qué posición (orden) cae una tarea nueva.
+// Decide en qué fase y en qué posición (orden) cae una tarea nueva (o una
+// existente que se está reposicionando, vía excluirId para no interferir
+// con su propia posición anterior).
 // Si se da antesDeTareaId/despuesDeTareaId, la fase se toma de esa tarea de
 // referencia (ignora el parámetro fase) y se inserta justo junto a ella.
 // Si no, se agrega al final de la fase indicada (o la fase actual del proyecto).
-function resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId }) {
+function resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId }, excluirId = null) {
   const refId = antesDeTareaId || despuesDeTareaId
   if (refId) {
+    if (refId === excluirId) return { error: 'Una tarea no puede posicionarse antes/después de sí misma.' }
     const ref = p.tareas.find((t) => t.id === refId)
     if (!ref) return { error: `No se encontró la tarea de referencia "${refId}".` }
-    const tareasFase = p.tareas.filter((t) => t.fase === ref.fase).sort((a, b) => a.orden - b.orden)
+    const tareasFase = p.tareas.filter((t) => t.fase === ref.fase && t.id !== excluirId).sort((a, b) => a.orden - b.orden)
     const orden = antesDeTareaId ? ordenAntesDe(tareasFase, ref) : ordenDespuesDe(tareasFase, ref)
     return { faseFinal: ref.fase, orden }
   }
@@ -363,7 +366,7 @@ function buildServer() {
     'editar_actividad',
     {
       title: 'Editar actividad o solicitud',
-      description: 'Corrige el título, descripción, instrucciones al cliente o plazo de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden.',
+      description: 'Corrige el título, descripción, instrucciones, plazo o posición de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden. Para reordenarla (ej. corregir una actividad que quedó después de "revisión" cuando debía ir antes), pasa antesDeTareaId o despuesDeTareaId — mueve la tarea a esa posición, incluso a otra fase si la tarea de referencia está en otra fase.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a editar'),
@@ -371,9 +374,11 @@ function buildServer() {
         descripcion: z.string().optional().describe('Nueva descripción interna'),
         instrucciones: z.string().optional().describe('Nuevas instrucciones para el cliente (solo aplica a solicitudes al cliente)'),
         plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
+        antesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo antes de otra (por ID)'),
+        despuesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo después de otra (por ID)'),
       },
     },
-    async ({ slug, tareaId, titulo, descripcion, instrucciones, plazoHoras }) => {
+    async ({ slug, tareaId, titulo, descripcion, instrucciones, plazoHoras, antesDeTareaId, despuesDeTareaId }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -385,6 +390,13 @@ function buildServer() {
       if (descripcion !== undefined) data.descripcion = descripcion
       if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
+
+      if (antesDeTareaId || despuesDeTareaId) {
+        const posicion = resolverFaseYOrden(p, { antesDeTareaId, despuesDeTareaId }, tareaId)
+        if (posicion.error) return fail(posicion.error)
+        data.fase = posicion.faseFinal
+        data.orden = posicion.orden
+      }
 
       if (!Object.keys(data).length) return fail('No se especificó ningún campo para editar.')
 
