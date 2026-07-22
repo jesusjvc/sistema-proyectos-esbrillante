@@ -2,6 +2,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin, requireAdminOrApiKey } from '../middleware/auth.js'
 import { generarSlug } from '../lib/slug.js'
+import { emitirCambio } from '../lib/eventos.js'
 import tareasRouter from './tareas.js'
 
 const router = Router()
@@ -120,6 +121,7 @@ router.post('/', requireAdminOrApiKey, async (req, res) => {
       return tx.proyecto.findUnique({ where: { id: p.id }, include: INCLUDE })
     })
 
+    emitirCambio(result.id)
     res.status(201).json(result)
   } catch (err) {
     console.error(err)
@@ -133,6 +135,7 @@ router.delete('/:slug', requireAdminOrApiKey, async (req, res) => {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
     await prisma.proyecto.delete({ where: { id: p.id } })
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -148,6 +151,7 @@ router.put('/:slug/links', requireAuth, async (req, res) => {
 
     const linksCliente = { ...(p.linksCliente || {}), ...req.body }
     await prisma.proyecto.update({ where: { id: p.id }, data: { linksCliente } })
+    emitirCambio(p.id)
     res.json({ ok: true, linksCliente })
   } catch (err) {
     console.error(err)
@@ -165,6 +169,7 @@ router.post('/:slug/anticipo', requireAdmin, async (req, res) => {
     await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'activo', proyecto: { ...p.proyecto, anticipoConfirmado: true }, tiempos } })
     await logEntry(p.id, req.user.nombre, 'Anticipo confirmado')
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -191,6 +196,7 @@ router.post('/:slug/pausa', requireAuth, async (req, res) => {
 
     await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'en_pausa', tiempos } })
     await logEntry(p.id, req.user.nombre, 'Proyecto en pausa')
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -210,6 +216,7 @@ router.delete('/:slug/pausa', requireAuth, async (req, res) => {
 
     await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'activo', tiempos } })
     await logEntry(p.id, req.user.nombre, 'Pausa terminada')
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -226,6 +233,7 @@ router.post('/:slug/cerrar', requireAdmin, async (req, res) => {
     const tiempos = { ...(p.tiempos || {}), cierre: new Date().toISOString() }
     await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'completado', tiempos } })
     await logEntry(p.id, req.user.nombre, 'Proyecto cerrado')
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)

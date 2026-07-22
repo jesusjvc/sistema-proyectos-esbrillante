@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
 import { formatFechaHora } from '../../data/storage'
+import { useEventosGlobal } from '../../hooks/useEventos'
 import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
 
 export default function MisTareas() {
@@ -20,6 +21,7 @@ export default function MisTareas() {
   }
 
   useEffect(() => { cargar() }, [])
+  useEventosGlobal(true, cargar)
 
   async function handleIniciar(slug, tareaId) {
     await iniciarTarea(slug, tareaId)

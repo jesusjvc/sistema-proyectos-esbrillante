@@ -8,6 +8,7 @@ import { requireApiKey } from '../middleware/auth.js'
 import { calcularAvance, getFaseActual } from '../lib/avance.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
+import { emitirCambio } from '../lib/eventos.js'
 
 const router = Router()
 
@@ -149,6 +150,7 @@ function buildServer() {
         },
       })
       await logEntry(p.id, USUARIO_MCP, 'Proyecto creado', `Paquete: ${paqueteFinal}`)
+      emitirCambio(p.id)
 
       const avisoAnticipo = anticipoConfirmado ? '' : ' Status: "pendiente_anticipo" — confirma el anticipo desde el panel admin cuando corresponda.'
       return ok(`Proyecto "${clienteNombre}" creado. slug: "${p.slug}". Contraseña del portal del cliente: "${password}".${avisoAnticipo}`)
@@ -189,6 +191,7 @@ function buildServer() {
         data: { proyecto: { ...p.proyecto, fases: fasesFinal } },
       })
       await logEntry(p.id, USUARIO_MCP, 'Fase actualizada', `Fase ${numero} — ${faseActualizada.nombre}`)
+      emitirCambio(p.id)
 
       return ok(`Fase ${numero} ("${faseActualizada.nombre}") actualizada.`)
     },
@@ -283,6 +286,7 @@ function buildServer() {
         },
       })
       await logEntry(p.id, USUARIO_MCP, marcarCompletada ? 'Tarea agregada y completada' : 'Tarea agregada', titulo)
+      emitirCambio(p.id)
 
       return ok(`Actividad "${titulo}" registrada en fase ${faseFinal}${marcarCompletada ? ' y marcada como completada' : ' (pendiente)'}.`)
     },
@@ -328,6 +332,7 @@ function buildServer() {
         },
       })
       await logEntry(p.id, USUARIO_MCP, 'Solicitud al cliente creada', titulo)
+      emitirCambio(p.id)
 
       return ok(`Se creó la solicitud "${titulo}" para el cliente en fase ${faseFinal}.`)
     },
@@ -355,6 +360,7 @@ function buildServer() {
         data: { estado: 'en_proceso', asignadoA: USUARIO_MCP },
       })
       await logEntry(p.id, USUARIO_MCP, 'Tarea en proceso', tarea.titulo)
+      emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" marcada en proceso.`)
     },
@@ -383,6 +389,7 @@ function buildServer() {
         data: { estado: 'completada', completadaPor: USUARIO_MCP, completadaEn: new Date() },
       })
       await logEntry(p.id, USUARIO_MCP, 'Tarea completada', respuesta ? `${tarea.titulo} — Respuesta: ${respuesta}` : tarea.titulo)
+      emitirCambio(p.id)
 
       return ok(`Tarea "${tarea.titulo}" marcada como completada.${respuesta ? ' Respuesta registrada en el log.' : ''}`)
     },
@@ -428,6 +435,7 @@ function buildServer() {
 
       await prisma.tarea.update({ where: { id: tareaId }, data })
       await logEntry(p.id, USUARIO_MCP, 'Tarea editada', tarea.titulo)
+      emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" actualizada.`)
     },
@@ -453,6 +461,7 @@ function buildServer() {
 
       await prisma.tarea.update({ where: { id: tareaId }, data: { estado: 'omitida' } })
       await logEntry(p.id, USUARIO_MCP, 'Tarea cancelada', motivo ? `${tarea.titulo} — ${motivo}` : tarea.titulo)
+      emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" cancelada.`)
     },
@@ -473,6 +482,7 @@ function buildServer() {
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
       await logEntry(p.id, USUARIO_MCP, 'Nota', mensaje)
+      emitirCambio(p.id)
 
       return ok('Nota interna registrada.')
     },

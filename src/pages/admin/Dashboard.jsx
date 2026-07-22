@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyectos, confirmarAnticipo } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES } from '../../data/paquetes'
+import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight } from 'lucide-react'
 
 const STATUS_CONFIG = {
@@ -31,6 +32,7 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => { cargar() }, [])
+  useEventosGlobal(true, cargar)
 
   async function handleConfirmarAnticipo(slug) {
     await confirmarAnticipo(slug)

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getProyectoCliente, loginCliente, completarTareaCliente } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
+import { useEventosProyecto } from '../../hooks/useEventos'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X } from 'lucide-react'
 
 export default function VistaCliente() {
@@ -27,6 +28,7 @@ export default function VistaCliente() {
   }
 
   useEffect(() => { cargar() }, [id])
+  useEventosProyecto(id, estado === 'ok', cargar)
 
   async function handleLogin(e) {
     e.preventDefault()

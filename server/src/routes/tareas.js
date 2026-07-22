@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { ordenAlFinal } from '../lib/orden.js'
+import { emitirCambio } from '../lib/eventos.js'
 
 const router = Router({ mergeParams: true })
 
@@ -34,6 +35,7 @@ router.post('/:tareaId/iniciar', requireAuth, async (req, res) => {
     })
     await logEntry(p.id, usuario, 'Tarea en proceso', tarea.titulo)
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -59,6 +61,7 @@ router.post('/:tareaId/completar', requireAuth, async (req, res) => {
     })
     await logEntry(p.id, usuario, 'Tarea completada', tarea.titulo)
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -84,6 +87,7 @@ router.post('/:tareaId/reabrir', requireAuth, async (req, res) => {
     })
     await logEntry(p.id, usuario, 'Tarea reabierta', tarea.titulo)
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -106,6 +110,7 @@ router.post('/:tareaId/omitir', requireAuth, async (req, res) => {
     await prisma.tarea.update({ where: { id: tareaId }, data: { estado: 'omitida' } })
     await logEntry(p.id, usuario, 'Tarea omitida', tarea.titulo)
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -131,6 +136,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
     const tarea = await prisma.tarea.update({ where: { id: tareaId }, data })
     await logEntry(p.id, usuario, 'Tarea editada', tarea.titulo)
 
+    emitirCambio(p.id)
     res.json(tarea)
   } catch (err) {
     console.error(err)
@@ -170,6 +176,7 @@ router.post('/', requireAuth, async (req, res) => {
     })
     await logEntry(p.id, usuario, 'Tarea agregada', nueva.titulo)
 
+    emitirCambio(p.id)
     res.status(201).json(nueva)
   } catch (err) {
     console.error(err)
@@ -193,6 +200,7 @@ router.delete('/:tareaId', requireAuth, async (req, res) => {
     await prisma.tarea.delete({ where: { id: tareaId } })
     await logEntry(p.id, usuario, 'Tarea eliminada', tarea.titulo)
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)

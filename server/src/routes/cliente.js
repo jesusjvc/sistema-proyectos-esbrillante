@@ -4,6 +4,7 @@ import prisma from '../lib/prisma.js'
 import { firmarToken, verificarToken } from '../lib/jwt.js'
 import { requireClienteToken } from '../middleware/auth.js'
 import { obtenerOCrearCarpetaProyecto, subirArchivo, driveConfigurado } from '../lib/drive.js'
+import { emitirCambio } from '../lib/eventos.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
@@ -86,6 +87,7 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
       data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Tarea completada por cliente', detalle: partesDetalle.join(' — ') },
     })
 
+    emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)

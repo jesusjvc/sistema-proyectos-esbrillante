@@ -10,6 +10,7 @@ import {
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { generarMensajeInicio } from '../../data/mensajes'
+import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
@@ -39,6 +40,8 @@ export default function DetalleProyecto() {
     const p = await getProyecto(id)
     setProyecto(p)
   }
+
+  useEventosProyecto(id, true, refresh)
 
   if (!proyecto) {
     return (

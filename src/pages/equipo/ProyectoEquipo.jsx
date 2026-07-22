@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyecto, iniciarTarea, completarTarea } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
+import { useEventosProyecto } from '../../hooks/useEventos'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -27,6 +28,8 @@ export default function ProyectoEquipo() {
     const p = await getProyecto(id)
     setProyecto(p)
   }
+
+  useEventosProyecto(id, true, refresh)
 
   if (!proyecto) {
     return (
