@@ -127,7 +127,7 @@ router.post('/', requireAdminOrApiKey, async (req, res) => {
 })
 
 // DELETE /api/proyectos/:slug
-router.delete('/:slug', requireAdmin, async (req, res) => {
+router.delete('/:slug', requireAdminOrApiKey, async (req, res) => {
   try {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
