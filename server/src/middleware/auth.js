@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto'
 import { verificarToken } from '../lib/jwt.js'
 
 export function requireAuth(req, res, next) {
@@ -16,6 +17,21 @@ export function requireAdmin(req, res, next) {
     if (req.user.rol !== 'ADMIN') return res.status(403).json({ error: 'Solo Admin' })
     next()
   })
+}
+
+export function requireApiKey(req, res, next) {
+  const header = req.headers.authorization || ''
+  const [scheme, token] = header.split(' ')
+  const expected = process.env.MCP_API_KEY
+
+  if (scheme !== 'Bearer' || !token || !expected) return res.status(401).json({ error: 'No autenticado' })
+
+  const a = Buffer.from(token)
+  const b = Buffer.from(expected)
+  const valido = a.length === b.length && timingSafeEqual(a, b)
+  if (!valido) return res.status(401).json({ error: 'No autenticado' })
+
+  next()
 }
 
 export function requireClienteToken(req, res, next) {

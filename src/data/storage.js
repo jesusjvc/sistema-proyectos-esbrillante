@@ -354,12 +354,13 @@ export function calcularEstadoTareas(proyecto) {
 
 export function getFaseActual(proyecto) {
   const tareas = proyecto.tareas
-  for (let fase = 1; fase <= 7; fase++) {
+  const totalFases = proyecto.proyecto?.fases?.length || 7
+  for (let fase = 1; fase <= totalFases; fase++) {
     const tareasF = tareas.filter((t) => t.fase === fase && t.estado !== 'omitida')
     const incompletas = tareasF.filter((t) => t.estado !== 'completada')
     if (incompletas.length > 0) return fase
   }
-  return 7
+  return totalFases
 }
 
 // ─── Tareas: edición y creación custom ────────────────────────────────────
