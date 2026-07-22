@@ -75,7 +75,7 @@ Esto crea/actualiza `.mcp.json` en la raíz del repo (los servidores van bajo la
 
 `${ESBRILLANTE_MCP_KEY}` se resuelve en tiempo de conexión desde la variable de entorno del shell — nunca queda la key en texto plano en el archivo, así que `.mcp.json` sí se puede versionar. Cada quien que clone el repo necesita exportar su propia `ESBRILLANTE_MCP_KEY` localmente para que el servidor conecte.
 
-Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 9 tools.
+Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 10 tools.
 
 ## 3. Identificar (o crear) el proyecto
 
@@ -101,7 +101,10 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `completar_actividad(slug, tareaId, respuesta?)` | Marcar como lista una tarea ya existente (del equipo o del cliente). Si estás cerrando una solicitud al cliente porque respondió por otro canal, pasa `respuesta` para dejarlo registrado. |
 | `editar_actividad(slug, tareaId, titulo?, descripcion?, instrucciones?, plazoHoras?)` | Corregir una tarea ya creada (equipo o cliente) sin tener que cancelarla y volver a crearla |
 | `cancelar_actividad(slug, tareaId, motivo?)` | Cancelar una actividad o solicitud que ya no aplica — queda omitida, no se borra |
+| `actualizar_fase(slug, numero, fechaEstimada?, requierePago?, pagoConfirmado?)` | Ajustar la fecha estimada o el estado de pago de una fase — útil en proyectos con pagos parciales por fase, donde una sola "fecha de entrega" no refleja la realidad |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
+
+**Proyectos con pagos parciales por fase:** si en `crear_proyecto` cada fase incluye `fechaEstimada`/`requierePago`/`pagoConfirmado`, el portal del cliente reemplaza la fecha única de entrega por un timeline con la fecha estimada de cada fase y un badge "Esperando confirmación de pago" en la que esté bloqueada. Usa `actualizar_fase` para ir ajustando esto conforme avanza el proyecto (ej. marcar `pagoConfirmado:true` cuando llegue el pago de la Fase 2).
 
 **Limitación conocida (aún no soportada):** no hay forma de adjuntar archivos a `solicitar_al_cliente` — si necesitas que el cliente suba o revise un archivo, pega un link (Drive, etc.) directo en `instrucciones`.
 

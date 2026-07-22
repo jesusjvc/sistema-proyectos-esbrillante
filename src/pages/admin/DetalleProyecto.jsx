@@ -297,6 +297,12 @@ export default function DetalleProyecto() {
                     </div>
                     <span className="font-medium text-slate-800">Fase {fase.numero} — {fase.nombre}</span>
                     <span className="text-xs text-slate-400">{completadas}/{total}</span>
+                    {fase.fechaEstimada && <span className="text-xs text-slate-400">· est. {formatFecha(fase.fechaEstimada)}</span>}
+                    {fase.requierePago && !fase.pagoConfirmado && (
+                      <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                        <Lock size={10} /> Esperando pago
+                      </span>
+                    )}
                   </div>
                   {abierta ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                 </button>

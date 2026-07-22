@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getProyectoCliente, loginCliente, completarTareaCliente } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen } from 'lucide-react'
+import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock } from 'lucide-react'
 
 export default function VistaCliente() {
   const { id } = useParams()
@@ -101,6 +101,7 @@ export default function VistaCliente() {
   const faseActual = getFaseActual(proyecto)
   const fases = proyecto.proyecto.fases || FASES_WEB
   const faseActualNombre = fases.find((f) => f.numero === faseActual)?.nombre || ''
+  const tieneFechasPorFase = fases.some((f) => f.fechaEstimada)
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
 
   const tareasPendientesCliente = proyecto.tareas.filter((t) => {
@@ -170,22 +171,26 @@ export default function VistaCliente() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-              <Calendar size={18} className="text-violet-600" />
+        {tieneFechasPorFase ? (
+          <FasesConFechas fases={fases} faseActual={faseActual} completado={completado} fechaCierre={proyecto.tiempos.cierre} />
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
+                <Calendar size={18} className="text-violet-600" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
+                <div className="text-xl font-bold text-slate-800">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
+                {completado && proyecto.tiempos.cierre && <div className="text-sm text-emerald-600 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
+              </div>
             </div>
-            <div className="flex-1">
-              <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
-              <div className="text-xl font-bold text-slate-800">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
-              {completado && proyecto.tiempos.cierre && <div className="text-sm text-emerald-600 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
+            <div className="mt-3 flex items-start gap-2 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2.5">
+              <Info size={12} className="shrink-0 mt-0.5" />
+              <span>Esta fecha es un estimado. Te avisaremos con anticipación si hay algún cambio.</span>
             </div>
           </div>
-          <div className="mt-3 flex items-start gap-2 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2.5">
-            <Info size={12} className="shrink-0 mt-0.5" />
-            <span>Esta fecha es un estimado. Te avisaremos con anticipación si hay algún cambio.</span>
-          </div>
-        </div>
+        )}
 
         <RecursosProyecto links={proyecto.linksCliente || {}} />
 
@@ -280,6 +285,42 @@ export default function VistaCliente() {
           <p className="font-semibold text-slate-500">Equipo EsBrillante</p>
         </div>
       </main>
+    </div>
+  )
+}
+
+function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Fechas estimadas por fase</div>
+      <div className="space-y-3">
+        {fases.map((f) => {
+          const bloqueadaPorPago = !!f.requierePago && !f.pagoConfirmado
+          const esActual = f.numero === faseActual && !completado
+          const yaPaso = f.numero < faseActual || completado
+          return (
+            <div key={f.numero} className="flex items-start gap-3">
+              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-violet-500' : 'bg-slate-200'}`} />
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium ${esActual ? 'text-slate-800' : yaPaso ? 'text-slate-500' : 'text-slate-400'}`}>{f.nombre}</div>
+                {f.fechaEstimada && <div className="text-xs text-slate-400 mt-0.5">Estimado: {formatFecha(f.fechaEstimada)}</div>}
+              </div>
+              {bloqueadaPorPago && (
+                <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full shrink-0">
+                  <Lock size={10} /> Esperando confirmación de pago
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {completado && fechaCierre && (
+        <div className="mt-3 text-sm text-emerald-600 font-medium">✓ Entregado el {formatFecha(fechaCierre)}</div>
+      )}
+      <div className="mt-3 flex items-start gap-2 text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2.5">
+        <Info size={12} className="shrink-0 mt-0.5" />
+        <span>Estas fechas son un estimado y pueden ajustarse. Te avisaremos si hay algún cambio.</span>
+      </div>
     </div>
   )
 }

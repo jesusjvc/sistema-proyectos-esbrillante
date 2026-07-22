@@ -68,8 +68,14 @@ function buildServer() {
         contactoNombre: z.string().optional().describe('Nombre del contacto principal del cliente'),
         correo: z.string().optional().describe('Correo del contacto principal'),
         paquete: z.string().optional().describe('Nombre del paquete/tipo de proyecto. Default: "Personalizado"'),
-        fases: z.array(z.object({ numero: z.number().int(), nombre: z.string() })).optional()
-          .describe('Fases del proyecto en orden, ej. [{"numero":1,"nombre":"Fase 1 — Auth"}]. Si se omite, usa un default genérico de 3 fases (Planeación/Desarrollo/Entrega).'),
+        fases: z.array(z.object({
+          numero: z.number().int(),
+          nombre: z.string(),
+          fechaEstimada: z.string().optional().describe('Fecha estimada de esa fase, YYYY-MM-DD'),
+          requierePago: z.boolean().optional().describe('true si esta fase no arranca hasta confirmar un pago adicional (ej. Parte A de Fase 2)'),
+          pagoConfirmado: z.boolean().optional().describe('true si ese pago ya se confirmó'),
+        })).optional()
+          .describe('Fases del proyecto en orden, ej. [{"numero":1,"nombre":"Fase 1 — Auth","fechaEstimada":"2026-08-15"}]. Si se omite, usa un default genérico de 3 fases (Planeación/Desarrollo/Entrega). Úsalo para proyectos con pagos parciales por fase en vez de una sola fechaEstimadaEntrega — así el cliente ve el estimado real de cada etapa y cuál está esperando pago.'),
         fechaInicio: z.string().optional().describe('Fecha de inicio en formato YYYY-MM-DD. Default: hoy'),
         fechaEstimadaEntrega: z.string().optional().describe('Fecha estimada de entrega en formato YYYY-MM-DD'),
         anticipoConfirmado: z.boolean().describe('true SOLO si consta que el anticipo/pago inicial ya fue confirmado y recibido. Si no estás seguro, usa false.'),
@@ -110,6 +116,45 @@ function buildServer() {
 
       const avisoAnticipo = anticipoConfirmado ? '' : ' Status: "pendiente_anticipo" — confirma el anticipo desde el panel admin cuando corresponda.'
       return ok(`Proyecto "${clienteNombre}" creado. slug: "${p.slug}". Contraseña del portal del cliente: "${password}".${avisoAnticipo}`)
+    },
+  )
+
+  server.registerTool(
+    'actualizar_fase',
+    {
+      title: 'Actualizar fecha o estado de pago de una fase',
+      description: 'Actualiza la fecha estimada y/o el estado de pago de una fase ya existente en un proyecto (ej. marcar que se confirmó el pago que desbloquea la Fase 2, o ajustar su fecha estimada). Solo actualiza los campos que se manden. Visible de inmediato en el portal del cliente.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        numero: z.number().int().describe('Número de la fase a actualizar'),
+        fechaEstimada: z.string().optional().describe('Nueva fecha estimada, YYYY-MM-DD'),
+        requierePago: z.boolean().optional().describe('true si esta fase requiere confirmar un pago para arrancar'),
+        pagoConfirmado: z.boolean().optional().describe('true si ese pago ya se confirmó (desbloquea la fase en el portal del cliente)'),
+      },
+    },
+    async ({ slug, numero, fechaEstimada, requierePago, pagoConfirmado }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const fases = p.proyecto?.fases || []
+      const idx = fases.findIndex((f) => f.numero === numero)
+      if (idx === -1) return fail(`El proyecto "${slug}" no tiene una fase número ${numero}.`)
+
+      const faseActualizada = { ...fases[idx] }
+      if (fechaEstimada !== undefined) faseActualizada.fechaEstimada = fechaEstimada
+      if (requierePago !== undefined) faseActualizada.requierePago = requierePago
+      if (pagoConfirmado !== undefined) faseActualizada.pagoConfirmado = pagoConfirmado
+
+      const fasesFinal = [...fases]
+      fasesFinal[idx] = faseActualizada
+
+      await prisma.proyecto.update({
+        where: { id: p.id },
+        data: { proyecto: { ...p.proyecto, fases: fasesFinal } },
+      })
+      await logEntry(p.id, USUARIO_MCP, 'Fase actualizada', `Fase ${numero} — ${faseActualizada.nombre}`)
+
+      return ok(`Fase ${numero} ("${faseActualizada.nombre}") actualizada.`)
     },
   )
 
