@@ -14,19 +14,35 @@ Esta es la key compartida (global, una sola para todos los proyectos) que usará
 
 Ya está configurada en producción (app `proyectos-backend` en Coolify, `https://api-proyectos.esbrillante.mx`).
 
-## 2. Agregar el MCP en cada repo cliente
+## 2. Agregar el MCP
 
-Desde la raíz del repo (ej. el repo de E&E Shipping), con la key exportada en el shell:
+Con la key exportada en el shell:
 
 ```bash
 export ESBRILLANTE_MCP_KEY="<la misma MCP_API_KEY del backend>"
+```
 
+Elige el scope (`-s/--scope`) según el caso:
+
+**Opción recomendada — `user`: disponible en todos tus repos de esta máquina, sin repetir el setup por proyecto.**
+
+```bash
+claude mcp add --transport http esbrillante-seguimiento https://api-proyectos.esbrillante.mx/mcp \
+  --header "Authorization: Bearer ${ESBRILLANTE_MCP_KEY}" \
+  --scope user
+```
+
+No genera ningún archivo en el repo — queda guardado en tu `~/.claude.json` (config global del usuario).
+
+**Alternativa — `project`: solo ese repo, versionado en `.mcp.json`** (útil si otras personas del equipo también deben poder usarlo desde ese repo específico):
+
+```bash
 claude mcp add --transport http esbrillante-seguimiento https://api-proyectos.esbrillante.mx/mcp \
   --header "Authorization: Bearer ${ESBRILLANTE_MCP_KEY}" \
   --scope project
 ```
 
-Esto crea/actualiza `.mcp.json` en la raíz del repo con este contenido (los servidores van bajo la clave `mcpServers`):
+Esto crea/actualiza `.mcp.json` en la raíz del repo (los servidores van bajo la clave `mcpServers`):
 
 ```json
 {
