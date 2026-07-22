@@ -16,10 +16,16 @@ Ya está configurada en producción (app `proyectos-backend` en Coolify, `https:
 
 ## 2. Agregar el MCP
 
-Con la key exportada en el shell:
+Con la key exportada en el shell — la sintaxis cambia según tu shell:
 
 ```bash
+# bash / zsh
 export ESBRILLANTE_MCP_KEY="<la misma MCP_API_KEY del backend>"
+```
+
+```fish
+# fish
+set -x ESBRILLANTE_MCP_KEY "<la misma MCP_API_KEY del backend>"
 ```
 
 Elige el scope (`-s/--scope`) según el caso:
@@ -27,8 +33,16 @@ Elige el scope (`-s/--scope`) según el caso:
 **Opción recomendada — `user`: disponible en todos tus repos de esta máquina, sin repetir el setup por proyecto.**
 
 ```bash
+# bash / zsh
 claude mcp add --transport http esbrillante-seguimiento https://api-proyectos.esbrillante.mx/mcp \
   --header "Authorization: Bearer ${ESBRILLANTE_MCP_KEY}" \
+  --scope user
+```
+
+```fish
+# fish (sin llaves en la variable)
+claude mcp add --transport http esbrillante-seguimiento https://api-proyectos.esbrillante.mx/mcp \
+  --header "Authorization: Bearer $ESBRILLANTE_MCP_KEY" \
   --scope user
 ```
 
@@ -37,6 +51,7 @@ No genera ningún archivo en el repo — queda guardado en tu `~/.claude.json` (
 **Alternativa — `project`: solo ese repo, versionado en `.mcp.json`** (útil si otras personas del equipo también deben poder usarlo desde ese repo específico):
 
 ```bash
+# bash / zsh — en fish, usa $ESBRILLANTE_MCP_KEY sin llaves como arriba
 claude mcp add --transport http esbrillante-seguimiento https://api-proyectos.esbrillante.mx/mcp \
   --header "Authorization: Bearer ${ESBRILLANTE_MCP_KEY}" \
   --scope project
