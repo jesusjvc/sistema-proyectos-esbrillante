@@ -11,8 +11,11 @@ export function getFaseActual(proyecto) {
 
   for (let fase = 1; fase <= totalFases; fase++) {
     const tareasF = tareas.filter((t) => t.fase === fase && t.estado !== 'omitida')
-    const incompletas = tareasF.filter((t) => t.estado !== 'completada')
-    if (incompletas.length > 0) return fase
+    // Una fase sin tareas todavía no cuenta como completada — evita saltar
+    // de largo a la última fase en proyectos con checklist vacío (ej. los
+    // que arma el MCP con actividades libres en vez de un paquete predefinido).
+    const completa = tareasF.length > 0 && tareasF.every((t) => t.estado === 'completada')
+    if (!completa) return fase
   }
   return totalFases
 }

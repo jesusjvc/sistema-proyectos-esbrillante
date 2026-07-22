@@ -357,8 +357,10 @@ export function getFaseActual(proyecto) {
   const totalFases = proyecto.proyecto?.fases?.length || 7
   for (let fase = 1; fase <= totalFases; fase++) {
     const tareasF = tareas.filter((t) => t.fase === fase && t.estado !== 'omitida')
-    const incompletas = tareasF.filter((t) => t.estado !== 'completada')
-    if (incompletas.length > 0) return fase
+    // Una fase sin tareas todavía no cuenta como completada — evita saltar
+    // de largo a la última fase en proyectos con checklist vacío.
+    const completa = tareasF.length > 0 && tareasF.every((t) => t.estado === 'completada')
+    if (!completa) return fase
   }
   return totalFases
 }
