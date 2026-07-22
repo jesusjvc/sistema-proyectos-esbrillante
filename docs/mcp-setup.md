@@ -75,23 +75,26 @@ Esto crea/actualiza `.mcp.json` en la raíz del repo (los servidores van bajo la
 
 `${ESBRILLANTE_MCP_KEY}` se resuelve en tiempo de conexión desde la variable de entorno del shell — nunca queda la key en texto plano en el archivo, así que `.mcp.json` sí se puede versionar. Cada quien que clone el repo necesita exportar su propia `ESBRILLANTE_MCP_KEY` localmente para que el servidor conecte.
 
-Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 6 tools.
+Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 7 tools.
 
-## 3. Identificar el slug del proyecto
+## 3. Identificar (o crear) el proyecto
 
-Cada repo cliente reporta a un proyecto específico del Sistema de Seguimiento (creado antes desde el wizard admin, `NuevoProyecto.jsx`). Para saber el slug, desde Claude Code en ese repo:
+Si el proyecto del repo ya existe en el Sistema de Seguimiento, pide el slug:
 
 ```
 Usa la tool listar_proyectos del MCP esbrillante-seguimiento y dime el slug de <cliente>.
 ```
 
-Guarda ese slug — todas las demás tools lo piden como primer argumento.
+Si no existe todavía, Claude Code puede crearlo directo con `crear_proyecto` — no hace falta pasar por el wizard admin. `anticipoConfirmado` es solo informativo: en `false` el proyecto queda como "pendiente_anticipo" hasta que se confirme el pago desde el panel admin, pero de cualquier forma ya se le puede reportar avance.
+
+Guarda el slug que devuelva — todas las demás tools lo piden como primer argumento.
 
 ## 4. Tools disponibles
 
 | Tool | Uso |
 |---|---|
 | `listar_proyectos` | Ver todos los proyectos activos y su slug |
+| `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
 | `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente |
 | `registrar_actividad(slug, titulo, descripcion?, fase?, completada?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
 | `solicitar_al_cliente(slug, titulo, instrucciones, plazoHoras?, fase?)` | Pedirle algo al cliente — aparece de inmediato en su portal |

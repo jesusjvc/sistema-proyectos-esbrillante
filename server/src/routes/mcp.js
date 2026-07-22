@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import prisma from '../lib/prisma.js'
 import { requireApiKey } from '../middleware/auth.js'
 import { calcularAvance, getFaseActual } from '../lib/avance.js'
+import { generarSlug } from '../lib/slug.js'
 
 const router = Router()
 
@@ -54,6 +55,61 @@ function buildServer() {
         avance: calcularAvance(p),
       }))
       return ok(JSON.stringify(resumen, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'crear_proyecto',
+    {
+      title: 'Crear proyecto',
+      description: 'Da de alta un proyecto nuevo en el Sistema de Seguimiento para poder empezar a reportarle avance. No confirma pagos ni cierra proyectos: anticipoConfirmado es solo informativo (si es false, el proyecto queda en status "pendiente_anticipo" hasta que se confirme desde el panel admin).',
+      inputSchema: {
+        clienteNombre: z.string().describe('Nombre comercial del cliente'),
+        contactoNombre: z.string().optional().describe('Nombre del contacto principal del cliente'),
+        correo: z.string().optional().describe('Correo del contacto principal'),
+        paquete: z.string().optional().describe('Nombre del paquete/tipo de proyecto. Default: "Personalizado"'),
+        fases: z.array(z.object({ numero: z.number().int(), nombre: z.string() })).optional()
+          .describe('Fases del proyecto en orden, ej. [{"numero":1,"nombre":"Fase 1 — Auth"}]. Si se omite, usa un default genérico de 3 fases (Planeación/Desarrollo/Entrega).'),
+        fechaInicio: z.string().optional().describe('Fecha de inicio en formato YYYY-MM-DD. Default: hoy'),
+        fechaEstimadaEntrega: z.string().optional().describe('Fecha estimada de entrega en formato YYYY-MM-DD'),
+        anticipoConfirmado: z.boolean().describe('true SOLO si consta que el anticipo/pago inicial ya fue confirmado y recibido. Si no estás seguro, usa false.'),
+        passwordCliente: z.string().optional().describe('Contraseña de acceso al portal del cliente. Si se omite, se genera una automáticamente.'),
+      },
+    },
+    async ({ clienteNombre, contactoNombre, correo, paquete, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente }) => {
+      const slug = generarSlug(clienteNombre)
+      const fasesFinal = fases?.length ? fases : [
+        { numero: 1, nombre: 'Planeación' },
+        { numero: 2, nombre: 'Desarrollo' },
+        { numero: 3, nombre: 'Entrega' },
+      ]
+      const password = passwordCliente || randomUUID().slice(0, 8)
+      const paqueteFinal = paquete || 'Personalizado'
+
+      const p = await prisma.proyecto.create({
+        data: {
+          slug,
+          status: anticipoConfirmado ? 'activo' : 'pendiente_anticipo',
+          cliente: { nombreComercial: clienteNombre, contactoNombre: contactoNombre || '', correo: correo || '', whatsapp: '', participantes: [] },
+          proyecto: {
+            paquete: paqueteFinal,
+            fases: fasesFinal,
+            extras: [],
+            fechaInicio: fechaInicio || new Date().toISOString().slice(0, 10),
+            fechaEstimadaEntrega: fechaEstimadaEntrega || null,
+            anticipoConfirmado,
+          },
+          condicionesTecnicas: {},
+          equipo: {},
+          passwordCliente: password,
+          linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
+          tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },
+        },
+      })
+      await logEntry(p.id, USUARIO_MCP, 'Proyecto creado', `Paquete: ${paqueteFinal}`)
+
+      const avisoAnticipo = anticipoConfirmado ? '' : ' Status: "pendiente_anticipo" — confirma el anticipo desde el panel admin cuando corresponda.'
+      return ok(`Proyecto "${clienteNombre}" creado. slug: "${p.slug}". Contraseña del portal del cliente: "${password}".${avisoAnticipo}`)
     },
   )
 
