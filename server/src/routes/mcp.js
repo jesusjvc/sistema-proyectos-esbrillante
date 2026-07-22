@@ -38,15 +38,29 @@ async function logEntry(proyectoId, usuario, accion, detalle = '') {
 // Si se da antesDeTareaId/despuesDeTareaId, la fase se toma de esa tarea de
 // referencia (ignora el parámetro fase) y se inserta justo junto a ella.
 // Si no, se agrega al final de la fase indicada (o la fase actual del proyecto).
-function resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId }, excluirId = null) {
+//
+// Tareas creadas antes de que existiera este campo quedaron todas con
+// orden=0 (empatadas) — si detecta empates en la fase, primero renumera
+// esas tareas de forma estable antes de calcular el punto medio, si no
+// insertar "antes/después" de algo empatado no mueve nada de verdad.
+async function resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId }, excluirId = null) {
   const refId = antesDeTareaId || despuesDeTareaId
   if (refId) {
     if (refId === excluirId) return { error: 'Una tarea no puede posicionarse antes/después de sí misma.' }
-    const ref = p.tareas.find((t) => t.id === refId)
-    if (!ref) return { error: `No se encontró la tarea de referencia "${refId}".` }
-    const tareasFase = p.tareas.filter((t) => t.fase === ref.fase && t.id !== excluirId).sort((a, b) => a.orden - b.orden)
+    const refOriginal = p.tareas.find((t) => t.id === refId)
+    if (!refOriginal) return { error: `No se encontró la tarea de referencia "${refId}".` }
+
+    let tareasFase = p.tareas.filter((t) => t.fase === refOriginal.fase && t.id !== excluirId).sort((a, b) => a.orden - b.orden)
+
+    const hayEmpates = new Set(tareasFase.map((t) => t.orden)).size !== tareasFase.length
+    if (hayEmpates) {
+      tareasFase = tareasFase.map((t, idx) => ({ ...t, orden: idx }))
+      await Promise.all(tareasFase.map((t) => prisma.tarea.update({ where: { id: t.id }, data: { orden: t.orden } })))
+    }
+
+    const ref = tareasFase.find((t) => t.id === refId)
     const orden = antesDeTareaId ? ordenAntesDe(tareasFase, ref) : ordenDespuesDe(tareasFase, ref)
-    return { faseFinal: ref.fase, orden }
+    return { faseFinal: refOriginal.fase, orden }
   }
   const faseFinal = fase ?? getFaseActual(p)
   const tareasFase = p.tareas.filter((t) => t.fase === faseFinal)
@@ -235,7 +249,7 @@ function buildServer() {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
-      const posicion = resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
+      const posicion = await resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
       if (posicion.error) return fail(posicion.error)
       const { faseFinal, orden } = posicion
       const marcarCompletada = completada !== false
@@ -281,7 +295,7 @@ function buildServer() {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
-      const posicion = resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
+      const posicion = await resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
       if (posicion.error) return fail(posicion.error)
       const { faseFinal, orden } = posicion
 
@@ -392,7 +406,7 @@ function buildServer() {
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
 
       if (antesDeTareaId || despuesDeTareaId) {
-        const posicion = resolverFaseYOrden(p, { antesDeTareaId, despuesDeTareaId }, tareaId)
+        const posicion = await resolverFaseYOrden(p, { antesDeTareaId, despuesDeTareaId }, tareaId)
         if (posicion.error) return fail(posicion.error)
         data.fase = posicion.faseFinal
         data.orden = posicion.orden
