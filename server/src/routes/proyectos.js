@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
-import { requireAuth, requireAdmin } from '../middleware/auth.js'
+import { requireAuth, requireAdmin, requireAdminOrApiKey } from '../middleware/auth.js'
 import { generarSlug } from '../lib/slug.js'
 import tareasRouter from './tareas.js'
 
@@ -51,7 +51,7 @@ router.get('/:slug', requireAuth, async (req, res) => {
 })
 
 // POST /api/proyectos
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireAdminOrApiKey, async (req, res) => {
   const { cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor } = req.body
   const slug = generarSlug(cliente.nombreComercial)
 

@@ -19,19 +19,30 @@ export function requireAdmin(req, res, next) {
   })
 }
 
-export function requireApiKey(req, res, next) {
+function tieneApiKeyValida(req) {
   const header = req.headers.authorization || ''
   const [scheme, token] = header.split(' ')
   const expected = process.env.MCP_API_KEY
 
-  if (scheme !== 'Bearer' || !token || !expected) return res.status(401).json({ error: 'No autenticado' })
+  if (scheme !== 'Bearer' || !token || !expected) return false
 
   const a = Buffer.from(token)
   const b = Buffer.from(expected)
-  const valido = a.length === b.length && timingSafeEqual(a, b)
-  if (!valido) return res.status(401).json({ error: 'No autenticado' })
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
+export function requireApiKey(req, res, next) {
+  if (!tieneApiKeyValida(req)) return res.status(401).json({ error: 'No autenticado' })
   next()
+}
+
+// Acepta la API key del MCP (rol equivalente a Admin) o, si no viene, cae a la sesión de Admin normal.
+export function requireAdminOrApiKey(req, res, next) {
+  if (tieneApiKeyValida(req)) {
+    req.user = { id: 'mcp', email: 'mcp@esbrillante.mx', nombre: 'Claude Code (MCP)', rol: 'ADMIN', esKarla: false }
+    return next()
+  }
+  requireAdmin(req, res, next)
 }
 
 export function requireClienteToken(req, res, next) {
