@@ -14,27 +14,37 @@ Esta es la key compartida (global, una sola para todos los proyectos) que usará
 
 Ya está configurada en producción (app `proyectos-backend` en Coolify, `https://api-proyectos.esbrillante.mx`).
 
-## 2. `.mcp.json` en cada repo cliente
+## 2. Agregar el MCP en cada repo cliente
 
-En la raíz del repo de cada proyecto (ej. el repo de E&E Shipping), crea `.mcp.json`:
+Desde la raíz del repo (ej. el repo de E&E Shipping), con la key exportada en el shell:
+
+```bash
+export ESBRILLANTE_MCP_KEY="<la misma MCP_API_KEY del backend>"
+
+claude mcp add --transport http esbrillante-seguimiento https://api-proyectos.esbrillante.mx/mcp \
+  --header "Authorization: Bearer ${ESBRILLANTE_MCP_KEY}" \
+  --scope project
+```
+
+Esto crea/actualiza `.mcp.json` en la raíz del repo con este contenido (los servidores van bajo la clave `mcpServers`):
 
 ```json
 {
-  "esbrillante-seguimiento": {
-    "type": "http",
-    "url": "https://api-proyectos.esbrillante.mx/mcp",
-    "headers": {
-      "Authorization": "Bearer ${ESBRILLANTE_MCP_KEY}"
+  "mcpServers": {
+    "esbrillante-seguimiento": {
+      "type": "http",
+      "url": "https://api-proyectos.esbrillante.mx/mcp",
+      "headers": {
+        "Authorization": "Bearer ${ESBRILLANTE_MCP_KEY}"
+      }
     }
   }
 }
 ```
 
-`${ESBRILLANTE_MCP_KEY}` se resuelve desde una variable de entorno local (no del `.mcp.json`, que sí se versiona) — expórtala en tu shell o en `.env` de ese repo:
+`${ESBRILLANTE_MCP_KEY}` se resuelve en tiempo de conexión desde la variable de entorno del shell — nunca queda la key en texto plano en el archivo, así que `.mcp.json` sí se puede versionar. Cada quien que clone el repo necesita exportar su propia `ESBRILLANTE_MCP_KEY` localmente para que el servidor conecte.
 
-```
-export ESBRILLANTE_MCP_KEY="<la misma MCP_API_KEY del backend>"
-```
+Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 6 tools.
 
 ## 3. Identificar el slug del proyecto
 
