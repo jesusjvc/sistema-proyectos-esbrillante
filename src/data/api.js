@@ -33,6 +33,7 @@ export const terminarPausa = (slug) => req('DELETE', `/api/proyectos/${slug}/pau
 export const cerrarProyecto = (slug) => req('POST', `/api/proyectos/${slug}/cerrar`)
 
 // ─── Tareas ────────────────────────────────────────────────────────────────
+export const iniciarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/iniciar`)
 export const completarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/completar`)
 export const reabrirTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/reabrir`)
 export const omitirTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/omitir`)

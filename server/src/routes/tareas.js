@@ -15,6 +15,31 @@ async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
+// POST /api/proyectos/:slug/tareas/:tareaId/iniciar
+router.post('/:tareaId/iniciar', requireAuth, async (req, res) => {
+  const { slug, tareaId } = req.params
+  const usuario = req.user.nombre
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const tarea = await prisma.tarea.findFirst({ where: { id: tareaId, proyectoId: p.id } })
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+
+    await prisma.tarea.update({
+      where: { id: tareaId },
+      data: { estado: 'en_proceso', asignadoA: usuario },
+    })
+    await logEntry(p.id, usuario, 'Tarea en proceso', tarea.titulo)
+
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // POST /api/proyectos/:slug/tareas/:tareaId/completar
 router.post('/:tareaId/completar', requireAuth, async (req, res) => {
   const { slug, tareaId } = req.params
@@ -54,7 +79,7 @@ router.post('/:tareaId/reabrir', requireAuth, async (req, res) => {
 
     await prisma.tarea.update({
       where: { id: tareaId },
-      data: { estado: 'pendiente', completadaPor: null, completadaEn: null },
+      data: { estado: 'pendiente', completadaPor: null, completadaEn: null, asignadoA: null },
     })
     await logEntry(p.id, usuario, 'Tarea reabierta', tarea.titulo)
 

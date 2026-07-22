@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { getProyecto, completarTarea } from '../../data/api'
+import { getProyecto, iniciarTarea, completarTarea } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import {
-  CheckCircle2, Circle, Lock, AlertCircle, XCircle,
+  CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
 } from 'lucide-react'
 
@@ -43,6 +43,11 @@ export default function ProyectoEquipo() {
   const avance = calcularAvance(proyecto)
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
 
+  async function marcarEnProceso(tareaId) {
+    await iniciarTarea(proyecto.slug, tareaId)
+    await refresh()
+  }
+
   async function marcarCompleta(tareaId) {
     await completarTarea(proyecto.slug, tareaId)
     setTareaExpandida(null)
@@ -69,6 +74,7 @@ export default function ProyectoEquipo() {
   function estadoCalculado(t) {
     if (t.estado === 'completada') return 'completada'
     if (t.estado === 'omitida') return 'omitida'
+    if (t.estado === 'en_proceso') return 'en_proceso'
     const deps = t.dependencias.every((d) => completadasIds.has(d))
     if (!deps) return 'bloqueada_dependencia'
     if (t.esCliente) return 'bloqueada_cliente'
@@ -123,18 +129,21 @@ export default function ProyectoEquipo() {
                 <div className="border-t border-slate-100">
                   {fase.tareas.map((t) => {
                     const est = estadoCalculado(t)
-                    const puedoCompletar = est === 'disponible' && !t.soloAdmin && (!t.soloKarlaOAdmin || user?.esKarla)
+                    const puedoOperar = !t.soloAdmin && (!t.soloKarlaOAdmin || user?.esKarla)
+                    const puedoEmpezar = est === 'disponible' && puedoOperar
+                    const puedoCompletar = (est === 'disponible' || est === 'en_proceso') && puedoOperar
                     const expandida = tareaExpandida === t.id
                     const hayDetalle = tieneDetalle(t)
 
                     return (
                       <div key={t.id} className={`border-b border-slate-50 last:border-0 ${
-                        est === 'completada' ? 'bg-emerald-50' : est === 'bloqueada_cliente' ? 'bg-amber-50' : ''
+                        est === 'completada' ? 'bg-emerald-50' : est === 'bloqueada_cliente' ? 'bg-amber-50' : est === 'en_proceso' ? 'bg-violet-50' : ''
                       }`}>
                         {/* Fila principal */}
                         <div className="px-5 py-3.5 flex items-start gap-3">
                           <div className="mt-0.5 shrink-0">
                             {est === 'completada' && <CheckCircle2 size={16} className="text-emerald-500" />}
+                            {est === 'en_proceso' && <PlayCircle size={16} className="text-violet-500" />}
                             {est === 'disponible' && <Circle size={16} className="text-slate-300" />}
                             {est === 'bloqueada_dependencia' && <Lock size={16} className="text-slate-200" />}
                             {est === 'bloqueada_cliente' && <AlertCircle size={16} className="text-amber-400" />}
@@ -157,6 +166,9 @@ export default function ProyectoEquipo() {
                             {est === 'completada' && t.completadaPor && (
                               <div className="text-xs text-slate-400 mt-0.5">{t.completadaPor} · {formatFechaHora(t.completadaEn)}</div>
                             )}
+                            {est === 'en_proceso' && (
+                              <div className="text-xs text-violet-600 mt-0.5">{t.asignadoA ? `${t.asignadoA} está trabajando en esto` : 'En proceso'}</div>
+                            )}
                             {est === 'bloqueada_cliente' && (
                               <div className="text-xs text-amber-600 mt-0.5">Esperando respuesta del cliente</div>
                             )}
@@ -174,6 +186,14 @@ export default function ProyectoEquipo() {
                               >
                                 <ClipboardList size={14} />
                                 {expandida ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              </button>
+                            )}
+                            {puedoEmpezar && !expandida && (
+                              <button
+                                onClick={() => marcarEnProceso(t.id)}
+                                className="text-xs border border-violet-200 text-violet-600 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                Empezar
                               </button>
                             )}
                             {puedoCompletar && !expandida && (
@@ -223,14 +243,24 @@ export default function ProyectoEquipo() {
                               </DetalleSeccion>
                             )}
 
-                            {puedoCompletar && (
-                              <div className="px-4 pb-4">
-                                <button
-                                  onClick={() => marcarCompleta(t.id)}
-                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
-                                >
-                                  Marcar como completada
-                                </button>
+                            {(puedoEmpezar || puedoCompletar) && (
+                              <div className="px-4 pb-4 flex gap-2">
+                                {puedoEmpezar && (
+                                  <button
+                                    onClick={() => marcarEnProceso(t.id)}
+                                    className="flex-1 border border-violet-200 text-violet-600 hover:bg-violet-100 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                                  >
+                                    Empezar
+                                  </button>
+                                )}
+                                {puedoCompletar && (
+                                  <button
+                                    onClick={() => marcarCompleta(t.id)}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+                                  >
+                                    Marcar como completada
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>

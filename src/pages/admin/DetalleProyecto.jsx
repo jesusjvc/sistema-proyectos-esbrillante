@@ -12,7 +12,7 @@ import { FASES_WEB } from '../../data/plantillas'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import {
-  CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause,
+  CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2,
 } from 'lucide-react'
@@ -141,6 +141,7 @@ export default function DetalleProyecto() {
   function estadoCalculado(t) {
     if (t.estado === 'completada') return 'completada'
     if (t.estado === 'omitida') return 'omitida'
+    if (t.estado === 'en_proceso') return 'en_proceso'
     const deps = t.dependencias.every((d) => completadasIds.has(d))
     if (!deps) return 'bloqueada_dependencia'
     if (t.esCliente) return 'bloqueada_cliente'
@@ -456,6 +457,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
 
   const iconMap = {
     completada: <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />,
+    en_proceso: <PlayCircle size={18} className="text-violet-500 shrink-0" />,
     disponible: <Circle size={18} className="text-slate-300 shrink-0" />,
     bloqueada_dependencia: <Lock size={18} className="text-slate-300 shrink-0" />,
     bloqueada_cliente: <AlertCircle size={18} className="text-amber-400 shrink-0" />,
@@ -464,6 +466,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
 
   const bgMap = {
     completada: 'bg-emerald-50',
+    en_proceso: 'bg-violet-50',
     disponible: 'bg-white',
     bloqueada_dependencia: 'bg-slate-50',
     bloqueada_cliente: 'bg-amber-50',
@@ -499,6 +502,11 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
               Completada por {t.completadaPor} · {formatFechaHora(t.completadaEn)}
             </div>
           )}
+          {estado === 'en_proceso' && (
+            <div className="text-xs text-violet-600 mt-0.5">
+              {t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso'}
+            </div>
+          )}
 
           {(t.descripcion || t.instruccionesCliente) && (
             <button
@@ -519,7 +527,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
 
         {esAdmin && (
           <div className="flex items-center gap-1 shrink-0">
-            {estado === 'disponible' && (
+            {(estado === 'disponible' || estado === 'en_proceso') && (
               <button onClick={onCompletar} className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors">
                 Completar
               </button>

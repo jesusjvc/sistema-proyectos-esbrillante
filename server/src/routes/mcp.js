@@ -274,6 +274,33 @@ function buildServer() {
   )
 
   server.registerTool(
+    'iniciar_actividad',
+    {
+      title: 'Marcar actividad en proceso',
+      description: 'Marca una tarea del checklist del equipo como "en proceso" — es decir, que alguien está trabajando en ella activamente ahora mismo, no solo que está disponible. Úsala cuando de verdad empieces a trabajar en algo, no para todo lo que esté disponible en paralelo: el objetivo es que el cliente y el equipo vean qué se está haciendo de verdad, no una lista de todo lo que técnicamente se podría hacer.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        tareaId: z.string().describe('ID de la tarea a marcar en proceso'),
+      },
+    },
+    async ({ slug, tareaId }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const tarea = p.tareas.find((t) => t.id === tareaId)
+      if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
+
+      await prisma.tarea.update({
+        where: { id: tareaId },
+        data: { estado: 'en_proceso', asignadoA: USUARIO_MCP },
+      })
+      await logEntry(p.id, USUARIO_MCP, 'Tarea en proceso', tarea.titulo)
+
+      return ok(`"${tarea.titulo}" marcada en proceso.`)
+    },
+  )
+
+  server.registerTool(
     'completar_actividad',
     {
       title: 'Completar actividad existente',

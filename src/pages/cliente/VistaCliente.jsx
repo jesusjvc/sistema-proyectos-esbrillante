@@ -116,8 +116,8 @@ export default function VistaCliente() {
   })
 
   const equipoCompletadas = tareasEquipoVisibles.filter((t) => t.estado === 'completada')
-  const equipoEnProceso = tareasEquipoVisibles.filter((t) => t.estado !== 'completada' && t.dependencias.every((d) => completadasIds.has(d)))
-  const equipoPendientes = tareasEquipoVisibles.filter((t) => t.estado !== 'completada' && !t.dependencias.every((d) => completadasIds.has(d)))
+  const equipoEnProceso = tareasEquipoVisibles.filter((t) => t.estado === 'en_proceso')
+  const equipoPendientes = tareasEquipoVisibles.filter((t) => t.estado === 'pendiente')
 
   const tareasPorFaseCliente = fases.map((f) => ({
     ...f,

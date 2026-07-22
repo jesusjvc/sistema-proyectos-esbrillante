@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { getProyectos, completarTarea } from '../../data/api'
+import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
 import { formatFechaHora } from '../../data/storage'
-import { CheckCircle2, ChevronRight } from 'lucide-react'
+import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
 
 export default function MisTareas() {
   const { user } = useAuth()
@@ -21,21 +21,32 @@ export default function MisTareas() {
 
   useEffect(() => { cargar() }, [])
 
+  async function handleIniciar(slug, tareaId) {
+    await iniciarTarea(slug, tareaId)
+    cargar()
+  }
+
   async function handleCompletar(slug, tareaId) {
     await completarTarea(slug, tareaId)
     cargar()
   }
 
   const tareasDisponibles = []
+  const tareasEnProceso = []
   proyectos
     .filter((p) => p.status === 'activo' || p.status === 'en_pausa')
     .forEach((p) => {
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
       p.tareas.forEach((t) => {
         if (t.estado === 'completada' || t.estado === 'omitida' || t.esCliente) return
-        if (!t.dependencias.every((d) => completadasIds.has(d))) return
         if (t.soloKarlaOAdmin && !user?.esKarla) return
         if (!matchRol(t.responsable, user)) return
+
+        if (t.estado === 'en_proceso') {
+          if (t.asignadoA === user?.nombre) tareasEnProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
+          return
+        }
+        if (!t.dependencias.every((d) => completadasIds.has(d))) return
         tareasDisponibles.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
       })
     })
@@ -53,6 +64,36 @@ export default function MisTareas() {
   return (
     <Layout titulo={`Hola, ${user?.nombre}`}>
       <div className="max-w-2xl space-y-6">
+        {tareasEnProceso.length > 0 && (
+          <section>
+            <h2 className="text-sm font-semibold text-violet-600 uppercase tracking-wide mb-3">
+              En proceso ({tareasEnProceso.length})
+            </h2>
+            <div className="bg-white rounded-xl border border-violet-200 divide-y divide-violet-50">
+              {tareasEnProceso.map((t) => (
+                <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-violet-50/50">
+                  <PlayCircle size={14} className="text-violet-500 mt-1 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-800 text-sm">{t.titulo}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{t.proyectoNombre}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
+                      Ver <ChevronRight size={12} />
+                    </Link>
+                    <button
+                      onClick={() => handleCompletar(t.proyectoSlug, t.id)}
+                      className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <CheckCircle2 size={13} /> Listo
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section>
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
             Tareas disponibles ({cargando ? '…' : tareasDisponibles.length})
@@ -80,6 +121,12 @@ export default function MisTareas() {
                     <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
                       Ver <ChevronRight size={12} />
                     </Link>
+                    <button
+                      onClick={() => handleIniciar(t.proyectoSlug, t.id)}
+                      className="flex items-center gap-1.5 text-xs border border-violet-200 text-violet-600 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <PlayCircle size={13} /> Empezar
+                    </button>
                     <button
                       onClick={() => handleCompletar(t.proyectoSlug, t.id)}
                       className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
