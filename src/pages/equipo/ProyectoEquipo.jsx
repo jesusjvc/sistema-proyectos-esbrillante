@@ -83,7 +83,7 @@ export default function ProyectoEquipo() {
 
   const tareasPorFase = fases.map((f) => ({
     ...f,
-    tareas: proyecto.tareas.filter((t) => t.fase === f.numero),
+    tareas: proyecto.tareas.filter((t) => t.fase === f.numero).sort((a, b) => a.orden - b.orden),
   }))
 
   const tieneDetalle = (t) => t.queHacer || t.necesitasAntes || t.plantillaMensaje || t.queEntregas

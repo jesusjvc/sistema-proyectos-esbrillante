@@ -77,10 +77,11 @@ router.post('/', requireAdminOrApiKey, async (req, res) => {
 
       if (tareas?.length) {
         await tx.tarea.createMany({
-          data: tareas.map((t) => ({
+          data: tareas.map((t, idx) => ({
             id: t.id,
             proyectoId: p.id,
             fase: t.fase,
+            orden: idx,
             titulo: t.titulo,
             responsable: t.responsable || 'equipo',
             dependencias: t.dependencias || [],

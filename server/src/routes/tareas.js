@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
+import { ordenAlFinal } from '../lib/orden.js'
 
 const router = Router({ mergeParams: true })
 
@@ -147,11 +148,15 @@ router.post('/', requireAuth, async (req, res) => {
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
     const { fase, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras } = req.body
+    const faseFinal = fase || 1
+    const tareasFase = await prisma.tarea.findMany({ where: { proyectoId: p.id, fase: faseFinal } })
+
     const nueva = await prisma.tarea.create({
       data: {
         id: randomUUID(),
         proyectoId: p.id,
-        fase: fase || 1,
+        fase: faseFinal,
+        orden: ordenAlFinal(tareasFase),
         titulo,
         descripcion: descripcion || '',
         instruccionesCliente: instruccionesCliente || '',

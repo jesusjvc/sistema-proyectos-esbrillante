@@ -7,6 +7,7 @@ import prisma from '../lib/prisma.js'
 import { requireApiKey } from '../middleware/auth.js'
 import { calcularAvance, getFaseActual } from '../lib/avance.js'
 import { generarSlug } from '../lib/slug.js'
+import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 
 const router = Router()
 
@@ -29,6 +30,24 @@ async function getProyecto(slug) {
 
 async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
+}
+
+// Decide en qué fase y en qué posición (orden) cae una tarea nueva.
+// Si se da antesDeTareaId/despuesDeTareaId, la fase se toma de esa tarea de
+// referencia (ignora el parámetro fase) y se inserta justo junto a ella.
+// Si no, se agrega al final de la fase indicada (o la fase actual del proyecto).
+function resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId }) {
+  const refId = antesDeTareaId || despuesDeTareaId
+  if (refId) {
+    const ref = p.tareas.find((t) => t.id === refId)
+    if (!ref) return { error: `No se encontró la tarea de referencia "${refId}".` }
+    const tareasFase = p.tareas.filter((t) => t.fase === ref.fase).sort((a, b) => a.orden - b.orden)
+    const orden = antesDeTareaId ? ordenAntesDe(tareasFase, ref) : ordenDespuesDe(tareasFase, ref)
+    return { faseFinal: ref.fase, orden }
+  }
+  const faseFinal = fase ?? getFaseActual(p)
+  const tareasFase = p.tareas.filter((t) => t.fase === faseFinal)
+  return { faseFinal, orden: ordenAlFinal(tareasFase) }
 }
 
 function buildServer() {
@@ -183,9 +202,11 @@ function buildServer() {
         faseNombre,
         tareasPendientesEquipo: p.tareas
           .filter((t) => !t.esCliente && t.estado === 'pendiente')
+          .sort((a, b) => a.orden - b.orden)
           .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo })),
         tareasPendientesCliente: p.tareas
           .filter((t) => t.esCliente && t.estado === 'pendiente')
+          .sort((a, b) => a.orden - b.orden)
           .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras })),
       }
       return ok(JSON.stringify(resumen, null, 2))
@@ -196,20 +217,24 @@ function buildServer() {
     'registrar_actividad',
     {
       title: 'Registrar actividad',
-      description: 'Agrega una actividad no contemplada en el checklist original. Por defecto queda marcada como completada de inmediato (para reportar avance ya hecho); si está en proceso, pasar completada=false. Si es del equipo (no esCliente), aparece en el portal del cliente dentro de "¿Qué está haciendo el equipo?".',
+      description: 'Agrega una actividad no contemplada en el checklist original. Por defecto queda marcada como completada de inmediato (para reportar avance ya hecho); si está en proceso, pasar completada=false. Si es del equipo (no esCliente), aparece en el portal del cliente dentro de "¿Qué está haciendo el equipo?". Importante para el orden: si esta actividad debe aparecer antes o después de otra ya existente (ver ver_proyecto), usa antesDeTareaId/despuesDeTareaId — si no se especifica ninguno, se agrega al final de la fase, lo cual puede quedar fuera de orden lógico (ej. después de una tarea de "revisión" cuando en realidad debía ir antes).',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de la actividad'),
         descripcion: z.string().optional().describe('Detalle interno de la actividad'),
-        fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto'),
+        fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId.'),
         completada: z.boolean().optional().describe('Si es false, la actividad queda pendiente en vez de completada. Default: true'),
+        antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta actividad'),
+        despuesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto después de la cual debe quedar esta actividad'),
       },
     },
-    async ({ slug, titulo, descripcion, fase, completada }) => {
+    async ({ slug, titulo, descripcion, fase, completada, antesDeTareaId, despuesDeTareaId }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
-      const faseFinal = fase ?? getFaseActual(p)
+      const posicion = resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
+      if (posicion.error) return fail(posicion.error)
+      const { faseFinal, orden } = posicion
       const marcarCompletada = completada !== false
 
       await prisma.tarea.create({
@@ -217,6 +242,7 @@ function buildServer() {
           id: randomUUID(),
           proyectoId: p.id,
           fase: faseFinal,
+          orden,
           titulo,
           descripcion: descripcion || '',
           responsable: 'equipo',
@@ -237,26 +263,31 @@ function buildServer() {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Aparece de inmediato en su portal dentro de "Necesitamos tu respuesta".',
+      description: 'Crea una tarea pendiente para el cliente. Aparece de inmediato en su portal dentro de "Necesitamos tu respuesta". Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
         instrucciones: z.string().describe('Instrucciones claras para el cliente sobre qué debe hacer'),
         plazoHoras: z.number().int().optional().describe('Plazo sugerido en horas'),
-        fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto'),
+        fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId.'),
+        antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta solicitud'),
+        despuesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto después de la cual debe quedar esta solicitud'),
       },
     },
-    async ({ slug, titulo, instrucciones, plazoHoras, fase }) => {
+    async ({ slug, titulo, instrucciones, plazoHoras, fase, antesDeTareaId, despuesDeTareaId }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
-      const faseFinal = fase ?? getFaseActual(p)
+      const posicion = resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
+      if (posicion.error) return fail(posicion.error)
+      const { faseFinal, orden } = posicion
 
       await prisma.tarea.create({
         data: {
           id: randomUUID(),
           proyectoId: p.id,
           fase: faseFinal,
+          orden,
           titulo,
           responsable: 'cliente',
           esCliente: true,

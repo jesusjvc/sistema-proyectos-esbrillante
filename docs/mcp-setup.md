@@ -96,14 +96,16 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `listar_proyectos` | Ver todos los proyectos activos y su slug |
 | `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
 | `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente |
-| `registrar_actividad(slug, titulo, descripcion?, fase?, completada?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
-| `solicitar_al_cliente(slug, titulo, instrucciones, plazoHoras?, fase?)` | Pedirle algo al cliente — aparece de inmediato en su portal |
+| `registrar_actividad(slug, titulo, descripcion?, fase?, completada?, antesDeTareaId?, despuesDeTareaId?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
+| `solicitar_al_cliente(slug, titulo, instrucciones, plazoHoras?, fase?, antesDeTareaId?, despuesDeTareaId?)` | Pedirle algo al cliente — aparece de inmediato en su portal |
 | `iniciar_actividad(slug, tareaId)` | Marcar una tarea como "en proceso" de verdad — que alguien la está trabajando ahora, no solo que está disponible. Úsala solo cuando realmente empieces algo, no para todo lo que esté disponible en paralelo (ver nota abajo). |
 | `completar_actividad(slug, tareaId, respuesta?)` | Marcar como lista una tarea ya existente (del equipo o del cliente). Si estás cerrando una solicitud al cliente porque respondió por otro canal, pasa `respuesta` para dejarlo registrado. |
 | `editar_actividad(slug, tareaId, titulo?, descripcion?, instrucciones?, plazoHoras?)` | Corregir una tarea ya creada (equipo o cliente) sin tener que cancelarla y volver a crearla |
 | `cancelar_actividad(slug, tareaId, motivo?)` | Cancelar una actividad o solicitud que ya no aplica — queda omitida, no se borra |
 | `actualizar_fase(slug, numero, fechaEstimada?, requierePago?, pagoConfirmado?)` | Ajustar la fecha estimada o el estado de pago de una fase — útil en proyectos con pagos parciales por fase, donde una sola "fecha de entrega" no refleja la realidad |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
+
+**El orden del checklist es explícito, no por fecha de creación:** cada tarea tiene un campo `orden` interno. Si registras una actividad sin indicar posición, se agrega al final de su fase — lo cual puede quedar fuera de secuencia lógica (ej. "verificar acceso" apareciendo después de "revisión" solo porque se reportó después). `ver_proyecto` ya devuelve las tareas pendientes en su orden real, así que puedes referenciar sus IDs: usa `antesDeTareaId`/`despuesDeTareaId` en `registrar_actividad`/`solicitar_al_cliente` para insertar la nueva actividad justo donde corresponde, en vez de siempre al final.
 
 **"En proceso" es un estado real, no una inferencia:** antes, el portal del cliente y las vistas de equipo mostraban como "en proceso" cualquier tarea desbloqueada, aunque nadie la estuviera trabajando todavía — daba la impresión de que todo avanzaba en paralelo. Ahora `en_proceso` solo se activa cuando alguien (persona o Claude Code vía `iniciar_actividad`) declara explícitamente que está trabajando en esa tarea. Si varios miembros del equipo (o varias sesiones de Claude Code) sí están trabajando cosas distintas en paralelo, cada quien marca la suya — el sistema no fuerza secuencialidad, solo pide que "en proceso" refleje trabajo real para que el cliente confíe en lo que ve.
 

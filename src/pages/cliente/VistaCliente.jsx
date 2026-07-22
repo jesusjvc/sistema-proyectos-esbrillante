@@ -108,12 +108,12 @@ export default function VistaCliente() {
     if (t.estado === 'completada' || t.estado === 'omitida') return false
     if (!t.esCliente) return false
     return t.dependencias.every((d) => completadasIds.has(d))
-  })
+  }).sort((a, b) => a.orden - b.orden)
 
   const tareasEquipoVisibles = proyecto.tareas.filter((t) => {
     if (t.esCliente || t.estado === 'omitida') return false
     return t.fase === faseActual || t.fase === faseActual - 1
-  })
+  }).sort((a, b) => a.orden - b.orden)
 
   const equipoCompletadas = tareasEquipoVisibles.filter((t) => t.estado === 'completada')
   const equipoEnProceso = tareasEquipoVisibles.filter((t) => t.estado === 'en_proceso')
@@ -121,7 +121,7 @@ export default function VistaCliente() {
 
   const tareasPorFaseCliente = fases.map((f) => ({
     ...f,
-    tareasCliente: proyecto.tareas.filter((t) => t.fase === f.numero && t.esCliente),
+    tareasCliente: proyecto.tareas.filter((t) => t.fase === f.numero && t.esCliente).sort((a, b) => a.orden - b.orden),
   })).filter((f) => f.tareasCliente.length > 0)
 
   const enPausa = proyecto.status === 'en_pausa'

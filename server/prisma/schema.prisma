@@ -53,6 +53,7 @@ model Tarea {
   proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 
   fase             Int
+  orden            Float    @default(0)
   titulo           String
   responsable      String   @default("equipo")
   dependencias     String[]
