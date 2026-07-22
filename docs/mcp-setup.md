@@ -111,6 +111,8 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 
 **Proyectos con pagos parciales por fase:** si en `crear_proyecto` cada fase incluye `fechaEstimada`/`requierePago`/`pagoConfirmado`, el portal del cliente reemplaza la fecha única de entrega por un timeline con la fecha estimada de cada fase y un badge "Esperando confirmación de pago" en la que esté bloqueada. Usa `actualizar_fase` para ir ajustando esto conforme avanza el proyecto (ej. marcar `pagoConfirmado:true` cuando llegue el pago de la Fase 2).
 
+**El cliente ya puede responder directo desde su portal:** las tarjetas de "Necesitamos tu respuesta" ahora tienen un campo de texto y la opción de adjuntar un archivo — el cliente ya no depende de WhatsApp/correo para contestar. `ver_proyecto` incluye `respuestasClienteRecientes` (texto y, si adjuntó archivo, el link de Drive para descargarlo — el archivo en sí nunca pasa por el MCP, solo el link, para no gastar tokens ni tiempo en transferir binarios). Si el cliente sí respondió por otro canal en vez de por el portal, sigue funcionando `completar_actividad(..., respuesta)` como antes.
+
 **Limitación conocida (aún no soportada):** no hay forma de adjuntar archivos a `solicitar_al_cliente` — si necesitas que el cliente suba o revise un archivo, pega un link (Drive, etc.) directo en `instrucciones`.
 
 ## 5. Para que el reporte sea automático, no manual

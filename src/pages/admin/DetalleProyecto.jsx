@@ -502,6 +502,16 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
               Completada por {t.completadaPor} · {formatFechaHora(t.completadaEn)}
             </div>
           )}
+          {estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl) && (
+            <div className="mt-1.5 text-xs bg-violet-50 border border-violet-100 rounded-lg px-2.5 py-2 space-y-1">
+              {t.respuestaTexto && <p className="text-slate-700">{t.respuestaTexto}</p>}
+              {t.respuestaArchivoUrl && (
+                <a href={t.respuestaArchivoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-violet-600 hover:text-violet-800 font-medium">
+                  <ExternalLink size={11} /> {t.respuestaArchivoNombre || 'Archivo adjunto'}
+                </a>
+              )}
+            </div>
+          )}
           {estado === 'en_proceso' && (
             <div className="text-xs text-violet-600 mt-0.5">
               {t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso'}

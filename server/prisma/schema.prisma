@@ -36,6 +36,7 @@ model Proyecto {
   condicionesTecnicas Json
   equipo              Json
   linksCliente        Json     @default("{}")
+  driveRespuestasId   String?
   tiempos             Json     @default("{}")
   passwordCliente     String
 
@@ -78,6 +79,10 @@ model Tarea {
   completadaPor String?
   completadaEn  DateTime?
   asignadoA     String?
+
+  respuestaTexto       String?
+  respuestaArchivoUrl  String?
+  respuestaArchivoNombre String?
 
   @@map("tareas")
 }

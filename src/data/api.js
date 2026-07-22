@@ -50,5 +50,24 @@ export const eliminarMiembro = (id) => req('DELETE', `/api/miembros/${id}`)
 // ─── Cliente ───────────────────────────────────────────────────────────────
 export const loginCliente = (slug, password) => req('POST', '/api/cliente/login', { slug, password })
 export const getProyectoCliente = (slug) => req('GET', `/api/cliente/${slug}`)
-export const completarTareaCliente = (slug, tareaId) => req('POST', `/api/cliente/${slug}/tareas/${tareaId}/completar`)
 export const logoutCliente = () => req('POST', '/api/cliente/logout')
+
+// texto y/o archivo son opcionales — completar sin ninguno equivale al "Ya lo hice" simple
+export async function completarTareaCliente(slug, tareaId, { texto, archivo } = {}) {
+  const form = new FormData()
+  if (texto) form.append('respuestaTexto', texto)
+  if (archivo) form.append('archivo', archivo)
+
+  const res = await fetch(`${BASE}/api/cliente/${slug}/tareas/${tareaId}/completar`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const error = new Error(err.error || `Error ${res.status}`)
+    error.status = res.status
+    throw error
+  }
+  return res.json()
+}

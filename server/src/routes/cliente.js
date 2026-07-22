@@ -1,7 +1,11 @@
 import { Router } from 'express'
+import multer from 'multer'
 import prisma from '../lib/prisma.js'
 import { firmarToken, verificarToken } from '../lib/jwt.js'
 import { requireClienteToken } from '../middleware/auth.js'
+import { obtenerOCrearCarpetaProyecto, subirArchivo, driveConfigurado } from '../lib/drive.js'
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
 const router = Router()
 
@@ -51,18 +55,35 @@ router.get('/:slug', requireClienteToken, async (req, res) => {
 })
 
 // POST /api/cliente/:slug/tareas/:tareaId/completar
-router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, async (req, res) => {
+// Acepta multipart/form-data opcional: campo "respuestaTexto" y/o archivo "archivo"
+router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.single('archivo'), async (req, res) => {
   const { slug, tareaId } = req.params
+  const respuestaTexto = req.body?.respuestaTexto?.trim() || null
+
   try {
     const p = await getProyecto(slug)
     if (!p || p.id !== req.clienteProyectoId) return res.status(403).json({ error: 'Sin acceso' })
 
-    await prisma.tarea.update({
-      where: { id: tareaId },
-      data: { estado: 'completada', completadaPor: 'Cliente', completadaEn: new Date() },
-    })
+    const data = { estado: 'completada', completadaPor: 'Cliente', completadaEn: new Date() }
+    if (respuestaTexto) data.respuestaTexto = respuestaTexto
+
+    if (req.file) {
+      if (!driveConfigurado()) return res.status(503).json({ error: 'La subida de archivos todavía no está configurada. Por ahora, comparte el archivo por otro medio.' })
+      const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+      if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+      const subido = await subirArchivo({ carpetaId, nombre: req.file.originalname, mimeType: req.file.mimetype, buffer: req.file.buffer })
+      data.respuestaArchivoUrl = subido.url
+      data.respuestaArchivoNombre = subido.nombre
+    }
+
+    const tarea = await prisma.tarea.update({ where: { id: tareaId }, data })
+
+    const partesDetalle = [tarea.titulo]
+    if (respuestaTexto) partesDetalle.push(`Respuesta: ${respuestaTexto}`)
+    if (data.respuestaArchivoNombre) partesDetalle.push(`Archivo: ${data.respuestaArchivoNombre}`)
+
     await prisma.logEntry.create({
-      data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Tarea completada por cliente', detalle: tareaId },
+      data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Tarea completada por cliente', detalle: partesDetalle.join(' — ') },
     })
 
     res.json({ ok: true })

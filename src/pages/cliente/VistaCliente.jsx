@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getProyectoCliente, loginCliente, completarTareaCliente } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock } from 'lucide-react'
+import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X } from 'lucide-react'
 
 export default function VistaCliente() {
   const { id } = useParams()
@@ -42,8 +42,8 @@ export default function VistaCliente() {
     }
   }
 
-  async function handleCompletar(tareaId) {
-    await completarTareaCliente(id, tareaId)
+  async function handleCompletar(tareaId, respuesta) {
+    await completarTareaCliente(id, tareaId, respuesta)
     cargar()
   }
 
@@ -203,7 +203,7 @@ export default function VistaCliente() {
             </h2>
             <div className="space-y-3">
               {tareasPendientesCliente.map((t) => (
-                <TareaClienteCard key={t.id} tarea={t} onCompletar={() => handleCompletar(t.id)} />
+                <TareaClienteCard key={t.id} tarea={t} onCompletar={(respuesta) => handleCompletar(t.id, respuesta)} />
               ))}
             </div>
           </section>
@@ -379,6 +379,23 @@ function GrupoActividad({ titulo, tareas, estado }) {
 
 function TareaClienteCard({ tarea: t, onCompletar }) {
   const [expandida, setExpandida] = useState(true)
+  const [texto, setTexto] = useState('')
+  const [archivo, setArchivo] = useState(null)
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function enviar() {
+    setError('')
+    setEnviando(true)
+    try {
+      await onCompletar({ texto: texto.trim() || undefined, archivo: archivo || undefined })
+    } catch {
+      setError('No se pudo enviar tu respuesta. Intenta de nuevo.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   return (
     <div className="bg-white border-2 border-amber-200 rounded-xl overflow-hidden shadow-sm">
       <div className="bg-amber-50 px-5 py-3 flex items-center justify-between">
@@ -399,10 +416,42 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
               Tiempo sugerido: {t.plazoHoras} horas
             </div>
           )}
-          <button onClick={onCompletar} className="w-full bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
-            ✓ Ya lo hice / Ya respondí
+
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Escribe tu respuesta aquí (opcional si solo vas a adjuntar un archivo)..."
+            rows={3}
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400 resize-none"
+          />
+
+          {archivo ? (
+            <div className="flex items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-3">
+              <Paperclip size={12} className="text-slate-400 shrink-0" />
+              <span className="flex-1 truncate text-slate-600">{archivo.name}</span>
+              <button onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-700 cursor-pointer w-fit mb-3">
+              <Paperclip size={12} />
+              Adjuntar un archivo
+              <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
+            </label>
+          )}
+
+          {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+
+          <button
+            onClick={enviar}
+            disabled={enviando}
+            className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+            ✓ Enviar respuesta
           </button>
-          <p className="text-xs text-slate-400 text-center mt-2">Presiona cuando hayas enviado tu respuesta</p>
+          <p className="text-xs text-slate-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>
         </div>
       )}
     </div>

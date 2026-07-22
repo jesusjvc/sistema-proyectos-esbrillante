@@ -198,7 +198,7 @@ function buildServer() {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve fase actual, % de avance, status y las tareas pendientes (del equipo y del cliente) de un proyecto.',
+      description: 'Devuelve fase actual, % de avance, status, las tareas pendientes (del equipo y del cliente) y las respuestas recientes que el cliente ya envió desde su portal (texto y/o link de archivo — los archivos nunca se transfieren por MCP, solo el link para descargarlos).',
       inputSchema: { slug: z.string().describe('Slug o ID del proyecto') },
     },
     async ({ slug }) => {
@@ -225,6 +225,18 @@ function buildServer() {
           .filter((t) => t.esCliente && t.estado === 'pendiente')
           .sort((a, b) => a.orden - b.orden)
           .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras })),
+        respuestasClienteRecientes: p.tareas
+          .filter((t) => t.esCliente && t.estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl))
+          .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
+          .slice(0, 10)
+          .map((t) => ({
+            id: t.id,
+            titulo: t.titulo,
+            respuestaTexto: t.respuestaTexto || null,
+            archivoUrl: t.respuestaArchivoUrl || null,
+            archivoNombre: t.respuestaArchivoNombre || null,
+            respondidoEn: t.completadaEn,
+          })),
       }
       return ok(JSON.stringify(resumen, null, 2))
     },

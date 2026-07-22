@@ -28,4 +28,11 @@ app.use('/mcp', mcpRouter)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'El archivo supera el límite de 20 MB' })
+  console.error(err)
+  res.status(500).json({ error: 'Error interno' })
+})
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
