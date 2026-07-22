@@ -141,7 +141,7 @@ function buildServer() {
           .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo })),
         tareasPendientesCliente: p.tareas
           .filter((t) => t.esCliente && t.estado === 'pendiente')
-          .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, instrucciones: t.instruccionesCliente })),
+          .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras })),
       }
       return ok(JSON.stringify(resumen, null, 2))
     },
@@ -232,13 +232,14 @@ function buildServer() {
     'completar_actividad',
     {
       title: 'Completar actividad existente',
-      description: 'Marca como completada una tarea que ya existe en el checklist del proyecto (del checklist base o creada antes).',
+      description: 'Marca como completada una tarea que ya existe — tanto del checklist del equipo como una solicitud al cliente (tareasPendientesEquipo o tareasPendientesCliente de ver_proyecto). Úsala también para cerrar una solicitud al cliente cuando responda por otro canal (WhatsApp, correo): pasa "respuesta" para dejar registrado qué contestó.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a completar (ver_proyecto lista los IDs pendientes)'),
+        respuesta: z.string().optional().describe('Si se está cerrando una solicitud al cliente, qué fue lo que respondió'),
       },
     },
-    async ({ slug, tareaId }) => {
+    async ({ slug, tareaId, respuesta }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -249,9 +250,70 @@ function buildServer() {
         where: { id: tareaId },
         data: { estado: 'completada', completadaPor: USUARIO_MCP, completadaEn: new Date() },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Tarea completada', tarea.titulo)
+      await logEntry(p.id, USUARIO_MCP, 'Tarea completada', respuesta ? `${tarea.titulo} — Respuesta: ${respuesta}` : tarea.titulo)
 
-      return ok(`Tarea "${tarea.titulo}" marcada como completada.`)
+      return ok(`Tarea "${tarea.titulo}" marcada como completada.${respuesta ? ' Respuesta registrada en el log.' : ''}`)
+    },
+  )
+
+  server.registerTool(
+    'editar_actividad',
+    {
+      title: 'Editar actividad o solicitud',
+      description: 'Corrige el título, descripción, instrucciones al cliente o plazo de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        tareaId: z.string().describe('ID de la tarea a editar'),
+        titulo: z.string().optional().describe('Nuevo título'),
+        descripcion: z.string().optional().describe('Nueva descripción interna'),
+        instrucciones: z.string().optional().describe('Nuevas instrucciones para el cliente (solo aplica a solicitudes al cliente)'),
+        plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
+      },
+    },
+    async ({ slug, tareaId, titulo, descripcion, instrucciones, plazoHoras }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const tarea = p.tareas.find((t) => t.id === tareaId)
+      if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
+
+      const data = {}
+      if (titulo !== undefined) data.titulo = titulo
+      if (descripcion !== undefined) data.descripcion = descripcion
+      if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
+      if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
+
+      if (!Object.keys(data).length) return fail('No se especificó ningún campo para editar.')
+
+      await prisma.tarea.update({ where: { id: tareaId }, data })
+      await logEntry(p.id, USUARIO_MCP, 'Tarea editada', tarea.titulo)
+
+      return ok(`"${tarea.titulo}" actualizada.`)
+    },
+  )
+
+  server.registerTool(
+    'cancelar_actividad',
+    {
+      title: 'Cancelar actividad o solicitud',
+      description: 'Cancela una tarea del equipo o una solicitud al cliente que ya no aplica. No la borra: queda marcada como omitida y desaparece de las listas de pendientes de ver_proyecto.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        tareaId: z.string().describe('ID de la tarea a cancelar'),
+        motivo: z.string().optional().describe('Por qué se cancela'),
+      },
+    },
+    async ({ slug, tareaId, motivo }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const tarea = p.tareas.find((t) => t.id === tareaId)
+      if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
+
+      await prisma.tarea.update({ where: { id: tareaId }, data: { estado: 'omitida' } })
+      await logEntry(p.id, USUARIO_MCP, 'Tarea cancelada', motivo ? `${tarea.titulo} — ${motivo}` : tarea.titulo)
+
+      return ok(`"${tarea.titulo}" cancelada.`)
     },
   )
 

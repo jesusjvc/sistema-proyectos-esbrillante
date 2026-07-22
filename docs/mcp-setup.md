@@ -75,7 +75,7 @@ Esto crea/actualiza `.mcp.json` en la raíz del repo (los servidores van bajo la
 
 `${ESBRILLANTE_MCP_KEY}` se resuelve en tiempo de conexión desde la variable de entorno del shell — nunca queda la key en texto plano en el archivo, así que `.mcp.json` sí se puede versionar. Cada quien que clone el repo necesita exportar su propia `ESBRILLANTE_MCP_KEY` localmente para que el servidor conecte.
 
-Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 7 tools.
+Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 9 tools.
 
 ## 3. Identificar (o crear) el proyecto
 
@@ -98,8 +98,12 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente |
 | `registrar_actividad(slug, titulo, descripcion?, fase?, completada?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
 | `solicitar_al_cliente(slug, titulo, instrucciones, plazoHoras?, fase?)` | Pedirle algo al cliente — aparece de inmediato en su portal |
-| `completar_actividad(slug, tareaId)` | Marcar como lista una tarea ya existente en el checklist |
+| `completar_actividad(slug, tareaId, respuesta?)` | Marcar como lista una tarea ya existente (del equipo o del cliente). Si estás cerrando una solicitud al cliente porque respondió por otro canal, pasa `respuesta` para dejarlo registrado. |
+| `editar_actividad(slug, tareaId, titulo?, descripcion?, instrucciones?, plazoHoras?)` | Corregir una tarea ya creada (equipo o cliente) sin tener que cancelarla y volver a crearla |
+| `cancelar_actividad(slug, tareaId, motivo?)` | Cancelar una actividad o solicitud que ya no aplica — queda omitida, no se borra |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
+
+**Limitación conocida (aún no soportada):** no hay forma de adjuntar archivos a `solicitar_al_cliente` — si necesitas que el cliente suba o revise un archivo, pega un link (Drive, etc.) directo en `instrucciones`.
 
 ## 5. Para que el reporte sea automático, no manual
 
