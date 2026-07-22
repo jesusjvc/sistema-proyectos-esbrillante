@@ -68,13 +68,13 @@ export default function MisTareas() {
       <div className="max-w-2xl space-y-6">
         {tareasEnProceso.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-violet-600 uppercase tracking-wide mb-3">
+            <h2 className="text-sm font-semibold text-brand-700 uppercase tracking-wide mb-3">
               En proceso ({tareasEnProceso.length})
             </h2>
-            <div className="bg-white rounded-xl border border-violet-200 divide-y divide-violet-50">
+            <div className="bg-white rounded-xl border border-brand-200 divide-y divide-brand-50">
               {tareasEnProceso.map((t) => (
-                <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-violet-50/50">
-                  <PlayCircle size={14} className="text-violet-500 mt-1 shrink-0" />
+                <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-brand-50/50">
+                  <PlayCircle size={14} className="text-brand-600 mt-1 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-slate-800 text-sm">{t.titulo}</div>
                     <div className="text-xs text-slate-400 mt-0.5">{t.proyectoNombre}</div>
@@ -102,7 +102,7 @@ export default function MisTareas() {
           </h2>
 
           {cargando ? (
-            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
           ) : tareasDisponibles.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
               <div className="text-3xl mb-2">✅</div>
@@ -113,7 +113,7 @@ export default function MisTareas() {
             <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
               {tareasDisponibles.map((t) => (
                 <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0" />
+                  <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-slate-800 text-sm">{t.titulo}</div>
                     <div className="text-xs text-slate-400 mt-0.5">{t.proyectoNombre}</div>
@@ -125,7 +125,7 @@ export default function MisTareas() {
                     </Link>
                     <button
                       onClick={() => handleIniciar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-xs border border-violet-200 text-violet-600 hover:bg-violet-50 px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-xs border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       <PlayCircle size={13} /> Empezar
                     </button>

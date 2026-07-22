@@ -64,7 +64,7 @@ export default function AdminDashboard() {
               key={f}
               onClick={() => setFiltro(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filtro === f ? 'bg-violet-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+                filtro === f ? 'bg-brand-500 text-slate-900' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
               }`}
             >
               {f === 'todos' ? 'Todos' : STATUS_CONFIG[f]?.label}
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
         </div>
         <Link
           to="/admin/proyecto/nuevo"
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           <PlusCircle size={16} />
           Nuevo proyecto
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
       </div>
 
       {cargando ? (
-        <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+        <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
       ) : filtrados.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <div className="text-4xl mb-3">📋</div>
@@ -131,7 +131,7 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
               <span className="font-semibold text-slate-700">{avance}%</span>
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
+              <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-400">
@@ -140,7 +140,7 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
               Entrega estimada: {formatFecha(p.proyecto.fechaEstimadaEntrega)}
             </span>
             {tareasDisponibles > 0 && (
-              <span className="text-violet-600 font-medium">
+              <span className="text-brand-700 font-medium">
                 {tareasDisponibles} tarea{tareasDisponibles > 1 ? 's' : ''} disponible{tareasDisponibles > 1 ? 's' : ''}
               </span>
             )}
@@ -157,7 +157,7 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
           )}
           <Link
             to={`/admin/proyecto/${p.slug}`}
-            className="flex items-center gap-1 text-sm text-violet-600 hover:text-violet-800 font-medium transition-colors"
+            className="flex items-center gap-1 text-sm text-brand-700 hover:text-brand-800 font-medium transition-colors"
           >
             Ver proyecto <ChevronRight size={14} />
           </Link>

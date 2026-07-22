@@ -167,9 +167,9 @@ export default function NuevoProyecto() {
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                 paso > i + 1
-                  ? 'bg-violet-600 text-white'
+                  ? 'bg-brand-500 text-slate-900'
                   : paso === i + 1
-                  ? 'bg-violet-600 text-white ring-4 ring-violet-100'
+                  ? 'bg-brand-500 text-slate-900 ring-4 ring-brand-100'
                   : 'bg-slate-200 text-slate-400'
               }`}
             >
@@ -205,7 +205,7 @@ export default function NuevoProyecto() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-slate-700">Participantes adicionales</label>
-                <button onClick={agregarParticipante} className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-800">
+                <button onClick={agregarParticipante} className="flex items-center gap-1 text-xs text-brand-700 hover:text-brand-800">
                   <Plus size={13} /> Agregar
                 </button>
               </div>
@@ -242,7 +242,7 @@ export default function NuevoProyecto() {
               <button
                 onClick={() => setPaso(2)}
                 disabled={!valido1}
-                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                className="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
               >
                 Siguiente →
               </button>
@@ -268,7 +268,7 @@ export default function NuevoProyecto() {
                         onClick={() => setProyectoData({ ...proyectoData, paquete: pq.nombre, plantillaId: pq.id })}
                         className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
                           proyectoData.plantillaId === pq.id
-                            ? 'border-violet-500 bg-violet-50 text-violet-700 font-medium'
+                            ? 'border-brand-500 bg-brand-50 text-brand-800 font-medium'
                             : 'border-slate-200 hover:border-slate-300 text-slate-700'
                         }`}
                       >
@@ -290,7 +290,7 @@ export default function NuevoProyecto() {
                       type="checkbox"
                       checked={proyectoData.extras.includes(e)}
                       onChange={() => toggleExtra(e)}
-                      className="mt-0.5 accent-violet-600"
+                      className="mt-0.5 accent-brand-500"
                     />
                     <span className="text-sm text-slate-700">{e}</span>
                   </label>
@@ -312,7 +312,7 @@ export default function NuevoProyecto() {
                 type="checkbox"
                 checked={proyectoData.anticipoConfirmado}
                 onChange={(e) => setProyectoData({ ...proyectoData, anticipoConfirmado: e.target.checked })}
-                className="accent-violet-600 w-4 h-4"
+                className="accent-brand-500 w-4 h-4"
               />
               <span className="text-sm font-medium text-slate-700">Anticipo confirmado</span>
               {!proyectoData.anticipoConfirmado && (
@@ -337,7 +337,7 @@ export default function NuevoProyecto() {
                     type="checkbox"
                     checked={condiciones[key]}
                     onChange={(e) => setCondiciones({ ...condiciones, [key]: e.target.checked })}
-                    className="accent-violet-600 w-4 h-4"
+                    className="accent-brand-500 w-4 h-4"
                   />
                   <span className="text-sm text-slate-700">{label}</span>
                 </label>
@@ -349,7 +349,7 @@ export default function NuevoProyecto() {
                 type="checkbox"
                 checked={condiciones.requierePluginAdicional}
                 onChange={(e) => setCondiciones({ ...condiciones, requierePluginAdicional: e.target.checked })}
-                className="accent-violet-600 w-4 h-4"
+                className="accent-brand-500 w-4 h-4"
               />
               <span className="text-sm text-slate-700">¿Requiere plugin adicional?</span>
             </label>
@@ -367,7 +367,7 @@ export default function NuevoProyecto() {
               <button
                 onClick={() => setPaso(3)}
                 disabled={!valido2}
-                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                className="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
               >
                 Siguiente →
               </button>
@@ -427,7 +427,7 @@ export default function NuevoProyecto() {
               <button
                 onClick={handleCrear}
                 disabled={creando}
-                className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
               >
                 {creando && <Loader2 size={14} className="animate-spin" />}
                 Crear proyecto ✓
@@ -523,7 +523,7 @@ export default function NuevoProyecto() {
             <div className="flex gap-3">
               <button
                 onClick={() => navigate(`/admin/proyecto/${proyectoCreado.slug}`)}
-                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg text-sm font-semibold transition-colors"
+                className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-3 rounded-lg text-sm font-semibold transition-colors"
               >
                 Ver proyecto →
               </button>
@@ -550,7 +550,7 @@ function Campo({ label, children }) {
   )
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent placeholder:text-slate-400'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400'
 
 function generarPasswordSimple() {
   const palabras = ['cielo', 'verde', 'azul', 'rio', 'sol', 'luna', 'mar', 'viento']

@@ -47,7 +47,7 @@ export default function DetalleProyecto() {
     return (
       <Layout titulo="Proyecto" volver="/admin">
         <div className="flex justify-center py-12">
-          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
       </Layout>
     )
@@ -207,7 +207,7 @@ export default function DetalleProyecto() {
             <span className="font-bold text-slate-800">{avance}%</span>
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-violet-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
+            <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
           </div>
         </div>
 
@@ -236,7 +236,7 @@ export default function DetalleProyecto() {
               setCopiado('link')
               setTimeout(() => setCopiado(false), 2000)
             }}
-            className="flex items-center gap-1 bg-slate-100 hover:bg-violet-50 hover:text-violet-700 px-2 py-0.5 rounded transition-colors"
+            className="flex items-center gap-1 bg-slate-100 hover:bg-brand-50 hover:text-brand-800 px-2 py-0.5 rounded transition-colors"
             title="Copiar link"
           >
             <code className="text-slate-700">/cliente/{proyecto.slug}</code>
@@ -250,7 +250,7 @@ export default function DetalleProyecto() {
               setCopiado('pass')
               setTimeout(() => setCopiado(false), 2000)
             }}
-            className="flex items-center gap-1 bg-slate-100 hover:bg-violet-50 hover:text-violet-700 px-2 py-0.5 rounded transition-colors"
+            className="flex items-center gap-1 bg-slate-100 hover:bg-brand-50 hover:text-brand-800 px-2 py-0.5 rounded transition-colors"
             title="Copiar contraseña"
           >
             <code className="text-slate-700">{proyecto.passwordCliente}</code>
@@ -270,7 +270,7 @@ export default function DetalleProyecto() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              tab === t ? 'border-brand-600 text-brand-800' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {l}
@@ -295,7 +295,7 @@ export default function DetalleProyecto() {
                   <div className="flex items-center gap-3">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                       completadas === total && total > 0 ? 'bg-emerald-100 text-emerald-700' :
-                      fase.numero === faseActual ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'
+                      fase.numero === faseActual ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500'
                     }`}>
                       {fase.numero}
                     </div>
@@ -332,7 +332,7 @@ export default function DetalleProyecto() {
                     <div className="px-5 py-2.5 border-t border-slate-50">
                       <button
                         onClick={() => setModalNueva(fase.numero)}
-                        className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 transition-colors"
                       >
                         <Plus size={13} /> Agregar tarea a Fase {fase.numero}
                       </button>
@@ -413,7 +413,7 @@ export default function DetalleProyecto() {
               ? <p className="text-sm text-slate-400">Sin extras</p>
               : proyecto.proyecto.extras.map((e) => (
                 <div key={e} className="text-sm text-slate-700 flex items-center gap-2">
-                  <Check size={13} className="text-violet-500 shrink-0" /> {e}
+                  <Check size={13} className="text-brand-600 shrink-0" /> {e}
                 </div>
               ))
             }
@@ -438,7 +438,7 @@ export default function DetalleProyecto() {
         <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
           {[...proyecto.log].reverse().map((entry) => (
             <div key={entry.id} className="px-5 py-3 flex items-start gap-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-2 shrink-0" />
+              <div className="w-1.5 h-1.5 rounded-full bg-brand-400 mt-2 shrink-0" />
               <div>
                 <div className="text-sm text-slate-800">
                   <span className="font-medium">{entry.usuario}</span> — {entry.accion}
@@ -460,7 +460,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
 
   const iconMap = {
     completada: <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />,
-    en_proceso: <PlayCircle size={18} className="text-violet-500 shrink-0" />,
+    en_proceso: <PlayCircle size={18} className="text-brand-600 shrink-0" />,
     disponible: <Circle size={18} className="text-slate-300 shrink-0" />,
     bloqueada_dependencia: <Lock size={18} className="text-slate-300 shrink-0" />,
     bloqueada_cliente: <AlertCircle size={18} className="text-amber-400 shrink-0" />,
@@ -469,7 +469,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
 
   const bgMap = {
     completada: 'bg-emerald-50',
-    en_proceso: 'bg-violet-50',
+    en_proceso: 'bg-brand-50',
     disponible: 'bg-white',
     bloqueada_dependencia: 'bg-slate-50',
     bloqueada_cliente: 'bg-amber-50',
@@ -490,7 +490,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>
             )}
             {t.esRutaCritica && (
-              <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">Ruta crítica</span>
+              <span className="text-xs bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full">Ruta crítica</span>
             )}
             {t.soloKarlaOAdmin && (
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>
@@ -506,17 +506,17 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
             </div>
           )}
           {estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl) && (
-            <div className="mt-1.5 text-xs bg-violet-50 border border-violet-100 rounded-lg px-2.5 py-2 space-y-1">
+            <div className="mt-1.5 text-xs bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-2 space-y-1">
               {t.respuestaTexto && <p className="text-slate-700">{t.respuestaTexto}</p>}
               {t.respuestaArchivoUrl && (
-                <a href={t.respuestaArchivoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-violet-600 hover:text-violet-800 font-medium">
+                <a href={t.respuestaArchivoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-brand-700 hover:text-brand-800 font-medium">
                   <ExternalLink size={11} /> {t.respuestaArchivoNombre || 'Archivo adjunto'}
                 </a>
               )}
             </div>
           )}
           {estado === 'en_proceso' && (
-            <div className="text-xs text-violet-600 mt-0.5">
+            <div className="text-xs text-brand-700 mt-0.5">
               {t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso'}
             </div>
           )}
@@ -559,7 +559,7 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
             {estado !== 'omitida' && (
               <button
                 onClick={onEditar}
-                className="p-1.5 text-slate-300 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                className="p-1.5 text-slate-300 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors"
                 title="Editar tarea"
               >
                 <Pencil size={13} />
@@ -659,15 +659,15 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
 
           <div className="flex gap-4 flex-wrap">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-violet-600" />
+              <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
               Tarea del cliente
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-violet-600" />
+              <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-brand-500" />
               Ruta crítica
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-violet-600" />
+              <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-brand-500" />
               Solo Karla/Admin
             </label>
           </div>
@@ -680,7 +680,7 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
           )}
 
           <div className="flex gap-3 pt-2">
-            <button type="submit" className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Guardar cambios
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">
@@ -731,7 +731,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
           </div>
 
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-violet-600" />
+            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
             Es una tarea del cliente
           </label>
 
@@ -764,7 +764,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
           )}
 
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Agregar tarea
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">
@@ -777,7 +777,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
   )
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent placeholder:text-slate-400'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400'
 
 function InfoCard({ titulo, children, fullWidth }) {
   return (
@@ -819,10 +819,10 @@ function LinksClienteEditor({ links, onGuardar, onCrearDrive, driveEstado, drive
             value={form[tipo]}
             onChange={(e) => setForm({ ...form, [tipo]: e.target.value })}
             placeholder={placeholder}
-            className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-300"
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-300"
           />
           {form[tipo] && (
-            <a href={form[tipo]} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-violet-600 shrink-0">
+            <a href={form[tipo]} target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-brand-700 shrink-0">
               <ExternalLink size={13} />
             </a>
           )}
@@ -830,7 +830,7 @@ function LinksClienteEditor({ links, onGuardar, onCrearDrive, driveEstado, drive
       ))}
 
       <div className="flex items-center gap-2 pt-1 flex-wrap">
-        <button type="submit" className="text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+        <button type="submit" className="text-xs bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
           {guardado ? <><Check size={12} /> Guardado</> : <><Link2 size={12} /> Guardar links</>}
         </button>
 
@@ -887,7 +887,7 @@ function ModalLink({ tareaId, linkTipo, titulo, valorActual, onCompletar, onCerr
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">{info.label} *</label>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={info.placeholder} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400" autoFocus />
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={info.placeholder} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400" autoFocus />
           </div>
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={!url.trim()} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">

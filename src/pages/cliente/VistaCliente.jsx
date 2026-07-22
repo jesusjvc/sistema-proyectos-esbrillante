@@ -5,6 +5,7 @@ import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X } from 'lucide-react'
+import logo from '../../assets/logo-esbrillante.svg'
 
 export default function VistaCliente() {
   const { id } = useParams()
@@ -52,21 +53,18 @@ export default function VistaCliente() {
   if (estado === 'cargando') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   if (estado === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-800 flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-6">
-            <div className="inline-flex w-12 h-12 bg-white/10 rounded-xl items-center justify-center mb-3">
-              <span className="text-xl font-bold text-white">E</span>
-            </div>
-            <h1 className="text-xl font-bold text-white">EsBrillante</h1>
-            <p className="text-violet-300 text-sm mt-1">Seguimiento de tu proyecto</p>
+            <img src={logo} alt="EsBrillante" className="h-8 w-auto mx-auto mb-3" />
+            <p className="text-brand-300 text-sm mt-1">Seguimiento de tu proyecto</p>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-2xl">
             <form onSubmit={handleLogin} className="space-y-4">
@@ -77,7 +75,7 @@ export default function VistaCliente() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setLoginError('') }}
                   placeholder="Tu contraseña..."
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400"
                   autoFocus
                 />
               </div>
@@ -85,7 +83,7 @@ export default function VistaCliente() {
               <button
                 type="submit"
                 disabled={loginCargando}
-                className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white py-3 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 py-3 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
               >
                 {loginCargando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
                 Ver mi proyecto
@@ -133,7 +131,7 @@ export default function VistaCliente() {
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-4 py-4">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0">E</div>
+          <div className="w-8 h-8 bg-slate-950 rounded-lg flex items-center justify-center text-brand-400 text-sm font-bold shrink-0">E</div>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-slate-800 truncate">{proyecto.cliente.nombreComercial}</div>
             <div className="text-xs text-slate-400">Seguimiento de proyecto · EsBrillante</div>
@@ -152,17 +150,17 @@ export default function VistaCliente() {
                 {completado ? 'Proyecto entregado' : `Etapa ${faseActual} de ${fases.length} — ${faseActualNombre}`}
               </div>
             </div>
-            <div className="text-3xl font-bold text-violet-600">{avance}%</div>
+            <div className="text-3xl font-bold text-brand-600">{avance}%</div>
           </div>
           <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
-            <div className="h-full bg-gradient-to-r from-violet-500 to-violet-600 rounded-full transition-all duration-700" style={{ width: `${avance}%` }} />
+            <div className="h-full bg-gradient-to-r from-brand-400 to-brand-500 rounded-full transition-all duration-700" style={{ width: `${avance}%` }} />
           </div>
           <div className="flex gap-1 mb-3">
             {fases.map((f) => {
               const tareasF = proyecto.tareas.filter((t) => t.fase === f.numero && t.estado !== 'omitida')
               const completa = tareasF.length > 0 && tareasF.filter((t) => t.estado === 'completada').length === tareasF.length
               const enCurso = f.numero === faseActual && !completado
-              return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-violet-500' : enCurso ? 'bg-violet-300' : 'bg-slate-100'}`} />
+              return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100'}`} />
             })}
           </div>
           {enPausa && (
@@ -178,8 +176,8 @@ export default function VistaCliente() {
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center shrink-0">
-                <Calendar size={18} className="text-violet-600" />
+              <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center shrink-0">
+                <Calendar size={18} className="text-brand-600" />
               </div>
               <div className="flex-1">
                 <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
@@ -219,7 +217,7 @@ export default function VistaCliente() {
         )}
 
         {completado && (
-          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm text-violet-700 flex items-center gap-2">
+          <div className="bg-brand-50 border border-brand-200 rounded-xl p-4 text-sm text-brand-800 flex items-center gap-2">
             <CheckCircle2 size={16} className="shrink-0" />
             ¡Tu proyecto está completado! Si necesitas algún ajuste, contáctanos directamente.
           </div>
@@ -302,7 +300,7 @@ function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
           const yaPaso = f.numero < faseActual || completado
           return (
             <div key={f.numero} className="flex items-start gap-3">
-              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-violet-500' : 'bg-slate-200'}`} />
+              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-brand-500' : 'bg-slate-200'}`} />
               <div className="flex-1 min-w-0">
                 <div className={`text-sm font-medium ${esActual ? 'text-slate-800' : yaPaso ? 'text-slate-500' : 'text-slate-400'}`}>{f.nombre}</div>
                 {f.fechaEstimada && <div className="text-xs text-slate-400 mt-0.5">Estimado: {formatFecha(f.fechaEstimada)}</div>}
@@ -340,7 +338,7 @@ function RecursosProyecto({ links }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-        <FolderOpen size={16} className="text-violet-500" />
+        <FolderOpen size={16} className="text-brand-600" />
         <span className="font-semibold text-slate-800 text-sm">Recursos de tu proyecto</span>
       </div>
       <div className="divide-y divide-slate-50">
@@ -350,7 +348,7 @@ function RecursosProyecto({ links }) {
               <div className="text-sm font-medium text-slate-800">{r.label}</div>
               <div className="text-xs text-slate-400 mt-0.5">{r.descripcion}</div>
             </div>
-            <a href={links[r.tipo]} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0">
+            <a href={links[r.tipo]} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-lg transition-colors shrink-0">
               Abrir <ExternalLink size={11} />
             </a>
           </div>
@@ -368,7 +366,7 @@ function GrupoActividad({ titulo, tareas, estado }) {
         {tareas.map((t) => (
           <div key={t.id} className="flex items-center gap-2.5">
             {estado === 'completada' && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
-            {estado === 'en_proceso' && <div className="w-3.5 h-3.5 rounded-full border-2 border-violet-500 border-t-transparent animate-spin shrink-0" />}
+            {estado === 'en_proceso' && <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin shrink-0" />}
             {estado === 'pendiente' && <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200 shrink-0" />}
             <span className={`text-sm ${estado === 'completada' ? 'text-slate-400 line-through' : estado === 'en_proceso' ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>{t.titulo}</span>
             <span className="ml-auto text-xs text-slate-300 shrink-0">Equipo EsBrillante</span>
@@ -424,7 +422,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Escribe tu respuesta aquí (opcional si solo vas a adjuntar un archivo)..."
             rows={3}
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-violet-400 placeholder:text-slate-400 resize-none"
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 resize-none"
           />
 
           {archivo ? (
@@ -436,7 +434,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
               </button>
             </div>
           ) : (
-            <label className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-700 cursor-pointer w-fit mb-3">
+            <label className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 cursor-pointer w-fit mb-3">
               <Paperclip size={12} />
               Adjuntar un archivo
               <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
@@ -448,7 +446,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
           <button
             onClick={enviar}
             disabled={enviando}
-            className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
           >
             {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             ✓ Enviar respuesta

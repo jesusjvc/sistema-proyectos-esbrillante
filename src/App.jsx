@@ -15,7 +15,7 @@ import VistaCliente from './pages/cliente/VistaCliente'
 
 function RequireAuth({ rol, children }) {
   const { user } = useAuth()
-  if (user === undefined) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (user === undefined) return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
   if (!user || user.rol !== rol) return <Navigate to="/" replace />
   return children
 }

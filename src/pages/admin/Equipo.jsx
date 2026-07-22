@@ -69,7 +69,7 @@ export default function Equipo() {
         </p>
 
         {cargando ? (
-          <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
             {miembros.map((m, idx) => (
@@ -81,30 +81,30 @@ export default function Equipo() {
                         value={editForm.nombre}
                         onChange={(e) => setEditForm({ ...editForm, nombre: e.target.value })}
                         placeholder="Nombre"
-                        className="border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 w-36"
+                        className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-36"
                         autoFocus
                       />
                       <input
                         value={editForm.email}
                         onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                         placeholder="Email"
-                        className="border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 w-48"
+                        className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-48"
                       />
                       <input
                         type="password"
                         value={editForm.password}
                         onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                         placeholder="Nueva contraseña (opcional)"
-                        className="border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 w-48"
+                        className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-48"
                       />
                     </div>
                     <div className="flex items-center gap-4">
                       <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                        <input type="checkbox" checked={editForm.rol === 'ADMIN'} onChange={(e) => setEditForm({ ...editForm, rol: e.target.checked ? 'ADMIN' : 'EQUIPO' })} className="accent-violet-600" />
+                        <input type="checkbox" checked={editForm.rol === 'ADMIN'} onChange={(e) => setEditForm({ ...editForm, rol: e.target.checked ? 'ADMIN' : 'EQUIPO' })} className="accent-brand-500" />
                         Admin
                       </label>
                       <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                        <input type="checkbox" checked={editForm.esKarla} onChange={(e) => setEditForm({ ...editForm, esKarla: e.target.checked })} className="accent-violet-600" />
+                        <input type="checkbox" checked={editForm.esKarla} onChange={(e) => setEditForm({ ...editForm, esKarla: e.target.checked })} className="accent-brand-500" />
                         Rol QA (Karla)
                       </label>
                       <div className="flex gap-1 ml-auto">
@@ -127,21 +127,21 @@ export default function Equipo() {
                   </div>
                 ) : (
                   <>
-                    <div className="w-8 h-8 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-semibold text-sm shrink-0">
+                    <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-brand-800 font-semibold text-sm shrink-0">
                       {m.nombre[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-slate-800 text-sm">{m.nombre}</div>
                       <div className="text-xs text-slate-400">{m.email}</div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {m.rol === 'ADMIN' && <span className="text-xs text-violet-600 flex items-center gap-0.5"><Shield size={11} /> Admin</span>}
+                        {m.rol === 'ADMIN' && <span className="text-xs text-brand-700 flex items-center gap-0.5"><Shield size={11} /> Admin</span>}
                         {m.esKarla && <span className="text-xs text-amber-600 flex items-center gap-0.5"><Star size={11} /> QA</span>}
                         {m.rol !== 'ADMIN' && !m.esKarla && <span className="text-xs text-slate-400">Equipo</span>}
                         {!m.activo && <span className="text-xs text-red-400">Inactivo</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => iniciarEdicion(m)} className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"><Pencil size={14} /></button>
+                      <button onClick={() => iniciarEdicion(m)} className="p-1.5 text-slate-400 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors"><Pencil size={14} /></button>
                       <button onClick={() => setBorrandoId(m.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </>
@@ -150,24 +150,24 @@ export default function Equipo() {
             ))}
 
             {mostrarNuevo && (
-              <div className="px-5 py-4 border-t border-slate-100 bg-violet-50">
+              <div className="px-5 py-4 border-t border-slate-100 bg-brand-50">
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2 flex-wrap">
-                    <input value={nuevoForm.nombre} onChange={(e) => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} placeholder="Nombre" className="border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 w-36" autoFocus />
-                    <input value={nuevoForm.email} onChange={(e) => setNuevoForm({ ...nuevoForm, email: e.target.value })} placeholder="Email" className="border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 w-48" />
-                    <input type="password" value={nuevoForm.password} onChange={(e) => setNuevoForm({ ...nuevoForm, password: e.target.value })} placeholder="Contraseña" className="border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400 w-40" />
+                    <input value={nuevoForm.nombre} onChange={(e) => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} placeholder="Nombre" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-36" autoFocus />
+                    <input value={nuevoForm.email} onChange={(e) => setNuevoForm({ ...nuevoForm, email: e.target.value })} placeholder="Email" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-48" />
+                    <input type="password" value={nuevoForm.password} onChange={(e) => setNuevoForm({ ...nuevoForm, password: e.target.value })} placeholder="Contraseña" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-40" />
                   </div>
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                      <input type="checkbox" checked={nuevoForm.rol === 'ADMIN'} onChange={(e) => setNuevoForm({ ...nuevoForm, rol: e.target.checked ? 'ADMIN' : 'EQUIPO' })} className="accent-violet-600" />
+                      <input type="checkbox" checked={nuevoForm.rol === 'ADMIN'} onChange={(e) => setNuevoForm({ ...nuevoForm, rol: e.target.checked ? 'ADMIN' : 'EQUIPO' })} className="accent-brand-500" />
                       Admin
                     </label>
                     <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                      <input type="checkbox" checked={nuevoForm.esKarla} onChange={(e) => setNuevoForm({ ...nuevoForm, esKarla: e.target.checked })} className="accent-violet-600" />
+                      <input type="checkbox" checked={nuevoForm.esKarla} onChange={(e) => setNuevoForm({ ...nuevoForm, esKarla: e.target.checked })} className="accent-brand-500" />
                       Rol QA (Karla)
                     </label>
                     <div className="flex gap-1 ml-auto">
-                      <button onClick={handleAgregar} className="flex items-center gap-1 bg-violet-600 hover:bg-violet-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+                      <button onClick={handleAgregar} className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 text-slate-900 text-xs px-3 py-1.5 rounded-lg transition-colors">
                         <Check size={13} /> Agregar
                       </button>
                       <button onClick={() => { setMostrarNuevo(false); setNuevoForm(FORM_VACIO); setError('') }} className="text-slate-400 hover:text-slate-700 px-2"><X size={15} /></button>
@@ -181,7 +181,7 @@ export default function Equipo() {
         )}
 
         {!mostrarNuevo && (
-          <button onClick={() => setMostrarNuevo(true)} className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-800 font-medium transition-colors">
+          <button onClick={() => setMostrarNuevo(true)} className="flex items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium transition-colors">
             <Plus size={16} /> Agregar miembro
           </button>
         )}

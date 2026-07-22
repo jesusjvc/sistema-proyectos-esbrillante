@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login } from '../data/api'
 import { useAuth } from '../context/AuthContext'
+import logo from '../assets/logo-esbrillante.svg'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -34,10 +35,7 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-violet-600 rounded-2xl mb-4">
-            <span className="text-2xl font-bold text-white">E</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white">EsBrillante</h1>
+          <img src={logo} alt="EsBrillante" className="h-9 w-auto mx-auto mb-4" />
           <p className="text-slate-400 text-sm mt-1">Sistema de Seguimiento de Proyectos</p>
         </div>
 
@@ -52,7 +50,7 @@ export default function Login() {
                 placeholder="tu@esbrillante.mx"
                 required
                 autoFocus
-                className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 outline-none text-sm placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500"
+                className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 outline-none text-sm placeholder:text-slate-500 focus:ring-2 focus:ring-brand-400"
               />
             </div>
             <div>
@@ -63,7 +61,7 @@ export default function Login() {
                 onChange={(e) => { setPassword(e.target.value); setError('') }}
                 placeholder="••••••••"
                 required
-                className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 outline-none text-sm placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500"
+                className="w-full bg-slate-700 text-white rounded-lg px-4 py-3 outline-none text-sm placeholder:text-slate-500 focus:ring-2 focus:ring-brand-400"
               />
             </div>
 
@@ -72,7 +70,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={cargando}
-              className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white rounded-lg py-3 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 rounded-lg py-3 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
               {cargando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
               Entrar

@@ -127,12 +127,12 @@ export default function EditarPaquete() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">{plantilla.area}</span>
+                  <span className="text-xs bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full font-medium">{plantilla.area}</span>
                   <span className="text-xs text-slate-400">{plantilla.tareas.length} actividades · {plantilla.fases.length} fases</span>
                 </div>
                 {plantilla.descripcion && <p className="text-sm text-slate-500 mt-1">{plantilla.descripcion}</p>}
               </div>
-              <button onClick={iniciarEditarMeta} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-violet-600 transition-colors shrink-0">
+              <button onClick={iniciarEditarMeta} className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-brand-700 transition-colors shrink-0">
                 <Pencil size={14} /> Editar nombre/área
               </button>
             </div>
@@ -156,7 +156,7 @@ export default function EditarPaquete() {
                 {/* Header de fase */}
                 <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-slate-100">
                   <button onClick={() => toggleFase(fase.numero)} className="flex items-center gap-2 flex-1 text-left">
-                    <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-brand-100 text-brand-800 text-xs font-bold flex items-center justify-center shrink-0">
                       {fase.numero}
                     </div>
                     {editandoFase === fase.numero ? (
@@ -166,7 +166,7 @@ export default function EditarPaquete() {
                         onBlur={(e) => handleEditarNombreFase(fase.numero, e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleEditarNombreFase(fase.numero, e.target.value)}
                         onClick={(e) => e.stopPropagation()}
-                        className="border border-violet-300 rounded px-2 py-0.5 text-sm font-medium outline-none focus:ring-2 focus:ring-violet-400"
+                        className="border border-brand-300 rounded px-2 py-0.5 text-sm font-medium outline-none focus:ring-2 focus:ring-brand-400"
                       />
                     ) : (
                       <span className="font-medium text-slate-700 text-sm">{fase.nombre}</span>
@@ -204,7 +204,7 @@ export default function EditarPaquete() {
                     <div className="px-5 py-2.5 border-t border-slate-50">
                       <button
                         onClick={() => setModalTarea({ modo: 'nueva', faseNum: fase.numero })}
-                        className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 transition-colors"
                       >
                         <Plus size={13} /> Agregar actividad a Fase {fase.numero}
                       </button>
@@ -217,7 +217,7 @@ export default function EditarPaquete() {
 
           {/* Nueva fase */}
           {mostrarNuevaFase ? (
-            <form onSubmit={handleAgregarFase} className="bg-violet-50 border border-violet-200 rounded-xl px-5 py-4 flex items-center gap-3">
+            <form onSubmit={handleAgregarFase} className="bg-brand-50 border border-brand-200 rounded-xl px-5 py-4 flex items-center gap-3">
               <input
                 value={nuevaFaseNombre}
                 onChange={(e) => setNuevaFaseNombre(e.target.value)}
@@ -225,7 +225,7 @@ export default function EditarPaquete() {
                 className={inputCls + ' flex-1'}
                 autoFocus
               />
-              <button type="submit" disabled={!nuevaFaseNombre.trim()} className="bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+              <button type="submit" disabled={!nuevaFaseNombre.trim()} className="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 text-sm px-4 py-2 rounded-lg transition-colors">
                 Agregar
               </button>
               <button type="button" onClick={() => { setMostrarNuevaFase(false); setNuevaFaseNombre('') }} className="text-slate-400 hover:text-slate-700">
@@ -276,7 +276,7 @@ function TareaFilaPlantilla({ tarea: t, idx, total, onEditar, onEliminar, onMove
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-slate-800">{t.titulo}</span>
           {t.esCliente && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>}
-          {t.esRutaCritica && <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">Ruta crítica</span>}
+          {t.esRutaCritica && <span className="text-xs bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full">Ruta crítica</span>}
           {t.soloKarlaOAdmin && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>}
           {t.opcional && <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Opcional</span>}
         </div>
@@ -298,7 +298,7 @@ function TareaFilaPlantilla({ tarea: t, idx, total, onEditar, onEliminar, onMove
         </div>
       ) : (
         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onEditar} className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors">
+          <button onClick={onEditar} className="p-1.5 text-slate-400 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors">
             <Pencil size={13} />
           </button>
           <button onClick={() => setConfirmarEliminar(true)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -361,7 +361,7 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
           </div>
 
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked, responsable: e.target.checked ? 'cliente' : 'equipo' })} className="accent-violet-600 w-4 h-4" />
+            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked, responsable: e.target.checked ? 'cliente' : 'equipo' })} className="accent-brand-500 w-4 h-4" />
             <span className="font-medium">Es una actividad del cliente</span>
           </label>
 
@@ -426,21 +426,21 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
           {/* Flags */}
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-violet-600" />
+              <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-brand-500" />
               Ruta crítica
             </label>
             {!form.esCliente && (
               <>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-violet-600" />
+                  <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-brand-500" />
                   Solo Karla / Admin
                 </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={form.soloAdmin} onChange={(e) => setForm({ ...form, soloAdmin: e.target.checked })} className="accent-violet-600" />
+                  <input type="checkbox" checked={form.soloAdmin} onChange={(e) => setForm({ ...form, soloAdmin: e.target.checked })} className="accent-brand-500" />
                   Solo Admin
                 </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={form.opcional} onChange={(e) => setForm({ ...form, opcional: e.target.checked })} className="accent-violet-600" />
+                  <input type="checkbox" checked={form.opcional} onChange={(e) => setForm({ ...form, opcional: e.target.checked })} className="accent-brand-500" />
                   Opcional
                 </label>
               </>
@@ -448,7 +448,7 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               {modo === 'nueva' ? 'Agregar actividad' : 'Guardar cambios'}
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">
@@ -461,5 +461,5 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
   )
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent placeholder:text-slate-400'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400'
 const labelCls = 'block text-sm font-medium text-slate-700 mb-1.5'

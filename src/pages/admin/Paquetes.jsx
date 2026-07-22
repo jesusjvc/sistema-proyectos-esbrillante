@@ -98,7 +98,7 @@ export default function Paquetes() {
                         </button>
                         <Link
                           to={`/admin/paquetes/${p.id}`}
-                          className="flex items-center gap-1.5 text-sm text-violet-600 hover:text-violet-800 font-medium px-3 py-1.5 rounded-lg hover:bg-violet-50 transition-colors"
+                          className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
                         >
                           <Pencil size={13} /> Editar
                         </Link>
@@ -113,7 +113,7 @@ export default function Paquetes() {
 
         {/* Nuevo paquete */}
         {mostrarNuevo ? (
-          <form onSubmit={handleCrear} className="bg-white border-2 border-violet-200 rounded-xl p-5 space-y-4">
+          <form onSubmit={handleCrear} className="bg-white border-2 border-brand-200 rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-semibold text-slate-800">Nuevo paquete</h3>
               <button type="button" onClick={() => setMostrarNuevo(false)} className="text-slate-400 hover:text-slate-700"><X size={16} /></button>
@@ -170,12 +170,12 @@ export default function Paquetes() {
                 ))}
               </select>
               {nuevoForm.copiarDe && (
-                <p className="text-xs text-violet-600 mt-1">Se copiarán todas las actividades del paquete seleccionado. Podrás editarlas después.</p>
+                <p className="text-xs text-brand-700 mt-1">Se copiarán todas las actividades del paquete seleccionado. Podrás editarlas después.</p>
               )}
             </div>
 
             <div className="flex gap-3 pt-1">
-              <button type="submit" disabled={!nuevoForm.nombre.trim()} className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+              <button type="submit" disabled={!nuevoForm.nombre.trim()} className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors">
                 <Check size={15} /> Crear paquete
               </button>
               <button type="button" onClick={() => setMostrarNuevo(false)} className="text-slate-500 hover:text-slate-700 text-sm px-4 py-2.5">
@@ -186,7 +186,7 @@ export default function Paquetes() {
         ) : (
           <button
             onClick={() => setMostrarNuevo(true)}
-            className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-800 font-medium transition-colors"
+            className="flex items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium transition-colors"
           >
             <Plus size={16} /> Nuevo paquete
           </button>
@@ -196,4 +196,4 @@ export default function Paquetes() {
   )
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent placeholder:text-slate-400'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400'
