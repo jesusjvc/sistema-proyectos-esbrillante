@@ -5,6 +5,19 @@ export function calcularAvance(proyecto) {
   return Math.round((completadas / tareas.length) * 100)
 }
 
+export function contarPendientesCliente(proyecto) {
+  return proyecto.tareas.filter((t) => t.esCliente && t.estado === 'pendiente').length
+}
+
+// true si el cliente hizo algo (completó una tarea, respondió) después de la
+// última vez que el admin abrió el detalle del proyecto.
+export function tieneRespuestaNueva(proyecto) {
+  const log = proyecto.log || []
+  if (!log.length) return false
+  const vistoEn = proyecto.vistoAdminEn ? new Date(proyecto.vistoAdminEn) : null
+  return log.some((l) => l.usuario === 'Cliente' && (!vistoEn || new Date(l.fecha) > vistoEn))
+}
+
 export function getFaseActual(proyecto) {
   const tareas = proyecto.tareas
   const totalFases = proyecto.proyecto?.fases?.length || 7

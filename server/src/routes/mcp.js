@@ -5,7 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
 import { requireApiKey } from '../middleware/auth.js'
-import { calcularAvance, getFaseActual } from '../lib/avance.js'
+import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
@@ -75,13 +75,13 @@ function buildServer() {
     'listar_proyectos',
     {
       title: 'Listar proyectos',
-      description: 'Lista los proyectos activos (excluye los que aún no confirman anticipo) con su slug, cliente, paquete, status y % de avance.',
+      description: 'Lista los proyectos activos (excluye los que aún no confirman anticipo) con su slug, cliente, paquete, status, % de avance, cuántas tareas tiene pendientes el cliente y si respondió algo que el admin todavía no ha visto — útil para priorizar en qué proyecto hace falta dar seguimiento.',
       inputSchema: {},
     },
     async () => {
       const proyectos = await prisma.proyecto.findMany({
         where: { status: { not: 'pendiente_anticipo' } },
-        include: { tareas: true },
+        include: { tareas: true, log: { orderBy: { fecha: 'desc' }, take: 20 } },
         orderBy: { creadoEn: 'desc' },
       })
       const resumen = proyectos.map((p) => ({
@@ -90,6 +90,8 @@ function buildServer() {
         paquete: p.proyecto?.paquete || '(sin paquete)',
         status: p.status,
         avance: calcularAvance(p),
+        pendientesCliente: contarPendientesCliente(p),
+        respuestaNuevaSinRevisar: tieneRespuestaNueva(p),
       }))
       return ok(JSON.stringify(resumen, null, 2))
     },

@@ -31,6 +31,7 @@ export const confirmarAnticipo = (slug) => req('POST', `/api/proyectos/${slug}/a
 export const iniciarPausa = (slug, fase) => req('POST', `/api/proyectos/${slug}/pausa`, { fase })
 export const terminarPausa = (slug) => req('DELETE', `/api/proyectos/${slug}/pausa`)
 export const cerrarProyecto = (slug) => req('POST', `/api/proyectos/${slug}/cerrar`)
+export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-visto`)
 
 // ─── Tareas ────────────────────────────────────────────────────────────────
 export const iniciarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/iniciar`)

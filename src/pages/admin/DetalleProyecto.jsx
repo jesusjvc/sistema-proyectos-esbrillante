@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   getProyecto, completarTarea, reabrirTarea, omitirTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
-  editarTarea, agregarTarea, eliminarTarea, actualizarLinks,
+  editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
@@ -34,6 +34,7 @@ export default function DetalleProyecto() {
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/admin'))
+    marcarVisto(id).catch(() => {})
   }, [id])
 
   async function refresh() {

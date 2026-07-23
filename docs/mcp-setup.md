@@ -93,7 +93,7 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 
 | Tool | Uso |
 |---|---|
-| `listar_proyectos` | Ver todos los proyectos activos y su slug |
+| `listar_proyectos` | Ver todos los proyectos activos, su slug, cuántas tareas tiene pendientes el cliente y si respondió algo que el admin no ha visto todavía |
 | `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
 | `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente |
 | `registrar_actividad(slug, titulo, descripcion?, fase?, completada?, antesDeTareaId?, despuesDeTareaId?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |

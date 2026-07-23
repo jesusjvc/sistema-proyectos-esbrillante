@@ -143,6 +143,20 @@ router.delete('/:slug', requireAdminOrApiKey, async (req, res) => {
   }
 })
 
+// POST /api/proyectos/:slug/marcar-visto
+router.post('/:slug/marcar-visto', requireAuth, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    await prisma.proyecto.update({ where: { id: p.id }, data: { vistoAdminEn: new Date() } })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/proyectos/:slug/links
 router.put('/:slug/links', requireAuth, async (req, res) => {
   try {

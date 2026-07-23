@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, confirmarAnticipo } from '../../data/api'
-import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
+import { calcularAvance, getFaseActual, formatFecha, contarPendientesCliente, tieneRespuestaNueva } from '../../data/storage'
 import { FASES } from '../../data/paquetes'
 import { useEventosGlobal } from '../../hooks/useEventos'
-import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight } from 'lucide-react'
+import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, Bell, MessageCircle } from 'lucide-react'
 
 const STATUS_CONFIG = {
   activo: { label: 'Activo', color: 'bg-emerald-100 text-emerald-700', icon: <CheckCircle2 size={13} /> },
@@ -46,15 +46,17 @@ export default function AdminDashboard() {
     en_pausa: proyectos.filter((p) => p.status === 'en_pausa').length,
     pendiente_anticipo: proyectos.filter((p) => p.status === 'pendiente_anticipo').length,
     completado: proyectos.filter((p) => p.status === 'completado').length,
+    respuestasNuevas: proyectos.filter(tieneRespuestaNueva).length,
   }
 
   return (
     <Layout titulo="Proyectos">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <MetricaCard label="Activos" valor={counts.activo} color="text-emerald-600" />
         <MetricaCard label="En pausa" valor={counts.en_pausa} color="text-amber-600" />
         <MetricaCard label="Pendientes anticipo" valor={counts.pendiente_anticipo} color="text-red-600" />
         <MetricaCard label="Completados" valor={counts.completado} color="text-slate-500" />
+        <MetricaCard label="Respuestas nuevas" valor={counts.respuestasNuevas} color="text-brand-700" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -104,6 +106,8 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
   const faseActual = getFaseActual(p)
   const faseNombre = FASES.find((f) => f.numero === faseActual)?.nombre || ''
   const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.activo
+  const pendientesCliente = contarPendientesCliente(p)
+  const respuestaNueva = tieneRespuestaNueva(p)
 
   const tareasDisponibles = p.tareas.filter((t) => {
     if (t.estado === 'completada' || t.estado === 'omitida') return false
@@ -112,14 +116,24 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
   }).length
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 transition-colors">
+    <div className={`bg-white rounded-xl border p-5 transition-colors ${respuestaNueva ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="font-semibold text-slate-800 truncate">{p.cliente.nombreComercial}</h3>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${cfg.color}`}>
               {cfg.icon}{cfg.label}
             </span>
+            {respuestaNueva && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-brand-100 text-brand-800">
+                <Bell size={11} /> Respuesta nueva
+              </span>
+            )}
+            {pendientesCliente > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 bg-amber-100 text-amber-700">
+                <MessageCircle size={11} /> {pendientesCliente} pendiente{pendientesCliente > 1 ? 's' : ''} del cliente
+              </span>
+            )}
           </div>
           <div className="text-sm text-slate-500 mb-3">
             {p.proyecto.paquete}

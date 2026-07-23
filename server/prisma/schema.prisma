@@ -37,6 +37,7 @@ model Proyecto {
   equipo              Json
   linksCliente        Json     @default("{}")
   driveRespuestasId   String?
+  vistoAdminEn        DateTime?
   tiempos             Json     @default("{}")
   passwordCliente     String
 
