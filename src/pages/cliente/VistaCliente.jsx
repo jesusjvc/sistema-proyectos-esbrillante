@@ -207,6 +207,9 @@ export default function VistaCliente() {
               Necesitamos tu respuesta
               <span className="text-sm bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
             </h2>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800 leading-relaxed">
+              Te pedimos apoyarnos respondiendo esto a la brevedad — mientras más tardemos en tener esta información, más se puede alargar el tiempo del proyecto. No hace falta que nos mandes todo junto: puedes ir compartiendo la información poco a poco y nosotros vamos avanzando de este lado con lo que ya tengamos.
+            </div>
             <div className="space-y-3">
               {tareasPendientesCliente.map((t) => (
                 <TareaClienteCard key={t.id} tarea={t} onCompletar={(respuesta) => handleCompletar(t.id, respuesta)} />
