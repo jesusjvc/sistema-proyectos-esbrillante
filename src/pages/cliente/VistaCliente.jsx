@@ -4,12 +4,14 @@ import { getProyectoCliente, loginCliente, completarTareaCliente } from '../../d
 import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X } from 'lucide-react'
+import { useTheme } from '../../context/ThemeContext'
+import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon } from 'lucide-react'
 import logo from '../../assets/logo-esbrillante.svg'
 
 export default function VistaCliente() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { tema, toggleTema } = useTheme()
   const [proyecto, setProyecto] = useState(null)
   const [estado, setEstado] = useState('cargando') // 'cargando' | 'login' | 'ok' | 'error'
   const [password, setPassword] = useState('')
@@ -52,7 +54,7 @@ export default function VistaCliente() {
 
   if (estado === 'cargando') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -128,33 +130,38 @@ export default function VistaCliente() {
   const completado = proyecto.status === 'completado'
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-4 py-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="bg-slate-950 border-b border-brand-500/25 px-4 py-4 shadow-lg shadow-black/5">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="h-10 px-2.5 bg-slate-950 rounded-lg flex items-center justify-center shrink-0">
-            <img src={logo} alt="EsBrillante" className="h-6 w-auto" />
-          </div>
+          <img src={logo} alt="EsBrillante" className="h-8 w-auto shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-slate-800 text-lg truncate">{proyecto.cliente.nombreComercial}</div>
-            <div className="text-sm text-slate-500">Seguimiento de proyecto · EsBrillante</div>
+            <div className="font-semibold text-white text-lg truncate">{proyecto.cliente.nombreComercial}</div>
+            <div className="text-sm text-slate-400">Seguimiento de proyecto · EsBrillante</div>
           </div>
-          {enPausa && <span className="text-sm bg-amber-100 text-amber-700 px-2 py-1 rounded-full shrink-0">En pausa</span>}
-          {completado && <span className="text-sm bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full shrink-0">Completado</span>}
+          {enPausa && <span className="text-sm bg-amber-400/15 text-amber-300 px-2 py-1 rounded-full shrink-0">En pausa</span>}
+          {completado && <span className="text-sm bg-emerald-400/15 text-emerald-300 px-2 py-1 rounded-full shrink-0">Completado</span>}
+          <button
+            onClick={toggleTema}
+            title={tema === 'dark' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
+            className="p-2 rounded-lg text-slate-400 hover:text-brand-400 hover:bg-white/5 transition-colors shrink-0"
+          >
+            {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="font-semibold text-slate-800 text-base">{proyecto.proyecto.paquete}</div>
-              <div className="text-base text-slate-500 mt-0.5">
+              <div className="font-semibold text-slate-800 dark:text-slate-100 text-base">{proyecto.proyecto.paquete}</div>
+              <div className="text-base text-slate-500 dark:text-slate-400 mt-0.5">
                 {completado ? 'Proyecto entregado' : `Etapa ${faseActual} de ${fases.length} — ${faseActualNombre}`}
               </div>
             </div>
-            <div className="text-3xl font-bold text-brand-600">{avance}%</div>
+            <div className="text-3xl font-bold text-brand-600 dark:text-brand-400">{avance}%</div>
           </div>
-          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-3">
+          <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-3">
             <div className="h-full bg-gradient-to-r from-brand-400 to-brand-500 rounded-full transition-all duration-700" style={{ width: `${avance}%` }} />
           </div>
           <div className="flex gap-1 mb-3">
@@ -162,16 +169,16 @@ export default function VistaCliente() {
               const tareasF = proyecto.tareas.filter((t) => t.fase === f.numero && t.estado !== 'omitida')
               const completa = tareasF.length > 0 && tareasF.filter((t) => t.estado === 'completada').length === tareasF.length
               const enCurso = f.numero === faseActual && !completado
-              return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100'}`} />
+              return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100 dark:bg-slate-800'}`} />
             })}
           </div>
           {enPausa && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-base text-amber-700 flex items-start gap-2 mb-3">
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-2.5 text-base text-amber-700 dark:text-amber-300 flex items-start gap-2 mb-3">
               <Clock size={15} className="shrink-0 mt-0.5" />
               <span>El proyecto está en espera de tu respuesta. En cuanto respondas, el equipo continúa.</span>
             </div>
           )}
-          <div className="flex items-start gap-2 text-sm text-slate-400 bg-slate-50 rounded-lg px-3 py-2.5">
+          <div className="flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
             <Info size={13} className="shrink-0 mt-0.5" />
             <span>El % es un estimado y puede ajustarse — si surgen nuevas actividades durante el proyecto, es normal que baje un poco antes de volver a subir. No significa que se haya retrocedido.</span>
           </div>
@@ -180,18 +187,18 @@ export default function VistaCliente() {
         {tieneFechasPorFase ? (
           <FasesConFechas fases={fases} faseActual={faseActual} completado={completado} fechaCierre={proyecto.tiempos.cierre} />
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center shrink-0">
-                <Calendar size={18} className="text-brand-600" />
+              <div className="w-10 h-10 bg-brand-50 dark:bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
+                <Calendar size={18} className="text-brand-600 dark:text-brand-400" />
               </div>
               <div className="flex-1">
-                <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
-                <div className="text-xl font-bold text-slate-800">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
-                {completado && proyecto.tiempos.cierre && <div className="text-base text-emerald-600 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
+                <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
+                {completado && proyecto.tiempos.cierre && <div className="text-base text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
               </div>
             </div>
-            <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 bg-slate-50 rounded-lg px-3 py-2.5">
+            <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
               <Info size={13} className="shrink-0 mt-0.5" />
               <span>Esta fecha es un estimado. Te avisaremos con anticipación si hay algún cambio.</span>
             </div>
@@ -202,12 +209,12 @@ export default function VistaCliente() {
 
         {tareasPendientesCliente.length > 0 && (
           <section>
-            <h2 className="font-semibold text-slate-800 text-base mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-base mb-3 flex items-center gap-2">
               <AlertCircle size={18} className="text-amber-500" />
               Necesitamos tu respuesta
-              <span className="text-sm bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
+              <span className="text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
             </h2>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800 leading-relaxed">
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
               Te pedimos apoyarnos respondiendo esto a la brevedad — mientras más tardemos en tener esta información, más se puede alargar el tiempo del proyecto. No hace falta que nos mandes todo junto: puedes ir compartiendo la información poco a poco y nosotros vamos avanzando de este lado con lo que ya tengamos.
             </div>
             <div className="space-y-3">
@@ -219,35 +226,35 @@ export default function VistaCliente() {
         )}
 
         {tareasPendientesCliente.length === 0 && !completado && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-base text-emerald-700 flex items-center gap-2">
+          <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-4 text-base text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
             <CheckCircle2 size={16} className="shrink-0" />
             No tienes nada pendiente por ahora. El equipo está trabajando en tu proyecto.
           </div>
         )}
 
         {completado && (
-          <div className="bg-brand-50 border border-brand-200 rounded-xl p-4 text-base text-brand-800 flex items-center gap-2">
+          <div className="bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 rounded-xl p-4 text-base text-brand-800 dark:text-brand-300 flex items-center gap-2">
             <CheckCircle2 size={16} className="shrink-0" />
             ¡Tu proyecto está completado! Si necesitas algún ajuste, contáctanos directamente.
           </div>
         )}
 
         {tareasEquipoVisibles.length > 0 && !completado && (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <button onClick={() => setSeccionAbierta(seccionAbierta === 'equipo' ? null : 'equipo')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <button onClick={() => setSeccionAbierta(seccionAbierta === 'equipo' ? null : 'equipo')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
               <div className="flex items-center gap-2">
-                <Users size={16} className="text-slate-500" />
-                <span className="font-semibold text-slate-800 text-base">¿Qué está haciendo el equipo?</span>
+                <Users size={16} className="text-slate-500 dark:text-slate-400" />
+                <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">¿Qué está haciendo el equipo?</span>
               </div>
               {seccionAbierta === 'equipo' ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
             </button>
             {seccionAbierta === 'equipo' && (
-              <div className="border-t border-slate-100 divide-y divide-slate-50">
+              <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800">
                 {equipoEnProceso.length > 0 && <GrupoActividad titulo="En proceso ahora" tareas={equipoEnProceso} estado="en_proceso" />}
                 {equipoPendientes.length > 0 && <GrupoActividad titulo="Próximamente" tareas={equipoPendientes} estado="pendiente" />}
                 {equipoCompletadas.length > 0 && <GrupoActividad titulo="Completadas" tareas={equipoCompletadas} estado="completada" />}
-                <div className="px-5 py-3 bg-slate-50">
-                  <p className="text-sm text-slate-500">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
+                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/60">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
                 </div>
               </div>
             )}
@@ -255,19 +262,19 @@ export default function VistaCliente() {
         )}
 
         {tareasPorFaseCliente.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <button onClick={() => setSeccionAbierta(seccionAbierta === 'participacion' ? null : 'participacion')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <button onClick={() => setSeccionAbierta(seccionAbierta === 'participacion' ? null : 'participacion')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-slate-500" />
-                <span className="font-semibold text-slate-800 text-base">Tu participación en el proyecto</span>
+                <CheckCircle2 size={16} className="text-slate-500 dark:text-slate-400" />
+                <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">Tu participación en el proyecto</span>
               </div>
               {seccionAbierta === 'participacion' ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
             </button>
             {seccionAbierta === 'participacion' && (
-              <div className="border-t border-slate-100">
+              <div className="border-t border-slate-100 dark:border-slate-800">
                 {tareasPorFaseCliente.map((fase) => (
-                  <div key={fase.numero} className="border-b border-slate-50 last:border-0">
-                    <div className="px-5 py-2.5 bg-slate-50"><span className="text-sm font-semibold text-slate-600">{fase.nombre}</span></div>
+                  <div key={fase.numero} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                    <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800/60"><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{fase.nombre}</span></div>
                     {fase.tareasCliente.map((t) => {
                       const desbloqueada = t.dependencias.every((d) => completadasIds.has(d))
                       const est = t.estado === 'completada' ? 'completada' : desbloqueada ? 'pendiente_tuya' : 'por_venir'
@@ -275,8 +282,8 @@ export default function VistaCliente() {
                         <div key={t.id} className="px-5 py-3 flex items-center gap-3">
                           {est === 'completada' && <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />}
                           {est === 'pendiente_tuya' && <AlertCircle size={15} className="text-amber-400 shrink-0" />}
-                          {est === 'por_venir' && <Clock size={15} className="text-slate-300 shrink-0" />}
-                          <span className={`text-base ${est === 'completada' ? 'line-through text-slate-500' : est === 'pendiente_tuya' ? 'text-amber-700 font-medium' : 'text-slate-500'}`}>{t.titulo}</span>
+                          {est === 'por_venir' && <Clock size={15} className="text-slate-300 dark:text-slate-600 shrink-0" />}
+                          <span className={`text-base ${est === 'completada' ? 'line-through text-slate-500 dark:text-slate-500' : est === 'pendiente_tuya' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-500 dark:text-slate-500'}`}>{t.titulo}</span>
                           {est === 'completada' && <span className="ml-auto text-sm text-emerald-500">Listo ✓</span>}
                           {est === 'pendiente_tuya' && <span className="ml-auto text-sm text-amber-500">Te toca</span>}
                         </div>
@@ -289,9 +296,9 @@ export default function VistaCliente() {
           </div>
         )}
 
-        <div className="text-center text-sm text-slate-400 pb-6 space-y-1">
+        <div className="text-center text-sm text-slate-400 dark:text-slate-500 pb-6 space-y-1">
           <p>¿Tienes preguntas? Contáctanos directamente por WhatsApp.</p>
-          <p className="font-semibold text-slate-500">Equipo EsBrillante</p>
+          <p className="font-semibold text-slate-500 dark:text-slate-400">Equipo EsBrillante</p>
         </div>
       </main>
     </div>
@@ -300,8 +307,8 @@ export default function VistaCliente() {
 
 function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
-      <div className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Fechas estimadas por fase</div>
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Fechas estimadas por fase</div>
       <div className="space-y-3">
         {fases.map((f) => {
           const bloqueadaPorPago = !!f.requierePago && !f.pagoConfirmado
@@ -309,13 +316,13 @@ function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
           const yaPaso = f.numero < faseActual || completado
           return (
             <div key={f.numero} className="flex items-start gap-3">
-              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-brand-500' : 'bg-slate-200'}`} />
+              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
               <div className="flex-1 min-w-0">
-                <div className={`text-base font-medium ${esActual ? 'text-slate-800' : yaPaso ? 'text-slate-600' : 'text-slate-500'}`}>{f.nombre}</div>
-                {f.fechaEstimada && <div className="text-sm text-slate-400 mt-0.5">Estimado: {formatFecha(f.fechaEstimada)}</div>}
+                <div className={`text-base font-medium ${esActual ? 'text-slate-800 dark:text-slate-100' : yaPaso ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-500'}`}>{f.nombre}</div>
+                {f.fechaEstimada && <div className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">Estimado: {formatFecha(f.fechaEstimada)}</div>}
               </div>
               {bloqueadaPorPago && (
-                <span className="flex items-center gap-1 text-sm bg-amber-100 text-amber-700 px-2 py-1 rounded-full shrink-0">
+                <span className="flex items-center gap-1 text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full shrink-0">
                   <Lock size={10} /> Esperando confirmación de pago
                 </span>
               )}
@@ -324,9 +331,9 @@ function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
         })}
       </div>
       {completado && fechaCierre && (
-        <div className="mt-3 text-base text-emerald-600 font-medium">✓ Entregado el {formatFecha(fechaCierre)}</div>
+        <div className="mt-3 text-base text-emerald-600 dark:text-emerald-400 font-medium">✓ Entregado el {formatFecha(fechaCierre)}</div>
       )}
-      <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 bg-slate-50 rounded-lg px-3 py-2.5">
+      <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
         <Info size={13} className="shrink-0 mt-0.5" />
         <span>Estas fechas son un estimado y pueden ajustarse. Te avisaremos si hay algún cambio.</span>
       </div>
@@ -345,17 +352,17 @@ function RecursosProyecto({ links }) {
   const disponibles = RECURSOS_CONFIG.filter((r) => links[r.tipo])
   if (disponibles.length === 0) return null
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-        <FolderOpen size={16} className="text-brand-600" />
-        <span className="font-semibold text-slate-800 text-base">Recursos de tu proyecto</span>
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+        <FolderOpen size={16} className="text-brand-600 dark:text-brand-400" />
+        <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">Recursos de tu proyecto</span>
       </div>
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-slate-50 dark:divide-slate-800">
         {disponibles.map((r) => (
           <div key={r.tipo} className="px-5 py-3.5 flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <div className="text-base font-medium text-slate-800">{r.label}</div>
-              <div className="text-sm text-slate-500 mt-0.5">{r.descripcion}</div>
+              <div className="text-base font-medium text-slate-800 dark:text-slate-100">{r.label}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{r.descripcion}</div>
             </div>
             <a href={links[r.tipo]} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-lg transition-colors shrink-0">
               Abrir <ExternalLink size={11} />
@@ -370,15 +377,15 @@ function RecursosProyecto({ links }) {
 function GrupoActividad({ titulo, tareas, estado }) {
   return (
     <div className="px-5 py-3">
-      <div className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">{titulo}</div>
+      <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{titulo}</div>
       <div className="space-y-2">
         {tareas.map((t) => (
           <div key={t.id} className="flex items-center gap-2.5">
             {estado === 'completada' && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
             {estado === 'en_proceso' && <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin shrink-0" />}
-            {estado === 'pendiente' && <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 shrink-0" />}
-            <span className={`text-base ${estado === 'completada' ? 'text-slate-500 line-through' : estado === 'en_proceso' ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>{t.titulo}</span>
-            <span className="ml-auto text-sm text-slate-400 shrink-0">Equipo EsBrillante</span>
+            {estado === 'pendiente' && <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 dark:border-slate-600 shrink-0" />}
+            <span className={`text-base ${estado === 'completada' ? 'text-slate-500 dark:text-slate-500 line-through' : estado === 'en_proceso' ? 'text-slate-800 dark:text-slate-100 font-medium' : 'text-slate-600 dark:text-slate-300'}`}>{t.titulo}</span>
+            <span className="ml-auto text-sm text-slate-400 dark:text-slate-500 shrink-0">Equipo EsBrillante</span>
           </div>
         ))}
       </div>
@@ -406,11 +413,11 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
   }
 
   return (
-    <div className="bg-white border-2 border-amber-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="bg-amber-50 px-5 py-3 flex items-center justify-between">
+    <div className="bg-white dark:bg-slate-900 border-2 border-amber-200 dark:border-amber-500/30 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-amber-50 dark:bg-amber-500/10 px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <AlertCircle size={15} className="text-amber-500 shrink-0" />
-          <span className="font-semibold text-amber-800 text-base truncate">{t.titulo}</span>
+          <span className="font-semibold text-amber-800 dark:text-amber-300 text-base truncate">{t.titulo}</span>
         </div>
         <button onClick={() => setExpandida(!expandida)} className="text-amber-400 shrink-0 ml-2">
           {expandida ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -418,9 +425,9 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
       </div>
       {expandida && (
         <div className="px-5 py-4">
-          <p className="text-base text-slate-700 leading-relaxed mb-4">{t.instruccionesCliente}</p>
+          <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed mb-4">{t.instruccionesCliente}</p>
           {t.plazoHoras && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
+            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
               <Clock size={12} />
               Tiempo sugerido: {t.plazoHoras} horas
             </div>
@@ -431,26 +438,26 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Escribe tu respuesta aquí (opcional si solo vas a adjuntar un archivo)..."
             rows={3}
-            className="w-full text-base border border-slate-200 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 resize-none"
+            className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
           />
 
           {archivo ? (
-            <div className="flex items-center gap-2 text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-3">
+            <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 mb-3">
               <Paperclip size={12} className="text-slate-400 shrink-0" />
-              <span className="flex-1 truncate text-slate-600">{archivo.name}</span>
+              <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{archivo.name}</span>
               <button onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
                 <X size={13} />
               </button>
             </div>
           ) : (
-            <label className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 cursor-pointer w-fit mb-3">
+            <label className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 cursor-pointer w-fit mb-3">
               <Paperclip size={12} />
               Adjuntar un archivo
               <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
             </label>
           )}
 
-          {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>}
 
           <button
             onClick={enviar}
@@ -460,7 +467,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             ✓ Enviar respuesta
           </button>
-          <p className="text-sm text-slate-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>
         </div>
       )}
     </div>
