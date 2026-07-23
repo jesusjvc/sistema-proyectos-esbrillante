@@ -15,7 +15,7 @@ import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
-  FolderOpen, Loader2,
+  FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -162,8 +162,9 @@ export default function DetalleProyecto() {
     <Layout titulo={proyecto.cliente.nombreComercial} volver="/admin">
       {/* Header del proyecto */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col lg:flex-row items-start gap-6">
+          {/* Columna izquierda: identidad + progreso + métricas */}
+          <div className="flex-1 min-w-0 w-full">
             <div className="flex items-center gap-2 mb-1">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge(proyecto.status)}`}>
                 {statusLabel(proyecto.status)}
@@ -172,95 +173,98 @@ export default function DetalleProyecto() {
             </div>
             <h2 className="text-xl font-bold text-slate-800">{proyecto.cliente.nombreComercial}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
+
+            {/* Barra de progreso */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-sm mb-1.5">
+                <span className="text-slate-600 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
+                <span className="font-bold text-slate-800">{avance}%</span>
+              </div>
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
+              </div>
+            </div>
+
+            {/* Métricas de tiempo */}
+            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Tiempo activo</div>
+                <div className="font-semibold text-slate-800 mt-0.5">{tiempos.activoHoras}h</div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">En pausa</div>
+                <div className="font-semibold text-amber-600 mt-0.5">{tiempos.pausaHoras}h</div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Entrega estimada</div>
+                <div className="font-semibold text-slate-800 mt-0.5">{formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {proyecto.status === 'pendiente_anticipo' && (
+          {/* Columna derecha: acciones + acceso del cliente */}
+          <div className="w-full lg:w-72 shrink-0 space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {proyecto.status === 'pendiente_anticipo' && (
+                <button
+                  onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
+                  className="flex-1 text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Confirmar anticipo
+                </button>
+              )}
+              {proyecto.status === 'activo' && (
+                <button onClick={togglePausa} className="flex-1 flex items-center justify-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg transition-colors">
+                  <Pause size={14} /> Marcar pausa
+                </button>
+              )}
+              {proyecto.status === 'en_pausa' && (
+                <button onClick={togglePausa} className="flex-1 flex items-center justify-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
+                  <Play size={14} /> Reanudar
+                </button>
+              )}
+              {proyecto.status !== 'completado' && (
+                <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
+                  <XCircle size={16} />
+                </button>
+              )}
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2.5">
+              <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Acceso del cliente</div>
               <button
-                onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
-                className="text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}`)
+                  setCopiado('link')
+                  setTimeout(() => setCopiado(false), 2000)
+                }}
+                className="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left"
+                title="Copiar link"
               >
-                Confirmar anticipo
+                <code className="text-xs text-slate-700 truncate">/cliente/{proyecto.slug}</code>
+                {copiado === 'link' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
               </button>
-            )}
-            {proyecto.status === 'activo' && (
-              <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg transition-colors">
-                <Pause size={14} /> Marcar pausa
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(proyecto.passwordCliente)
+                  setCopiado('pass')
+                  setTimeout(() => setCopiado(false), 2000)
+                }}
+                className="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left"
+                title="Copiar contraseña"
+              >
+                <code className="text-xs text-slate-700 truncate">{proyecto.passwordCliente}</code>
+                {copiado === 'pass' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
               </button>
-            )}
-            {proyecto.status === 'en_pausa' && (
-              <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
-                <Play size={14} /> Reanudar
+              <button
+                onClick={copiarMensaje}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-medium bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-md transition-colors"
+              >
+                {copiado === true ? <Check size={13} /> : <MessageCircle size={13} />}
+                {copiado === true ? 'Copiado' : 'Copiar mensaje WhatsApp'}
               </button>
-            )}
-            {proyecto.status !== 'completado' && (
-              <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 px-2 py-2 rounded-lg transition-colors">
-                <XCircle size={16} />
-              </button>
-            )}
+            </div>
           </div>
-        </div>
-
-        {/* Barra de progreso */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-sm mb-1.5">
-            <span className="text-slate-600 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
-            <span className="font-bold text-slate-800">{avance}%</span>
-          </div>
-          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
-          </div>
-        </div>
-
-        {/* Métricas de tiempo */}
-        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
-          <div>
-            <div className="text-xs text-slate-400">Tiempo activo</div>
-            <div className="font-semibold text-slate-800">{tiempos.activoHoras}h</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-400">En pausa</div>
-            <div className="font-semibold text-amber-600">{tiempos.pausaHoras}h</div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-400">Entrega estimada</div>
-            <div className="font-semibold text-slate-800">{formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
-          </div>
-        </div>
-
-        {/* Acceso cliente */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-          <span>Link cliente:</span>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}`)
-              setCopiado('link')
-              setTimeout(() => setCopiado(false), 2000)
-            }}
-            className="flex items-center gap-1 bg-slate-100 hover:bg-brand-50 hover:text-brand-800 px-2 py-0.5 rounded transition-colors"
-            title="Copiar link"
-          >
-            <code className="text-slate-700">/cliente/{proyecto.slug}</code>
-            {copiado === 'link' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} className="text-slate-400" />}
-          </button>
-          <span>·</span>
-          <span>Contraseña:</span>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(proyecto.passwordCliente)
-              setCopiado('pass')
-              setTimeout(() => setCopiado(false), 2000)
-            }}
-            className="flex items-center gap-1 bg-slate-100 hover:bg-brand-50 hover:text-brand-800 px-2 py-0.5 rounded transition-colors"
-            title="Copiar contraseña"
-          >
-            <code className="text-slate-700">{proyecto.passwordCliente}</code>
-            {copiado === 'pass' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} className="text-slate-400" />}
-          </button>
-          <button onClick={copiarMensaje} className="ml-auto flex items-center gap-1 text-slate-500 hover:text-slate-800">
-            {copiado === true ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-            {copiado === true ? 'Copiado' : 'Copiar mensaje WA'}
-          </button>
         </div>
       </div>
 
@@ -291,20 +295,20 @@ export default function DetalleProyecto() {
               <div key={fase.numero} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <button
                   onClick={() => setFaseAbierta(abierta ? null : fase.numero)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
+                  className={`w-full flex items-center justify-between px-5 py-4 transition-colors ${abierta ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                       completadas === total && total > 0 ? 'bg-emerald-100 text-emerald-700' :
                       fase.numero === faseActual ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500'
                     }`}>
-                      {fase.numero}
+                      {completadas === total && total > 0 ? <Check size={14} /> : fase.numero}
                     </div>
                     <span className="font-medium text-slate-800">Fase {fase.numero} — {fase.nombre}</span>
                     <span className="text-xs text-slate-400">{completadas}/{total}</span>
                     {fase.fechaEstimada && <span className="text-xs text-slate-400">· est. {formatFecha(fase.fechaEstimada)}</span>}
                     {fase.requierePago && !fase.pagoConfirmado && (
-                      <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                      <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
                         <Lock size={10} /> Esperando pago
                       </span>
                     )}
@@ -379,7 +383,7 @@ export default function DetalleProyecto() {
       {/* ─── Tab: Info ─── */}
       {tab === 'info' && (
         <div className="grid grid-cols-2 gap-5">
-          <InfoCard titulo="Links del cliente" fullWidth>
+          <InfoCard titulo="Links del cliente" icono={<Link2 size={14} />} fullWidth>
             <LinksClienteEditor
               links={proyecto.linksCliente || {}}
               onGuardar={async (cambios) => { await actualizarLinks(proyecto.slug, cambios); await refresh() }}
@@ -389,14 +393,14 @@ export default function DetalleProyecto() {
             />
           </InfoCard>
 
-          <InfoCard titulo="Equipo asignado">
+          <InfoCard titulo="Equipo asignado" icono={<Users size={14} />}>
             <InfoRow label="Copy" valor={proyecto.equipo.copy} />
             <InfoRow label="Diseñador" valor={proyecto.equipo.disenador} />
             <InfoRow label="Programador" valor={proyecto.equipo.programador} />
             <InfoRow label="Coordinador" valor={proyecto.equipo.adminProyecto} />
           </InfoCard>
 
-          <InfoCard titulo="Configuración técnica">
+          <InfoCard titulo="Configuración técnica" icono={<Settings2 size={14} />}>
             <InfoBool label="Ya tiene dominio" valor={proyecto.condicionesTecnicas.tieneDominio} />
             <InfoBool label="Ya tiene hosting" valor={proyecto.condicionesTecnicas.tieneHosting} />
             <InfoBool label="Correos corporativos" valor={proyecto.condicionesTecnicas.requiereCorreos} />
@@ -409,7 +413,7 @@ export default function DetalleProyecto() {
             )}
           </InfoCard>
 
-          <InfoCard titulo="Extras contratados">
+          <InfoCard titulo="Extras contratados" icono={<Sparkles size={14} />}>
             {proyecto.proyecto.extras.length === 0
               ? <p className="text-sm text-slate-400">Sin extras</p>
               : proyecto.proyecto.extras.map((e) => (
@@ -420,7 +424,7 @@ export default function DetalleProyecto() {
             }
           </InfoCard>
 
-          <InfoCard titulo="Participantes del cliente">
+          <InfoCard titulo="Participantes del cliente" icono={<UserCircle2 size={14} />}>
             {!proyecto.cliente.participantes?.length
               ? <p className="text-sm text-slate-400">Solo el contacto principal</p>
               : proyecto.cliente.participantes.map((p, i) => (
@@ -436,19 +440,27 @@ export default function DetalleProyecto() {
 
       {/* ─── Tab: Log ─── */}
       {tab === 'log' && (
-        <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-          {[...proyecto.log].reverse().map((entry) => (
-            <div key={entry.id} className="px-5 py-3 flex items-start gap-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-brand-400 mt-2 shrink-0" />
-              <div>
-                <div className="text-sm text-slate-800">
-                  <span className="font-medium">{entry.usuario}</span> — {entry.accion}
-                  {entry.detalle && <span className="text-slate-500"> · {entry.detalle}</span>}
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-4">
+            <Clock3 size={14} className="text-slate-400" /> Registro de actividad
+          </h3>
+          <div className="relative">
+            <div className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200" />
+            <div className="space-y-5">
+              {[...proyecto.log].reverse().map((entry) => (
+                <div key={entry.id} className="relative pl-6">
+                  <div className="absolute left-0 top-1 w-2.5 h-2.5 rounded-full bg-brand-400 ring-4 ring-white" />
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <div className="text-sm text-slate-800">
+                      <span className="font-semibold">{entry.usuario}</span> — {entry.accion}
+                    </div>
+                    <div className="text-xs text-slate-400 shrink-0">{formatFechaHora(entry.fecha)}</div>
+                  </div>
+                  {entry.detalle && <div className="text-xs text-slate-500 mt-0.5">{entry.detalle}</div>}
                 </div>
-                <div className="text-xs text-slate-400 mt-0.5">{formatFechaHora(entry.fecha)}</div>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
     </Layout>
@@ -780,10 +792,13 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400'
 
-function InfoCard({ titulo, children, fullWidth }) {
+function InfoCard({ titulo, icono, children, fullWidth }) {
   return (
     <div className={`bg-white rounded-xl border border-slate-200 p-5 ${fullWidth ? 'col-span-2' : ''}`}>
-      <h3 className="font-semibold text-slate-800 mb-3 text-sm">{titulo}</h3>
+      <h3 className="flex items-center gap-2 font-semibold text-slate-800 mb-3 text-sm">
+        {icono && <span className="text-slate-400">{icono}</span>}
+        {titulo}
+      </h3>
       <div className="space-y-2">{children}</div>
     </div>
   )

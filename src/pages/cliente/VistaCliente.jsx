@@ -209,8 +209,8 @@ export default function VistaCliente() {
 
         {tareasPendientesCliente.length > 0 && (
           <section>
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-base mb-3 flex items-center gap-2">
-              <AlertCircle size={18} className="text-amber-500" />
+            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3 flex items-center gap-2">
+              <AlertCircle size={20} className="text-amber-500" />
               Necesitamos tu respuesta
               <span className="text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
             </h2>
@@ -413,10 +413,10 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border-2 border-amber-200 dark:border-amber-500/30 rounded-xl overflow-hidden shadow-sm">
-      <div className="bg-amber-50 dark:bg-amber-500/10 px-5 py-3 flex items-center justify-between">
+    <div className="bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-500/40 rounded-xl overflow-hidden shadow-lg shadow-amber-100 dark:shadow-none">
+      <div className="bg-amber-50 dark:bg-amber-500/10 px-5 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          <AlertCircle size={15} className="text-amber-500 shrink-0" />
+          <AlertCircle size={17} className="text-amber-500 shrink-0" />
           <span className="font-semibold text-amber-800 dark:text-amber-300 text-base truncate">{t.titulo}</span>
         </div>
         <button onClick={() => setExpandida(!expandida)} className="text-amber-400 shrink-0 ml-2">
@@ -462,7 +462,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
           <button
             onClick={enviar}
             disabled={enviando}
-            className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 py-2.5 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 py-3 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             ✓ Enviar respuesta
