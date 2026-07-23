@@ -5,6 +5,7 @@ import { firmarToken, verificarToken } from '../lib/jwt.js'
 import { requireClienteToken } from '../middleware/auth.js'
 import { obtenerOCrearCarpetaProyecto, subirArchivo, driveConfigurado } from '../lib/drive.js'
 import { emitirCambio } from '../lib/eventos.js'
+import { enviarEmail } from '../lib/email.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
@@ -88,6 +89,7 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
     })
 
     emitirCambio(p.id)
+    notificarAdminsRespuestaCliente(p, tarea, { respuestaTexto, archivoNombre: data.respuestaArchivoNombre, archivoUrl: data.respuestaArchivoUrl }).catch((err) => console.error('Error notificando a admins:', err))
     res.json({ ok: true })
   } catch (err) {
     console.error(err)
@@ -100,6 +102,35 @@ router.post('/logout', (req, res) => {
   res.clearCookie('clienteToken')
   res.json({ ok: true })
 })
+
+async function notificarAdminsRespuestaCliente(proyecto, tarea, { respuestaTexto, archivoNombre, archivoUrl }) {
+  const admins = await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { email: true, nombre: true } })
+  if (!admins.length) return
+
+  const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
+  const linkProyecto = `${process.env.CLIENT_URL || ''}/admin/proyecto/${proyecto.slug}`
+
+  const partes = [`${nombreCliente} respondió "${tarea.titulo}".`]
+  if (respuestaTexto) partes.push(`\nRespuesta: ${respuestaTexto}`)
+  if (archivoNombre) partes.push(`\nArchivo adjunto: ${archivoNombre}${archivoUrl ? ` (${archivoUrl})` : ''}`)
+  partes.push(`\nVer proyecto: ${linkProyecto}`)
+  const texto = partes.join('\n')
+
+  const html = `
+    <p><strong>${nombreCliente}</strong> respondió "<strong>${tarea.titulo}</strong>".</p>
+    ${respuestaTexto ? `<p>${respuestaTexto}</p>` : ''}
+    ${archivoUrl ? `<p>📎 <a href="${archivoUrl}">${archivoNombre}</a></p>` : ''}
+    <p><a href="${linkProyecto}">Ver proyecto en el sistema →</a></p>
+  `
+
+  await Promise.all(admins.map((a) => enviarEmail({
+    to: a.email,
+    nombreDestino: a.nombre,
+    asunto: `💬 ${nombreCliente} respondió — ${tarea.titulo}`,
+    texto,
+    html,
+  })))
+}
 
 function proyectoPublico(p) {
   const { passwordCliente, ...rest } = p
