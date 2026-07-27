@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
-import { requireApiKey } from '../middleware/auth.js'
+import { requireMcpAuth } from '../middleware/auth.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
@@ -494,7 +494,7 @@ function buildServer() {
 }
 
 // POST /mcp
-router.post('/', requireApiKey, async (req, res) => {
+router.post('/', requireMcpAuth, async (req, res) => {
   try {
     const server = buildServer()
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })

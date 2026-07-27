@@ -232,18 +232,29 @@ export default function DetalleProyecto() {
 
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2.5">
               <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Acceso del cliente</div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}`)
-                  setCopiado('link')
-                  setTimeout(() => setCopiado(false), 2000)
-                }}
-                className="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left"
-                title="Copiar link"
-              >
-                <code className="text-xs text-slate-700 truncate">/cliente/{proyecto.slug}</code>
-                {copiado === 'link' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
-              </button>
+              <div className="flex items-stretch gap-1.5">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}`)
+                    setCopiado('link')
+                    setTimeout(() => setCopiado(false), 2000)
+                  }}
+                  className="flex-1 flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
+                  title="Copiar link"
+                >
+                  <code className="text-xs text-slate-700 truncate">/cliente/{proyecto.slug}</code>
+                  {copiado === 'link' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
+                </button>
+                <a
+                  href={`/cliente/${proyecto.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
+                  title="Ver como cliente (sin contraseña, con tu sesión)"
+                >
+                  <ExternalLink size={13} className="text-slate-400" />
+                </a>
+              </div>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(proyecto.passwordCliente)

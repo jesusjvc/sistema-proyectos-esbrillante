@@ -10,15 +10,22 @@ import miembrosRouter from './routes/miembros.js'
 import clienteRouter from './routes/cliente.js'
 import mcpRouter from './routes/mcp.js'
 import eventosRouter from './routes/eventos.js'
+import oauthRouter from './routes/oauth.js'
+import wellKnownRouter from './routes/wellKnown.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
+
+// Necesario para que req.protocol refleje https (vía X-Forwarded-Proto) al
+// correr detrás de un proxy — usado por las URLs absolutas de metadata OAuth.
+app.set('trust proxy', 1)
 
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
 }))
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 
 app.use('/api/auth', authRouter)
@@ -27,6 +34,8 @@ app.use('/api/miembros', miembrosRouter)
 app.use('/api/cliente', clienteRouter)
 app.use('/mcp', mcpRouter)
 app.use('/api/eventos', eventosRouter)
+app.use('/oauth', oauthRouter)
+app.use('/.well-known', wellKnownRouter)
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 

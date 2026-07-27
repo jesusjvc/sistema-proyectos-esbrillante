@@ -88,6 +88,20 @@ model Tarea {
   @@map("tareas")
 }
 
+// Clientes MCP registrados dinámicamente (RFC 7591) al conectar desde
+// claude.ai u otro cliente OAuth. Se persiste para que el client_id
+// siga siendo válido entre reinicios/deploys del servidor.
+model OAuthClient {
+  id           String   @id @default(cuid())
+  clientId     String   @unique
+  clientName   String?
+  redirectUris Json
+
+  creadoEn DateTime @default(now())
+
+  @@map("oauth_clients")
+}
+
 model LogEntry {
   id         String   @id @default(cuid())
   proyectoId String

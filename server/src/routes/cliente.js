@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import prisma from '../lib/prisma.js'
 import { firmarToken, verificarToken } from '../lib/jwt.js'
-import { requireClienteToken } from '../middleware/auth.js'
+import { requireClienteToken, requireClienteAcceso } from '../middleware/auth.js'
 import { obtenerOCrearCarpetaProyecto, subirArchivo, driveConfigurado } from '../lib/drive.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { enviarEmail } from '../lib/email.js'
@@ -45,10 +45,11 @@ router.post('/login', async (req, res) => {
 })
 
 // GET /api/cliente/:slug
-router.get('/:slug', requireClienteToken, async (req, res) => {
+router.get('/:slug', requireClienteAcceso, async (req, res) => {
   try {
     const p = await getProyecto(req.params.slug)
-    if (!p || p.id !== req.clienteProyectoId) return res.status(403).json({ error: 'Sin acceso' })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!req.esStaff && p.id !== req.clienteProyectoId) return res.status(403).json({ error: 'Sin acceso' })
     res.json(proyectoPublico(p))
   } catch (err) {
     console.error(err)
