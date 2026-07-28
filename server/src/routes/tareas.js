@@ -2,14 +2,18 @@ import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
-import { ordenAlFinal } from '../lib/orden.js'
+import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
+import { estadoDeColumna } from '../lib/kanban.js'
 import { emitirCambio } from '../lib/eventos.js'
 
 const router = Router({ mergeParams: true })
 
+const ESTADOS_TABLERO = ['pendiente', 'en_proceso', 'revision', 'completada']
+
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
     where: { OR: [{ slug }, { id: slug }] },
+    include: { tareas: true },
   })
 }
 
@@ -118,6 +122,61 @@ router.post('/:tareaId/omitir', requireAuth, async (req, res) => {
   }
 })
 
+// POST /api/proyectos/:slug/tareas/:tareaId/mover
+// Cambia de columna (estado) y/o reordena una tarjeta dentro de un tablero
+// Kanban (proyectos de tipo "continuo"). El orden se calcula entre las
+// tareas que ya están en la columna destino (mismo `estado`), no por fase.
+router.post('/:tareaId/mover', requireAuth, async (req, res) => {
+  const { slug, tareaId } = req.params
+  const { estado, antesDeTareaId, despuesDeTareaId } = req.body
+  const usuario = req.user.nombre
+
+  if (!ESTADOS_TABLERO.includes(estado)) {
+    return res.status(400).json({ error: `Estado inválido: "${estado}"` })
+  }
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const tarea = p.tareas.find((t) => t.id === tareaId)
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+
+    const refId = antesDeTareaId || despuesDeTareaId
+    let orden
+    if (refId) {
+      const ref = p.tareas.find((t) => t.id === refId && t.estado === estado)
+      if (!ref) return res.status(400).json({ error: `No se encontró la tarjeta de referencia "${refId}" en esa columna.` })
+      const columna = p.tareas.filter((t) => t.estado === estado && t.id !== tareaId).sort((a, b) => a.orden - b.orden)
+      orden = antesDeTareaId ? ordenAntesDe(columna, ref) : ordenDespuesDe(columna, ref)
+    } else {
+      const columna = p.tareas.filter((t) => t.estado === estado && t.id !== tareaId)
+      orden = ordenAlFinal(columna)
+    }
+
+    const data = { estado, orden }
+    if (estado === 'completada' && tarea.estado !== 'completada') {
+      data.completadaPor = usuario
+      data.completadaEn = new Date()
+    } else if (estado !== 'completada' && tarea.estado === 'completada') {
+      data.completadaPor = null
+      data.completadaEn = null
+    }
+    if (estado === 'en_proceso') data.asignadoA = usuario
+
+    await prisma.tarea.update({ where: { id: tareaId }, data })
+
+    const columnaLabel = { pendiente: 'Todo', en_proceso: 'Doing', revision: 'Revisión', completada: 'Done' }[estado]
+    await logEntry(p.id, usuario, 'Tarjeta movida', `${tarea.titulo} → ${columnaLabel}`)
+
+    emitirCambio(p.id)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/proyectos/:slug/tareas/:tareaId
 router.put('/:tareaId', requireAuth, async (req, res) => {
   const { slug, tareaId } = req.params
@@ -153,16 +212,20 @@ router.post('/', requireAuth, async (req, res) => {
     const p = await getProyecto(slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const { fase, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras } = req.body
-    const faseFinal = fase || 1
-    const tareasFase = await prisma.tarea.findMany({ where: { proyectoId: p.id, fase: faseFinal } })
+    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras } = req.body
+    const esContinuo = p.tipo === 'continuo'
+    const faseFinal = esContinuo ? 1 : (fase || 1)
+    const estadoFinal = esContinuo && !esCliente ? (estadoDeColumna(columna) || 'pendiente') : 'pendiente'
+    const tareasHermanas = esContinuo
+      ? await prisma.tarea.findMany({ where: { proyectoId: p.id, estado: estadoFinal } })
+      : await prisma.tarea.findMany({ where: { proyectoId: p.id, fase: faseFinal } })
 
     const nueva = await prisma.tarea.create({
       data: {
         id: randomUUID(),
         proyectoId: p.id,
         fase: faseFinal,
-        orden: ordenAlFinal(tareasFase),
+        orden: ordenAlFinal(tareasHermanas),
         titulo,
         descripcion: descripcion || '',
         instruccionesCliente: instruccionesCliente || '',
@@ -171,7 +234,7 @@ router.post('/', requireAuth, async (req, res) => {
         plazoHoras: plazoHoras ? Number(plazoHoras) : null,
         dependencias: [],
         custom: true,
-        estado: 'pendiente',
+        estado: estadoFinal,
       },
     })
     await logEntry(p.id, usuario, 'Tarea agregada', nueva.titulo)

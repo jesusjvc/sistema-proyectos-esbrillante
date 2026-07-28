@@ -53,7 +53,7 @@ router.get('/:slug', requireAuth, async (req, res) => {
 
 // POST /api/proyectos
 router.post('/', requireAdminOrApiKey, async (req, res) => {
-  const { cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor } = req.body
+  const { tipo, cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor } = req.body
   const slug = generarSlug(cliente.nombreComercial)
 
   try {
@@ -61,6 +61,7 @@ router.post('/', requireAdminOrApiKey, async (req, res) => {
       const p = await tx.proyecto.create({
         data: {
           slug,
+          tipo: tipo === 'continuo' ? 'continuo' : 'finito',
           status: proyecto.anticipoConfirmado ? 'activo' : 'pendiente_anticipo',
           cliente,
           proyecto,
@@ -247,6 +248,56 @@ router.post('/:slug/cerrar', requireAdmin, async (req, res) => {
     const tiempos = { ...(p.tiempos || {}), cierre: new Date().toISOString() }
     await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'completado', tiempos } })
     await logEntry(p.id, req.user.nombre, 'Proyecto cerrado')
+    emitirCambio(p.id)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// PUT /api/proyectos/:slug/tipo
+// Convierte un proyecto entre "finito" (fases) y "continuo" (tablero Kanban).
+// Al pasar a continuo, las tareas conservan su `estado` (que es justo lo que
+// define la columna del tablero) y solo se les resetea `fase` a 1. Al volver
+// a finito, todas las tareas quedan en fase 1 (el admin las reorganiza a
+// mano) y cualquier tarea en "revision" (estado exclusivo de Kanban) pasa a
+// "en_proceso", que es lo más cercano que reconoce el flujo por fases.
+router.put('/:slug/tipo', requireAdmin, async (req, res) => {
+  const { tipo } = req.body
+  if (tipo !== 'finito' && tipo !== 'continuo') return res.status(400).json({ error: 'tipo inválido' })
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (p.tipo === tipo) return res.json({ ok: true })
+
+    await prisma.$transaction(async (tx) => {
+      if (tipo === 'continuo') {
+        await tx.proyecto.update({
+          where: { id: p.id },
+          data: { tipo, proyecto: { ...p.proyecto, fases: [] } },
+        })
+        await tx.tarea.updateMany({ where: { proyectoId: p.id }, data: { fase: 1 } })
+      } else {
+        const fasesFinal = p.proyecto?.fases?.length ? p.proyecto.fases : [
+          { numero: 1, nombre: 'Planeación' },
+          { numero: 2, nombre: 'Desarrollo' },
+          { numero: 3, nombre: 'Entrega' },
+        ]
+        await tx.proyecto.update({
+          where: { id: p.id },
+          data: { tipo, proyecto: { ...p.proyecto, fases: fasesFinal } },
+        })
+        await tx.tarea.updateMany({ where: { proyectoId: p.id }, data: { fase: 1 } })
+        await tx.tarea.updateMany({ where: { proyectoId: p.id, estado: 'revision' }, data: { estado: 'en_proceso' } })
+      }
+
+      await tx.logEntry.create({
+        data: { proyectoId: p.id, usuario: req.user.nombre, accion: 'Tipo de proyecto cambiado', detalle: `${p.tipo} → ${tipo}` },
+      })
+    })
+
     emitirCambio(p.id)
     res.json({ ok: true })
   } catch (err) {

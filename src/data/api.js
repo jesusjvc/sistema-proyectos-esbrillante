@@ -31,6 +31,7 @@ export const confirmarAnticipo = (slug) => req('POST', `/api/proyectos/${slug}/a
 export const iniciarPausa = (slug, fase) => req('POST', `/api/proyectos/${slug}/pausa`, { fase })
 export const terminarPausa = (slug) => req('DELETE', `/api/proyectos/${slug}/pausa`)
 export const cerrarProyecto = (slug) => req('POST', `/api/proyectos/${slug}/cerrar`)
+export const cambiarTipoProyecto = (slug, tipo) => req('PUT', `/api/proyectos/${slug}/tipo`, { tipo })
 export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-visto`)
 
 // ─── Tareas ────────────────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ export const completarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${s
 export const reabrirTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/reabrir`)
 export const omitirTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/omitir`)
 export const editarTarea = (slug, tareaId, data) => req('PUT', `/api/proyectos/${slug}/tareas/${tareaId}`, data)
+export const moverTarea = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/mover`, data)
 export const agregarTarea = (slug, data) => req('POST', `/api/proyectos/${slug}/tareas`, data)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
 

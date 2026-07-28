@@ -3,15 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import {
-  getProyecto, completarTarea, reabrirTarea, omitirTarea,
+  getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
+  cambiarTipoProyecto,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
+import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
+import KanbanBoard from '../../components/KanbanBoard'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -115,6 +118,11 @@ export default function DetalleProyecto() {
     await refresh()
   }
 
+  async function handleMoverTarea(tareaId, datos) {
+    await moverTarea(proyecto.slug, tareaId, datos)
+    await refresh()
+  }
+
   async function handleEliminarTarea(tareaId) {
     await eliminarTarea(proyecto.slug, tareaId)
     await refresh()
@@ -136,6 +144,17 @@ export default function DetalleProyecto() {
     }
   }
 
+  async function handleCambiarTipo() {
+    const nuevoTipo = proyecto.tipo === 'continuo' ? 'finito' : 'continuo'
+    const aviso = nuevoTipo === 'continuo'
+      ? 'Las tareas actuales se reparten en el tablero Kanban según su estado (pendiente→Todo, en proceso→Doing, completada→Done). ¿Convertir a continuo?'
+      : 'Las tareas quedarán todas en Fase 1 y tendrás que reorganizarlas manualmente. ¿Convertir a finito?'
+    if (confirm(aviso)) {
+      await cambiarTipoProyecto(proyecto.slug, nuevoTipo)
+      await refresh()
+    }
+  }
+
   function copiarMensaje() {
     navigator.clipboard.writeText(generarMensajeInicio(proyecto))
     setCopiado(true)
@@ -152,11 +171,13 @@ export default function DetalleProyecto() {
     return 'disponible'
   }
 
+  const esContinuo = proyecto.tipo === 'continuo'
   const fases = proyecto.proyecto?.fases || FASES_WEB
   const tareasPorFase = fases.map((f) => ({
     ...f,
     tareas: proyecto.tareas.filter((t) => t.fase === f.numero).sort((a, b) => a.orden - b.orden),
   }))
+  const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
 
   return (
     <Layout titulo={proyecto.cliente.nombreComercial} volver="/admin">
@@ -170,20 +191,37 @@ export default function DetalleProyecto() {
                 {statusLabel(proyecto.status)}
               </span>
               <span className="text-xs text-slate-400">{proyecto.proyecto.paquete}</span>
+              <button
+                onClick={handleCambiarTipo}
+                className="text-xs text-slate-400 hover:text-brand-700 underline decoration-dotted transition-colors"
+                title={esContinuo ? 'Convertir a proyecto finito (con fases)' : 'Convertir a proyecto continuo (tablero Kanban)'}
+              >
+                Cambiar a {esContinuo ? 'finito' : 'continuo'}
+              </button>
             </div>
             <h2 className="text-xl font-bold text-slate-800">{proyecto.cliente.nombreComercial}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
 
-            {/* Barra de progreso */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-sm mb-1.5">
-                <span className="text-slate-600 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
-                <span className="font-bold text-slate-800">{avance}%</span>
+            {esContinuo ? (
+              <div className="mt-4 flex items-center gap-3 flex-wrap">
+                {KANBAN_COLUMNAS.map((c) => (
+                  <div key={c.columna} className="text-sm text-slate-500">
+                    <span className="font-bold text-slate-800">{columnasCount[c.columna]}</span> {c.label}
+                  </div>
+                ))}
               </div>
-              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
+            ) : (
+              /* Barra de progreso */
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-sm mb-1.5">
+                  <span className="text-slate-600 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
+                  <span className="font-bold text-slate-800">{avance}%</span>
+                </div>
+                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Métricas de tiempo */}
             <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
@@ -196,8 +234,8 @@ export default function DetalleProyecto() {
                 <div className="font-semibold text-amber-600 mt-0.5">{tiempos.pausaHoras}h</div>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Entrega estimada</div>
-                <div className="font-semibold text-slate-800 mt-0.5">{formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
+                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
+                <div className="font-semibold text-slate-800 mt-0.5">{esContinuo ? 'Continuo' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
               </div>
             </div>
           </div>
@@ -295,7 +333,26 @@ export default function DetalleProyecto() {
       </div>
 
       {/* ─── Tab: Tareas ─── */}
-      {tab === 'tareas' && (
+      {tab === 'tareas' && esContinuo && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button
+              onClick={() => setModalNueva('todo')}
+              className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 transition-colors"
+            >
+              <Plus size={13} /> Nueva tarjeta
+            </button>
+          </div>
+          <KanbanBoard
+            tareas={proyecto.tareas}
+            onMover={handleMoverTarea}
+            onEditar={(t) => setModalEditar(t)}
+            onEliminar={(t) => handleEliminarTarea(t.id)}
+          />
+        </div>
+      )}
+
+      {tab === 'tareas' && !esContinuo && (
         <div className="space-y-3">
           {tareasPorFase.map((fase) => {
             const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
@@ -373,7 +430,7 @@ export default function DetalleProyecto() {
       {/* ─── Modal: Nueva tarea ─── */}
       {modalNueva !== null && (
         <ModalNuevaTarea
-          fase={modalNueva}
+          contexto={modalNueva}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
         />
@@ -717,7 +774,8 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
   )
 }
 
-function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
+function ModalNuevaTarea({ contexto, onGuardar, onCerrar }) {
+  const esContinuo = typeof contexto === 'string'
   const [form, setForm] = useState({
     titulo: '',
     descripcion: '',
@@ -725,13 +783,15 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
     responsable: 'equipo',
     esCliente: false,
     plazoHoras: '',
+    columna: esContinuo ? contexto : 'todo',
   })
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!form.titulo.trim()) return
     onGuardar({
-      fase,
+      fase: esContinuo ? undefined : contexto,
+      columna: esContinuo ? form.columna : undefined,
       titulo: form.titulo.trim(),
       descripcion: form.descripcion,
       instruccionesCliente: form.instruccionesCliente,
@@ -745,7 +805,7 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
       <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-800">Nueva tarea — Fase {fase}</h3>
+          <h3 className="font-semibold text-slate-800">{esContinuo ? 'Nueva tarjeta' : `Nueva tarea — Fase ${contexto}`}</h3>
           <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -753,6 +813,15 @@ function ModalNuevaTarea({ fase, onGuardar, onCerrar }) {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Título *</label>
             <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} placeholder="Nombre de la tarea..." autoFocus />
           </div>
+
+          {esContinuo && !form.esCliente && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Columna</label>
+              <select value={form.columna} onChange={(e) => setForm({ ...form, columna: e.target.value })} className={inputCls}>
+                {KANBAN_COLUMNAS.map((c) => <option key={c.columna} value={c.columna}>{c.label}</option>)}
+              </select>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />

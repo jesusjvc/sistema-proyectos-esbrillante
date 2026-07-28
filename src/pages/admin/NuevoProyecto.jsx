@@ -7,7 +7,7 @@ import { generarMensajeInicio } from '../../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../../data/paquetes'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
-import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, AlertCircle } from 'lucide-react'
+import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, AlertCircle, Kanban, GitBranch } from 'lucide-react'
 
 const COND_DEFAULT = {
   tieneDominio: false,
@@ -35,6 +35,7 @@ export default function NuevoProyecto() {
   const [creando, setCreando] = useState(false)
   const [errorCrear, setErrorCrear] = useState('')
 
+  const [tipo, setTipo] = useState('finito')
   const [cliente, setCliente] = useState({
     nombreComercial: '',
     contactoPrincipal: '',
@@ -104,18 +105,20 @@ export default function NuevoProyecto() {
     setErrorCrear('')
     setCreando(true)
     try {
+      const esContinuo = tipo === 'continuo'
       const plantilla = getPlantilla(proyectoData.plantillaId)
-      const tareas = copiarTareasDesde(proyectoData.plantillaId, condiciones, proyectoData.extras)
+      const tareas = esContinuo ? [] : copiarTareasDesde(proyectoData.plantillaId, condiciones, proyectoData.extras)
 
       const p = await crearProyecto({
+        tipo,
         cliente,
         proyecto: {
           paquete: proyectoData.paquete,
-          plantillaId: proyectoData.plantillaId,
-          fases: plantilla?.fases || FASES_WEB,
-          extras: proyectoData.extras,
+          plantillaId: esContinuo ? '' : proyectoData.plantillaId,
+          fases: esContinuo ? [] : (plantilla?.fases || FASES_WEB),
+          extras: esContinuo ? [] : proyectoData.extras,
           fechaInicio: proyectoData.fechaInicio,
-          fechaEstimadaEntrega: proyectoData.fechaEstimadaEntrega,
+          fechaEstimadaEntrega: esContinuo ? null : proyectoData.fechaEstimadaEntrega,
           anticipoConfirmado: proyectoData.anticipoConfirmado,
         },
         condicionesTecnicas: condiciones,
@@ -154,8 +157,9 @@ export default function NuevoProyecto() {
     setTimeout(() => setMensajeCopiado(false), 2500)
   }
 
+  const esContinuo = tipo === 'continuo'
   const valido1 = cliente.nombreComercial && cliente.contactoPrincipal && cliente.correo
-  const valido2 = proyectoData.plantillaId && proyectoData.fechaEstimadaEntrega
+  const valido2 = esContinuo ? !!proyectoData.paquete : (proyectoData.plantillaId && proyectoData.fechaEstimadaEntrega)
   const valido3 = true
 
   return (
@@ -186,6 +190,37 @@ export default function NuevoProyecto() {
         {paso === 1 && (
           <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
             <h2 className="font-semibold text-slate-800">Datos del cliente</h2>
+
+            <Campo label="Tipo de proyecto">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTipo('finito')}
+                  className={`flex items-start gap-3 text-left px-4 py-3 rounded-xl border transition-colors ${
+                    tipo === 'finito' ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <GitBranch size={18} className={tipo === 'finito' ? 'text-brand-700' : 'text-slate-400'} />
+                  <div>
+                    <div className={`text-sm font-medium ${tipo === 'finito' ? 'text-brand-800' : 'text-slate-700'}`}>Finito</div>
+                    <div className="text-xs text-slate-400 mt-0.5">Con fases y fecha de entrega</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipo('continuo')}
+                  className={`flex items-start gap-3 text-left px-4 py-3 rounded-xl border transition-colors ${
+                    tipo === 'continuo' ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <Kanban size={18} className={tipo === 'continuo' ? 'text-brand-700' : 'text-slate-400'} />
+                  <div>
+                    <div className={`text-sm font-medium ${tipo === 'continuo' ? 'text-brand-800' : 'text-slate-700'}`}>Continuo</div>
+                    <div className="text-xs text-slate-400 mt-0.5">Servicio recurrente, tablero Kanban</div>
+                  </div>
+                </button>
+              </div>
+            </Campo>
 
             <Campo label="Nombre comercial *">
               <input value={cliente.nombreComercial} onChange={(e) => setCliente({ ...cliente, nombreComercial: e.target.value })} className={inputCls} placeholder="IM Multiservice LLC" />
@@ -251,7 +286,46 @@ export default function NuevoProyecto() {
         )}
 
         {/* ─── Paso 2: Proyecto ─── */}
-        {paso === 2 && (
+        {paso === 2 && esContinuo && (
+          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+            <h2 className="font-semibold text-slate-800">Datos del servicio</h2>
+            <p className="text-sm text-slate-400">Los proyectos continuos no usan fases ni plantillas — se gestionan con un tablero Kanban que empieza vacío y se llena manualmente o desde Claude Code.</p>
+
+            <Campo label="Nombre del servicio *">
+              <input value={proyectoData.paquete} onChange={(e) => setProyectoData({ ...proyectoData, paquete: e.target.value })} className={inputCls} placeholder="Mantenimiento mensual" />
+            </Campo>
+
+            <Campo label="Fecha de inicio">
+              <input type="date" value={proyectoData.fechaInicio} onChange={(e) => setProyectoData({ ...proyectoData, fechaInicio: e.target.value })} className={inputCls} />
+            </Campo>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={proyectoData.anticipoConfirmado}
+                onChange={(e) => setProyectoData({ ...proyectoData, anticipoConfirmado: e.target.checked })}
+                className="accent-brand-500 w-4 h-4"
+              />
+              <span className="text-sm font-medium text-slate-700">Primer pago confirmado</span>
+              {!proyectoData.anticipoConfirmado && (
+                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">El proyecto no se activará sin confirmar el pago</span>
+              )}
+            </label>
+
+            <div className="flex justify-between pt-2">
+              <button onClick={() => setPaso(1)} className="text-slate-500 hover:text-slate-700 text-sm px-4 py-2">← Atrás</button>
+              <button
+                onClick={() => setPaso(3)}
+                disabled={!valido2}
+                className="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {paso === 2 && !esContinuo && (
           <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
             <h2 className="font-semibold text-slate-800">Datos del proyecto</h2>
 

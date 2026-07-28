@@ -5,6 +5,7 @@ import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
+import KanbanBoard from '../../components/KanbanBoard'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon } from 'lucide-react'
 import logo from '../../assets/logo-esbrillante.svg'
 
@@ -99,9 +100,10 @@ export default function VistaCliente() {
 
   if (!proyecto) return null
 
+  const esContinuo = proyecto.tipo === 'continuo'
   const avance = calcularAvance(proyecto)
   const faseActual = getFaseActual(proyecto)
-  const fases = proyecto.proyecto.fases || FASES_WEB
+  const fases = esContinuo ? [] : (proyecto.proyecto.fases || FASES_WEB)
   const faseActualNombre = fases.find((f) => f.numero === faseActual)?.nombre || ''
   const tieneFechasPorFase = fases.some((f) => f.fechaEstimada)
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
@@ -121,10 +123,12 @@ export default function VistaCliente() {
   const equipoEnProceso = tareasEquipoVisibles.filter((t) => t.estado === 'en_proceso')
   const equipoPendientes = tareasEquipoVisibles.filter((t) => t.estado === 'pendiente')
 
-  const tareasPorFaseCliente = fases.map((f) => ({
-    ...f,
-    tareasCliente: proyecto.tareas.filter((t) => t.fase === f.numero && t.esCliente).sort((a, b) => a.orden - b.orden),
-  })).filter((f) => f.tareasCliente.length > 0)
+  const tareasPorFaseCliente = esContinuo
+    ? [{ numero: 1, nombre: null, tareasCliente: proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden) }].filter((f) => f.tareasCliente.length > 0)
+    : fases.map((f) => ({
+        ...f,
+        tareasCliente: proyecto.tareas.filter((t) => t.fase === f.numero && t.esCliente).sort((a, b) => a.orden - b.orden),
+      })).filter((f) => f.tareasCliente.length > 0)
 
   const enPausa = proyecto.status === 'en_pausa'
   const completado = proyecto.status === 'completado'
@@ -156,52 +160,67 @@ export default function VistaCliente() {
             <div>
               <div className="font-semibold text-slate-800 dark:text-slate-100 text-base">{proyecto.proyecto.paquete}</div>
               <div className="text-base text-slate-500 dark:text-slate-400 mt-0.5">
-                {completado ? 'Proyecto entregado' : `Etapa ${faseActual} de ${fases.length} — ${faseActualNombre}`}
+                {esContinuo ? 'Servicio continuo' : completado ? 'Proyecto entregado' : `Etapa ${faseActual} de ${fases.length} — ${faseActualNombre}`}
               </div>
             </div>
-            <div className="text-3xl font-bold text-brand-600 dark:text-brand-400">{avance}%</div>
+            {!esContinuo && <div className="text-3xl font-bold text-brand-600 dark:text-brand-400">{avance}%</div>}
           </div>
-          <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-3">
-            <div className="h-full bg-gradient-to-r from-brand-400 to-brand-500 rounded-full transition-all duration-700" style={{ width: `${avance}%` }} />
-          </div>
-          <div className="flex gap-1 mb-3">
-            {fases.map((f) => {
-              const tareasF = proyecto.tareas.filter((t) => t.fase === f.numero && t.estado !== 'omitida')
-              const completa = tareasF.length > 0 && tareasF.filter((t) => t.estado === 'completada').length === tareasF.length
-              const enCurso = f.numero === faseActual && !completado
-              return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100 dark:bg-slate-800'}`} />
-            })}
-          </div>
+          {!esContinuo && (
+            <>
+              <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-3">
+                <div className="h-full bg-gradient-to-r from-brand-400 to-brand-500 rounded-full transition-all duration-700" style={{ width: `${avance}%` }} />
+              </div>
+              <div className="flex gap-1 mb-3">
+                {fases.map((f) => {
+                  const tareasF = proyecto.tareas.filter((t) => t.fase === f.numero && t.estado !== 'omitida')
+                  const completa = tareasF.length > 0 && tareasF.filter((t) => t.estado === 'completada').length === tareasF.length
+                  const enCurso = f.numero === faseActual && !completado
+                  return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100 dark:bg-slate-800'}`} />
+                })}
+              </div>
+            </>
+          )}
           {enPausa && (
             <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3 py-2.5 text-base text-amber-700 dark:text-amber-300 flex items-start gap-2 mb-3">
               <Clock size={15} className="shrink-0 mt-0.5" />
               <span>El proyecto está en espera de tu respuesta. En cuanto respondas, el equipo continúa.</span>
             </div>
           )}
-          <div className="flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
-            <Info size={13} className="shrink-0 mt-0.5" />
-            <span>El % es un estimado y puede ajustarse — si surgen nuevas actividades durante el proyecto, es normal que baje un poco antes de volver a subir. No significa que se haya retrocedido.</span>
-          </div>
+          {!esContinuo && (
+            <div className="flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+              <Info size={13} className="shrink-0 mt-0.5" />
+              <span>El % es un estimado y puede ajustarse — si surgen nuevas actividades durante el proyecto, es normal que baje un poco antes de volver a subir. No significa que se haya retrocedido.</span>
+            </div>
+          )}
         </div>
 
-        {tieneFechasPorFase ? (
-          <FasesConFechas fases={fases} faseActual={faseActual} completado={completado} fechaCierre={proyecto.tiempos.cierre} />
-        ) : (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-brand-50 dark:bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Calendar size={18} className="text-brand-600 dark:text-brand-400" />
+        {!esContinuo && (
+          tieneFechasPorFase ? (
+            <FasesConFechas fases={fases} faseActual={faseActual} completado={completado} fechaCierre={proyecto.tiempos.cierre} />
+          ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-brand-50 dark:bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
+                  <Calendar size={18} className="text-brand-600 dark:text-brand-400" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
+                  <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
+                  {completado && proyecto.tiempos.cierre && <div className="text-base text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
+                </div>
               </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
-                {completado && proyecto.tiempos.cierre && <div className="text-base text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
+              <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+                <Info size={13} className="shrink-0 mt-0.5" />
+                <span>Esta fecha es un estimado. Te avisaremos con anticipación si hay algún cambio.</span>
               </div>
             </div>
-            <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
-              <Info size={13} className="shrink-0 mt-0.5" />
-              <span>Esta fecha es un estimado. Te avisaremos con anticipación si hay algún cambio.</span>
-            </div>
+          )
+        )}
+
+        {esContinuo && !completado && (
+          <div>
+            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3">¿En qué estamos trabajando?</h2>
+            <KanbanBoard tareas={proyecto.tareas} readOnly />
           </div>
         )}
 
@@ -239,7 +258,7 @@ export default function VistaCliente() {
           </div>
         )}
 
-        {tareasEquipoVisibles.length > 0 && !completado && (
+        {!esContinuo && tareasEquipoVisibles.length > 0 && !completado && (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
             <button onClick={() => setSeccionAbierta(seccionAbierta === 'equipo' ? null : 'equipo')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
               <div className="flex items-center gap-2">
@@ -274,7 +293,9 @@ export default function VistaCliente() {
               <div className="border-t border-slate-100 dark:border-slate-800">
                 {tareasPorFaseCliente.map((fase) => (
                   <div key={fase.numero} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
-                    <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800/60"><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{fase.nombre}</span></div>
+                    {fase.nombre && (
+                      <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800/60"><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{fase.nombre}</span></div>
+                    )}
                     {fase.tareasCliente.map((t) => {
                       const desbloqueada = t.dependencias.every((d) => completadasIds.has(d))
                       const est = t.estado === 'completada' ? 'completada' : desbloqueada ? 'pendiente_tuya' : 'por_venir'

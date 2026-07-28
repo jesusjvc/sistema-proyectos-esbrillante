@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyectos, confirmarAnticipo } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha, contarPendientesCliente, tieneRespuestaNueva } from '../../data/storage'
 import { FASES } from '../../data/paquetes'
+import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, Bell, MessageCircle } from 'lucide-react'
 
@@ -102,9 +103,11 @@ export default function AdminDashboard() {
 }
 
 function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
+  const esContinuo = p.tipo === 'continuo'
   const avance = calcularAvance(p)
   const faseActual = getFaseActual(p)
   const faseNombre = FASES.find((f) => f.numero === faseActual)?.nombre || ''
+  const columnasCount = esContinuo ? contarPorColumna(p) : null
   const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.activo
   const pendientesCliente = contarPendientesCliente(p)
   const respuestaNueva = tieneRespuestaNueva(p)
@@ -139,19 +142,27 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
             {p.proyecto.paquete}
             {p.proyecto.extras?.length > 0 && ` · ${p.proyecto.extras.length} extra${p.proyecto.extras.length > 1 ? 's' : ''}`}
           </div>
-          <div className="mb-2">
-            <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-              <span>Fase {faseActual} — {faseNombre}</span>
-              <span className="font-semibold text-slate-700">{avance}%</span>
+          {esContinuo ? (
+            <div className="mb-2 flex items-center gap-3 flex-wrap text-xs text-slate-500">
+              {KANBAN_COLUMNAS.map((c) => (
+                <span key={c.columna}><span className="font-semibold text-slate-700">{columnasCount[c.columna]}</span> {c.label}</span>
+              ))}
             </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
+          ) : (
+            <div className="mb-2">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <span>Fase {faseActual} — {faseNombre}</span>
+                <span className="font-semibold text-slate-700">{avance}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex items-center gap-4 text-xs text-slate-400">
             <span className="flex items-center gap-1">
               <Clock size={12} />
-              Entrega estimada: {formatFecha(p.proyecto.fechaEstimadaEntrega)}
+              {esContinuo ? 'Servicio continuo' : `Entrega estimada: ${formatFecha(p.proyecto.fechaEstimadaEntrega)}`}
             </span>
             {tareasDisponibles > 0 && (
               <span className="text-brand-700 font-medium">

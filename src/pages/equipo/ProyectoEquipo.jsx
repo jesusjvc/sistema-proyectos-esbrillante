@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { getProyecto, iniciarTarea, completarTarea } from '../../data/api'
+import { getProyecto, iniciarTarea, completarTarea, moverTarea } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
+import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { useEventosProyecto } from '../../hooks/useEventos'
+import KanbanBoard from '../../components/KanbanBoard'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -41,13 +43,20 @@ export default function ProyectoEquipo() {
     )
   }
 
+  const esContinuo = proyecto.tipo === 'continuo'
   const fases = proyecto.proyecto?.fases || FASES_WEB
   const faseActual = getFaseActual(proyecto)
   const avance = calcularAvance(proyecto)
+  const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
 
   async function marcarEnProceso(tareaId) {
     await iniciarTarea(proyecto.slug, tareaId)
+    await refresh()
+  }
+
+  async function handleMoverTarea(tareaId, datos) {
+    await moverTarea(proyecto.slug, tareaId, datos)
     await refresh()
   }
 
@@ -95,20 +104,36 @@ export default function ProyectoEquipo() {
     <Layout titulo={proyecto.cliente.nombreComercial} volver="/equipo">
       {/* Progreso */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-        <div className="flex items-center justify-between text-sm mb-2">
-          <span className="font-medium text-slate-700">
-            Fase {faseActual} — {fases.find((f) => f.numero === faseActual)?.nombre}
-          </span>
-          <span className="font-bold text-slate-800">{avance}%</span>
-        </div>
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
-        </div>
+        {esContinuo ? (
+          <div className="flex items-center gap-3 flex-wrap text-sm">
+            {KANBAN_COLUMNAS.map((c) => (
+              <div key={c.columna} className="text-slate-500">
+                <span className="font-bold text-slate-800">{columnasCount[c.columna]}</span> {c.label}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="font-medium text-slate-700">
+                Fase {faseActual} — {fases.find((f) => f.numero === faseActual)?.nombre}
+              </span>
+              <span className="font-bold text-slate-800">{avance}%</span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
+            </div>
+          </>
+        )}
         <div className="text-xs text-slate-400 mt-2">{proyecto.proyecto.paquete}</div>
       </div>
 
+      {esContinuo && (
+        <KanbanBoard tareas={proyecto.tareas} onMover={handleMoverTarea} />
+      )}
+
       {/* Tareas por fase */}
-      <div className="space-y-3">
+      {!esContinuo && <div className="space-y-3">
         {tareasPorFase.map((fase) => {
           if (fase.tareas.length === 0) return null
           const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
@@ -276,7 +301,7 @@ export default function ProyectoEquipo() {
             </div>
           )
         })}
-      </div>
+      </div>}
     </Layout>
   )
 }

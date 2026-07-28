@@ -30,6 +30,7 @@ model Proyecto {
   id     String @id @default(cuid())
   slug   String @unique
   status String @default("pendiente_anticipo")
+  tipo   String @default("finito")
 
   cliente             Json
   proyecto            Json
