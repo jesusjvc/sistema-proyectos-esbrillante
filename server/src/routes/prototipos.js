@@ -19,24 +19,27 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
-// POST /api/prototipos — publica un nuevo prototipo, opcionalmente ligado a un proyecto
+// POST /api/prototipos — publica un nuevo prototipo/página web, opcionalmente ligado a un proyecto
 router.post('/', requireAuth, async (req, res) => {
-  const { nombre, html, proyectoSlug, proyectoNombre } = req.body
-  if (!nombre || !html) return res.status(400).json({ error: 'nombre y html son requeridos' })
+  const { nombre, tipo, modo, html, url, proyectoSlug, proyectoNombre } = req.body
+  if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
+  if (modo === 'url' ? !url : !html) {
+    return res.status(400).json({ error: modo === 'url' ? 'url es requerida' : 'html es requerido' })
+  }
 
   try {
-    res.json(await crearPrototipo({ nombre, html, proyectoSlug, proyectoNombre }))
+    res.json(await crearPrototipo({ nombre, tipo, modo, html, url, proyectoSlug, proyectoNombre }))
   } catch (err) {
     console.error(err)
     res.status(502).json({ error: err.message })
   }
 })
 
-// PATCH /api/prototipos/:slug — reasignar proyecto y/o marcar aprobado
+// PATCH /api/prototipos/:slug — reasignar proyecto y/o cambiar estado
 router.patch('/:slug', requireAuth, async (req, res) => {
-  const { proyectoSlug, proyectoNombre, aprobado } = req.body
+  const { proyectoSlug, proyectoNombre, estado } = req.body
   try {
-    res.json(await actualizarPrototipo(req.params.slug, { proyectoSlug, proyectoNombre, aprobado }))
+    res.json(await actualizarPrototipo(req.params.slug, { proyectoSlug, proyectoNombre, estado }))
   } catch (err) {
     console.error(err)
     res.status(502).json({ error: err.message })
