@@ -15,6 +15,7 @@ import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import KanbanBoard from '../../components/KanbanBoard'
+import PrototiposPanel from '../../components/PrototiposPanel'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -319,7 +320,7 @@ export default function DetalleProyecto() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {[['tareas', 'Tareas'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
+        {[['tareas', 'Tareas'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -504,6 +505,11 @@ export default function DetalleProyecto() {
             }
           </InfoCard>
         </div>
+      )}
+
+      {/* ─── Tab: Prototipos ─── */}
+      {tab === 'prototipos' && (
+        <PrototiposPanel proyectoSlug={proyecto.slug} proyectoNombre={proyecto.cliente.nombreComercial} />
       )}
 
       {/* ─── Tab: Log ─── */}

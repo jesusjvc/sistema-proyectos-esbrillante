@@ -8,6 +8,7 @@ import { FASES_WEB } from '../../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import KanbanBoard from '../../components/KanbanBoard'
+import PrototiposPanel from '../../components/PrototiposPanel'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -21,6 +22,7 @@ export default function ProyectoEquipo() {
   const [faseAbierta, setFaseAbierta] = useState(null)
   const [tareaExpandida, setTareaExpandida] = useState(null)
   const [copiado, setCopiado] = useState(null)
+  const [tab, setTab] = useState('tareas')
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/equipo'))
@@ -128,12 +130,27 @@ export default function ProyectoEquipo() {
         <div className="text-xs text-slate-400 mt-2">{proyecto.proyecto.paquete}</div>
       </div>
 
-      {esContinuo && (
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 mb-5">
+        {[['tareas', 'Tareas'], ['prototipos', 'Prototipos']].map(([t, l]) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t ? 'border-brand-600 text-brand-800' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'tareas' && esContinuo && (
         <KanbanBoard tareas={proyecto.tareas} onMover={handleMoverTarea} />
       )}
 
       {/* Tareas por fase */}
-      {!esContinuo && <div className="space-y-3">
+      {tab === 'tareas' && !esContinuo && <div className="space-y-3">
         {tareasPorFase.map((fase) => {
           if (fase.tareas.length === 0) return null
           const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
@@ -302,6 +319,10 @@ export default function ProyectoEquipo() {
           )
         })}
       </div>}
+
+      {tab === 'prototipos' && (
+        <PrototiposPanel proyectoSlug={proyecto.slug} proyectoNombre={proyecto.cliente.nombreComercial} />
+      )}
     </Layout>
   )
 }

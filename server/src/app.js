@@ -12,6 +12,7 @@ import mcpRouter from './routes/mcp.js'
 import eventosRouter from './routes/eventos.js'
 import oauthRouter from './routes/oauth.js'
 import wellKnownRouter from './routes/wellKnown.js'
+import prototiposRouter from './routes/prototipos.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -31,6 +32,7 @@ app.use(cookieParser())
 app.use('/api/auth', authRouter)
 app.use('/api/proyectos', proyectosRouter)
 app.use('/api/miembros', miembrosRouter)
+app.use('/api/prototipos', prototiposRouter)
 app.use('/api/cliente', clienteRouter)
 app.use('/mcp', mcpRouter)
 app.use('/api/eventos', eventosRouter)

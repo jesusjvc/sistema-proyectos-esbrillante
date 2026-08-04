@@ -44,6 +44,12 @@ export const moverTarea = (slug, tareaId, data) => req('POST', `/api/proyectos/$
 export const agregarTarea = (slug, data) => req('POST', `/api/proyectos/${slug}/tareas`, data)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
 
+// ─── Prototipos (esbrillante-pages-mcp) ──────────────────────────────────────
+export const getPrototipos = () => req('GET', '/api/prototipos')
+export const crearPrototipo = (data) => req('POST', '/api/prototipos', data)
+export const actualizarPrototipo = (slug, data) => req('PATCH', `/api/prototipos/${slug}`, data)
+export const eliminarPrototipo = (slug) => req('DELETE', `/api/prototipos/${slug}`)
+
 // ─── Miembros ──────────────────────────────────────────────────────────────
 export const getMiembros = () => req('GET', '/api/miembros')
 export const crearMiembro = (data) => req('POST', '/api/miembros', data)

@@ -6,6 +6,7 @@ import AdminDashboard from './pages/admin/Dashboard'
 import NuevoProyecto from './pages/admin/NuevoProyecto'
 import DetalleProyecto from './pages/admin/DetalleProyecto'
 import Equipo from './pages/admin/Equipo'
+import Prototipos from './pages/admin/Prototipos'
 import Paquetes from './pages/admin/Paquetes'
 import EditarPaquete from './pages/admin/EditarPaquete'
 import MisTareas from './pages/equipo/MisTareas'
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/admin/proyecto/nuevo" element={<RequireAuth rol="admin"><NuevoProyecto /></RequireAuth>} />
       <Route path="/admin/proyecto/:id" element={<RequireAuth rol="admin"><DetalleProyecto /></RequireAuth>} />
       <Route path="/admin/equipo" element={<RequireAuth rol="admin"><Equipo /></RequireAuth>} />
+      <Route path="/admin/prototipos" element={<RequireAuth rol="admin"><Prototipos /></RequireAuth>} />
       <Route path="/admin/paquetes" element={<RequireAuth rol="admin"><Paquetes /></RequireAuth>} />
       <Route path="/admin/paquetes/:id" element={<RequireAuth rol="admin"><EditarPaquete /></RequireAuth>} />
 
