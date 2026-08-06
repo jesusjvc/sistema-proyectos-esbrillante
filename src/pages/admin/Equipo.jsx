@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
+import Avatar from '../../components/Avatar'
 import { getMiembros, crearMiembro, editarMiembro, eliminarMiembro } from '../../data/api'
 import { Plus, Pencil, Trash2, Check, X, Shield, Star } from 'lucide-react'
 
@@ -127,9 +128,7 @@ export default function Equipo() {
                   </div>
                 ) : (
                   <>
-                    <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-brand-800 font-semibold text-sm shrink-0">
-                      {m.nombre[0].toUpperCase()}
-                    </div>
+                    <Avatar nombre={m.nombre} avatarUrl={m.avatarUrl} size={32} />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-slate-800 text-sm">{m.nombre}</div>
                       <div className="text-xs text-slate-400">{m.email}</div>

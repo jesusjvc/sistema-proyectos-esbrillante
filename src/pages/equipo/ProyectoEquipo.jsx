@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { getProyecto, iniciarTarea, completarTarea, moverTarea } from '../../data/api'
+import { getProyecto, iniciarTarea, completarTarea, moverTarea, getMiembros } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import KanbanBoard from '../../components/KanbanBoard'
 import PrototiposPanel from '../../components/PrototiposPanel'
+import Avatar from '../../components/Avatar'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -23,9 +24,13 @@ export default function ProyectoEquipo() {
   const [tareaExpandida, setTareaExpandida] = useState(null)
   const [copiado, setCopiado] = useState(null)
   const [tab, setTab] = useState('tareas')
+  const [avatares, setAvatares] = useState({})
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/equipo'))
+    getMiembros().then((ms) => {
+      setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
+    }).catch(() => {})
   }, [id])
 
   async function refresh() {
@@ -146,7 +151,7 @@ export default function ProyectoEquipo() {
       </div>
 
       {tab === 'tareas' && esContinuo && (
-        <KanbanBoard tareas={proyecto.tareas} onMover={handleMoverTarea} />
+        <KanbanBoard tareas={proyecto.tareas} avatares={avatares} onMover={handleMoverTarea} />
       )}
 
       {/* Tareas por fase */}
@@ -209,10 +214,16 @@ export default function ProyectoEquipo() {
                             </div>
 
                             {est === 'completada' && t.completadaPor && (
-                              <div className="text-xs text-slate-400 mt-0.5">{t.completadaPor} · {formatFechaHora(t.completadaEn)}</div>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                                <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={16} />
+                                {t.completadaPor} · {formatFechaHora(t.completadaEn)}
+                              </div>
                             )}
                             {est === 'en_proceso' && (
-                              <div className="text-xs text-brand-700 mt-0.5">{t.asignadoA ? `${t.asignadoA} está trabajando en esto` : 'En proceso'}</div>
+                              <div className="flex items-center gap-1.5 text-xs text-brand-700 mt-0.5">
+                                {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={16} />}
+                                {t.asignadoA ? `${t.asignadoA} está trabajando en esto` : 'En proceso'}
+                              </div>
                             )}
                             {est === 'bloqueada_cliente' && (
                               <div className="text-xs text-amber-600 mt-0.5">Esperando respuesta del cliente</div>

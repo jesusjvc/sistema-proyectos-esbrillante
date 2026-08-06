@@ -5,6 +5,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { KANBAN_COLUMNAS } from '../data/kanban'
+import Avatar from './Avatar'
 import {
   CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical,
 } from 'lucide-react'
@@ -22,7 +23,7 @@ function agrupar(tareas) {
 // portal del cliente, para proyectos de tipo "continuo". El estado local
 // `columnas` se mantiene optimista durante el drag (patrón multi-container
 // de dnd-kit) y se resincroniza desde `tareas` cuando no hay drag activo.
-export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, readOnly = false }) {
+export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, readOnly = false, avatares = {} }) {
   const [columnas, setColumnas] = useState(() => agrupar(tareas))
   const [activeId, setActiveId] = useState(null)
 
@@ -107,17 +108,18 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, rea
             readOnly={readOnly}
             onEditar={onEditar}
             onEliminar={onEliminar}
+            avatares={avatares}
           />
         ))}
       </div>
       <DragOverlay>
-        {tareaActiva && <TareaCard tarea={tareaActiva} readOnly overlay />}
+        {tareaActiva && <TareaCard tarea={tareaActiva} readOnly overlay avatares={avatares} />}
       </DragOverlay>
     </DndContext>
   )
 }
 
-function Columna({ columna, tareas, readOnly, onEditar, onEliminar }) {
+function Columna({ columna, tareas, readOnly, onEditar, onEliminar, avatares }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
     todo: 'text-slate-500 dark:text-slate-400',
@@ -136,7 +138,7 @@ function Columna({ columna, tareas, readOnly, onEditar, onEliminar }) {
       <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
           {tareas.map((t) => (
-            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} />
+            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} avatares={avatares} />
           ))}
         </DroppableArea>
       </SortableContext>
@@ -154,7 +156,7 @@ function DroppableArea({ id, children }) {
   return <div ref={setNodeRef} className="flex-1 px-2.5 pb-2.5 space-y-2 min-h-[60px]">{children}</div>
 }
 
-function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay }) {
+function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares = {} }) {
   const [expandida, setExpandida] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
 
@@ -184,10 +186,16 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay }) {
           </div>
 
           {t.estado === 'en_proceso' && t.asignadoA && (
-            <div className="text-xs text-brand-700 dark:text-brand-400 mt-0.5">{t.asignadoA}</div>
+            <div className="flex items-center gap-1.5 text-xs text-brand-700 dark:text-brand-400 mt-0.5">
+              <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={15} />
+              {t.asignadoA}
+            </div>
           )}
           {t.estado === 'completada' && t.completadaPor && (
-            <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Por {t.completadaPor}</div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={15} />
+              Por {t.completadaPor}
+            </div>
           )}
 
           {t.descripcion && (

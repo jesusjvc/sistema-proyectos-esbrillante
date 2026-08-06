@@ -6,7 +6,7 @@ import {
   getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
-  cambiarTipoProyecto, eliminarProyecto,
+  cambiarTipoProyecto, eliminarProyecto, getMiembros,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
@@ -15,6 +15,7 @@ import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import KanbanBoard from '../../components/KanbanBoard'
+import Avatar from '../../components/Avatar'
 import PrototiposPanel from '../../components/PrototiposPanel'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
@@ -37,10 +38,14 @@ export default function DetalleProyecto() {
   const [modalEliminar, setModalEliminar] = useState(false)
   const [driveEstado, setDriveEstado] = useState(null)
   const [driveError, setDriveError] = useState('')
+  const [avatares, setAvatares] = useState({})
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/admin'))
     marcarVisto(id).catch(() => {})
+    getMiembros().then((ms) => {
+      setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
+    }).catch(() => {})
   }, [id])
 
   async function refresh() {
@@ -358,6 +363,7 @@ export default function DetalleProyecto() {
           </div>
           <KanbanBoard
             tareas={proyecto.tareas}
+            avatares={avatares}
             onMover={handleMoverTarea}
             onEditar={(t) => setModalEditar(t)}
             onEliminar={(t) => handleEliminarTarea(t.id)}
@@ -406,6 +412,7 @@ export default function DetalleProyecto() {
                           key={t.id}
                           tarea={t}
                           estado={est}
+                          avatares={avatares}
                           onCompletar={() => marcarCompleta(t.id)}
                           onReabrir={() => reabrir(t.id)}
                           onOmitir={() => omitir(t.id)}
@@ -562,7 +569,7 @@ export default function DetalleProyecto() {
   )
 }
 
-function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
+function TareaRow({ tarea: t, estado, avatares = {}, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
   const [expandida, setExpandida] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
 
@@ -609,7 +616,8 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
           </div>
 
           {estado === 'completada' && t.completadaPor && (
-            <div className="text-xs text-slate-400 mt-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={16} />
               Completada por {t.completadaPor} · {formatFechaHora(t.completadaEn)}
             </div>
           )}
@@ -624,7 +632,8 @@ function TareaRow({ tarea: t, estado, onCompletar, onReabrir, onOmitir, onEditar
             </div>
           )}
           {estado === 'en_proceso' && (
-            <div className="text-xs text-brand-700 mt-0.5">
+            <div className="flex items-center gap-1.5 text-xs text-brand-700 mt-0.5">
+              {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={16} />}
               {t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso'}
             </div>
           )}

@@ -9,7 +9,7 @@ const router = Router()
 router.get('/', requireAuth, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true, avatarUrl: true },
       orderBy: { nombre: 'asc' },
     })
     res.json(users)
@@ -28,7 +28,7 @@ router.post('/', requireAdmin, async (req, res) => {
     const hash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
       data: { email: email.toLowerCase().trim(), password: hash, nombre, rol: rol || 'EQUIPO', esKarla: esKarla || false },
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true, avatarUrl: true },
     })
     res.status(201).json(user)
   } catch (err) {
@@ -53,7 +53,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true, avatarUrl: true },
     })
     res.json(user)
   } catch (err) {

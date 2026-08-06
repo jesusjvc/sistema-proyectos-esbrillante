@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, confirmarAnticipo } from '../../data/api'
@@ -7,7 +7,7 @@ import { calcularAvance, getFaseActual, formatFecha, contarPendientesCliente, ti
 import { FASES } from '../../data/paquetes'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { useEventosGlobal } from '../../hooks/useEventos'
-import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, Bell, MessageCircle } from 'lucide-react'
+import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, Bell, MessageCircle, Search, X } from 'lucide-react'
 
 const STATUS_CONFIG = {
   activo: { label: 'Activo', color: 'bg-emerald-100 text-emerald-700', icon: <CheckCircle2 size={13} /> },
@@ -20,7 +20,8 @@ const STATUS_CONFIG = {
 export default function AdminDashboard() {
   const { user } = useAuth()
   const [proyectos, setProyectos] = useState([])
-  const [filtro, setFiltro] = useState('todos')
+  const [filtro, setFiltro] = useState('activo')
+  const [busqueda, setBusqueda] = useState('')
   const [cargando, setCargando] = useState(true)
 
   async function cargar() {
@@ -40,7 +41,10 @@ export default function AdminDashboard() {
     cargar()
   }
 
-  const filtrados = proyectos.filter((p) => filtro === 'todos' || p.status === filtro)
+  const q = busqueda.trim().toLowerCase()
+  const filtrados = proyectos
+    .filter((p) => filtro === 'todos' || p.status === filtro)
+    .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q) || p.proyecto.paquete.toLowerCase().includes(q))
 
   const counts = {
     activo: proyectos.filter((p) => p.status === 'activo').length,
@@ -60,19 +64,24 @@ export default function AdminDashboard() {
         <MetricaCard label="Respuestas nuevas" valor={counts.respuestasNuevas} color="text-brand-700" />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div className="flex gap-2">
-          {['todos', 'activo', 'en_pausa', 'pendiente_anticipo', 'completado'].map((f) => (
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="relative w-full sm:w-72">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar proyecto..."
+            className="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-300"
+          />
+          {busqueda && (
             <button
-              key={f}
-              onClick={() => setFiltro(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filtro === f ? 'bg-brand-500 text-slate-900' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
-              }`}
+              onClick={() => setBusqueda('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
-              {f === 'todos' ? 'Todos' : STATUS_CONFIG[f]?.label}
+              <X size={14} />
             </button>
-          ))}
+          )}
         </div>
         <Link
           to="/admin/proyecto/nuevo"
@@ -83,13 +92,33 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-5">
+        {['todos', 'activo', 'en_pausa', 'pendiente_anticipo', 'completado'].map((f) => (
+          <button
+            key={f}
+            onClick={() => setFiltro(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filtro === f ? 'bg-brand-500 text-slate-900' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            {f === 'todos' ? 'Todos' : STATUS_CONFIG[f]?.label}
+          </button>
+        ))}
+      </div>
+
       {cargando ? (
         <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
       ) : filtrados.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <div className="text-4xl mb-3">📋</div>
           <div className="font-medium">No hay proyectos</div>
-          <div className="text-sm mt-1">{filtro === 'todos' ? 'Crea el primer proyecto para comenzar' : `No hay proyectos con estado "${STATUS_CONFIG[filtro]?.label}"`}</div>
+          <div className="text-sm mt-1">
+            {q
+              ? `No hay proyectos que coincidan con "${busqueda}"`
+              : filtro === 'todos'
+              ? 'Crea el primer proyecto para comenzar'
+              : `No hay proyectos con estado "${STATUS_CONFIG[filtro]?.label}"`}
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -103,6 +132,7 @@ export default function AdminDashboard() {
 }
 
 function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
+  const navigate = useNavigate()
   const esContinuo = p.tipo === 'continuo'
   const avance = calcularAvance(p)
   const faseActual = getFaseActual(p)
@@ -119,7 +149,10 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
   }).length
 
   return (
-    <div className={`bg-white rounded-xl border p-5 transition-colors ${respuestaNueva ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}>
+    <div
+      onClick={() => navigate(`/admin/proyecto/${p.slug}`)}
+      className={`bg-white rounded-xl border p-5 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${respuestaNueva ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200 hover:border-slate-300'}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -174,18 +207,18 @@ function ProyectoCard({ proyecto: p, onConfirmarAnticipo }) {
         <div className="flex flex-col items-end gap-2 shrink-0">
           {p.status === 'pendiente_anticipo' && (
             <button
-              onClick={() => onConfirmarAnticipo(p.slug)}
+              onClick={(e) => {
+                e.stopPropagation()
+                onConfirmarAnticipo(p.slug)
+              }}
               className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors"
             >
               Confirmar anticipo
             </button>
           )}
-          <Link
-            to={`/admin/proyecto/${p.slug}`}
-            className="flex items-center gap-1 text-sm text-brand-700 hover:text-brand-800 font-medium transition-colors"
-          >
+          <span className="flex items-center gap-1 text-sm text-brand-700 font-medium">
             Ver proyecto <ChevronRight size={14} />
-          </Link>
+          </span>
         </div>
       </div>
     </div>

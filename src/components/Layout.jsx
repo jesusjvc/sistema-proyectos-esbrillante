@@ -3,9 +3,10 @@ import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, Users, Package, Sun, Moon, LayoutTemplate } from 'lucide-react'
 import logo from '../assets/logo-esbrillante.svg'
+import AvatarUploader from './AvatarUploader'
 
 export default function Layout({ children, titulo, volver }) {
-  const { user, logout } = useAuth()
+  const { user, setUser, logout } = useAuth()
   const { tema, toggleTema } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -42,9 +43,13 @@ export default function Layout({ children, titulo, volver }) {
         </nav>
 
         <div className="px-4 py-4 border-t border-slate-800 shrink-0">
-          <div className="text-xs text-slate-400 mb-1">Sesión activa</div>
-          <div className="text-sm font-medium text-white">{user?.nombre || '—'}</div>
-          <div className="text-xs text-slate-500 capitalize">{user?.rol}</div>
+          <div className="flex items-center gap-3">
+            <AvatarUploader user={user} onUpdated={(u) => setUser({ ...u, rol: u.rol.toLowerCase() })} />
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-white truncate">{user?.nombre || '—'}</div>
+              <div className="text-xs text-slate-500 capitalize">{user?.rol}</div>
+            </div>
+          </div>
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={salir}

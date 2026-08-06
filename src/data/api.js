@@ -20,6 +20,8 @@ async function req(method, path, body) {
 export const login = (email, password) => req('POST', '/api/auth/login', { email, password })
 export const logout = () => req('POST', '/api/auth/logout')
 export const getMe = () => req('GET', '/api/auth/me')
+export const actualizarMiAvatar = (avatarUrl) => req('PUT', '/api/auth/me/avatar', { avatarUrl })
+export const eliminarMiAvatar = () => req('DELETE', '/api/auth/me/avatar')
 
 // ─── Proyectos ─────────────────────────────────────────────────────────────
 export const getProyectos = () => req('GET', '/api/proyectos')

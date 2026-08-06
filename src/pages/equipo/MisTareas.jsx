@@ -5,12 +5,13 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
 import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
-import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
+import { CheckCircle2, ChevronRight, PlayCircle, Search, X } from 'lucide-react'
 
 export default function MisTareas() {
   const { user } = useAuth()
   const [proyectos, setProyectos] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [busqueda, setBusqueda] = useState('')
 
   async function cargar() {
     try {
@@ -62,6 +63,11 @@ export default function MisTareas() {
     )
     .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
     .slice(0, 10)
+
+  const q = busqueda.trim().toLowerCase()
+  const misProyectos = proyectos
+    .filter((p) => p.status === 'activo' || p.status === 'en_pausa')
+    .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q) || p.proyecto.paquete.toLowerCase().includes(q))
 
   return (
     <Layout titulo={`Hola, ${user?.nombre}`}>
@@ -143,12 +149,35 @@ export default function MisTareas() {
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Mis proyectos</h2>
-          <div className="space-y-2">
-            {proyectos
-              .filter((p) => p.status === 'activo' || p.status === 'en_pausa')
-              .map((p) => (
-                <Link key={p.id} to={`/equipo/proyecto/${p.slug}`} className="flex items-center justify-between bg-white rounded-xl border border-slate-200 px-5 py-4 hover:border-slate-300 transition-colors">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Mis proyectos</h2>
+            <div className="relative w-56">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar proyecto..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-300"
+              />
+              {busqueda && (
+                <button
+                  onClick={() => setBusqueda('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+          {misProyectos.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
+              {q ? `No hay proyectos que coincidan con "${busqueda}"` : 'No tienes proyectos activos'}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {misProyectos.map((p) => (
+                <Link key={p.id} to={`/equipo/proyecto/${p.slug}`} className="flex items-center justify-between bg-white rounded-xl border border-slate-200 px-5 py-4 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all">
                   <div>
                     <div className="font-medium text-slate-800 text-sm">{p.cliente.nombreComercial}</div>
                     <div className="text-xs text-slate-400 mt-0.5">{p.proyecto.paquete}</div>
@@ -156,7 +185,8 @@ export default function MisTareas() {
                   <ChevronRight size={16} className="text-slate-300" />
                 </Link>
               ))}
-          </div>
+            </div>
+          )}
         </section>
 
         {tareasRecientes.length > 0 && (

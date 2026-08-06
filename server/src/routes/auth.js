@@ -41,8 +41,57 @@ router.post('/logout', (req, res) => {
 })
 
 // GET /api/auth/me
-router.get('/me', requireAuth, (req, res) => {
-  res.json(req.user)
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, avatarUrl: true },
+    })
+    if (!user) return res.status(401).json({ error: 'Sesión inválida' })
+    res.json(user)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// PUT /api/auth/me/avatar — el usuario sube su propia foto de perfil como data URL
+// (ya redimensionada/comprimida en el navegador antes de llegar aquí).
+router.put('/me/avatar', requireAuth, async (req, res) => {
+  const { avatarUrl } = req.body
+  if (typeof avatarUrl !== 'string' || !avatarUrl.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Imagen inválida' })
+  }
+  if (avatarUrl.length > 700_000) {
+    return res.status(413).json({ error: 'La imagen es demasiado pesada' })
+  }
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatarUrl },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, avatarUrl: true },
+    })
+    res.json(user)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// DELETE /api/auth/me/avatar
+router.delete('/me/avatar', requireAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { avatarUrl: null },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, avatarUrl: true },
+    })
+    res.json(user)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
 })
 
 export default router
