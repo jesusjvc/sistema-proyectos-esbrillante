@@ -86,6 +86,7 @@ model Tarea {
   respuestaTexto       String?
   respuestaArchivoUrl  String?
   respuestaArchivoNombre String?
+  driveFolderUrl       String?
 
   @@map("tareas")
 }
