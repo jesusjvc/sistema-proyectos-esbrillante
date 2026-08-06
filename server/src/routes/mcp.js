@@ -39,6 +39,21 @@ async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
+// Valida que los IDs de dependencias existan en el proyecto y no se autorreferencien.
+// tareaId se pasa al editar una tarea existente, para que no pueda depender de sí misma.
+function validarDependencias(p, dependeDeTareaIds, tareaId = null) {
+  if (!dependeDeTareaIds || dependeDeTareaIds.length === 0) return null
+  if (tareaId && dependeDeTareaIds.includes(tareaId)) {
+    return 'Una tarea no puede depender de sí misma.'
+  }
+  const idsProyecto = new Set(p.tareas.map((t) => t.id))
+  const invalidos = dependeDeTareaIds.filter((id) => !idsProyecto.has(id))
+  if (invalidos.length > 0) {
+    return `No se encontraron estas tareas en el proyecto "${p.slug}": ${invalidos.join(', ')}.`
+  }
+  return null
+}
+
 // Decide en qué fase y en qué posición (orden) cae una tarea nueva (o una
 // existente que se está reposicionando, vía excluirId para no interferir
 // con su propia posición anterior).
@@ -341,11 +356,15 @@ function buildServer(usuario) {
         columna: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Solo para proyectos tipo "continuo": columna del tablero Kanban donde debe caer la tarjeta. Default: "todo". Se ignora si se da antesDeTareaId/despuesDeTareaId (se usa la columna de esa tarjeta de referencia).'),
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta actividad'),
         despuesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto después de la cual debe quedar esta actividad'),
+        dependeDeTareaIds: z.array(z.string()).optional().describe('IDs de tareas de este mismo proyecto que deben quedar completadas antes de que esta actividad se considere disponible.'),
       },
     },
-    async ({ slug, titulo, descripcion, fase, completada, columna, antesDeTareaId, despuesDeTareaId }) => {
+    async ({ slug, titulo, descripcion, fase, completada, columna, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const errorDeps = validarDependencias(p, dependeDeTareaIds)
+      if (errorDeps) return fail(errorDeps)
 
       const esContinuo = p.tipo === 'continuo'
       const posicion = esContinuo
@@ -365,7 +384,7 @@ function buildServer(usuario) {
           titulo,
           descripcion: descripcion || '',
           responsable: 'equipo',
-          dependencias: [],
+          dependencias: dependeDeTareaIds || [],
           custom: true,
           estado: estadoFinal,
           completadaPor: marcarCompletada ? usuario.nombre : null,
@@ -384,7 +403,7 @@ function buildServer(usuario) {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId.',
+      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero (ej. "revisa este prototipo" solo tiene sentido una vez diseñado), usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
@@ -393,11 +412,15 @@ function buildServer(usuario) {
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo".'),
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta solicitud'),
         despuesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto después de la cual debe quedar esta solicitud'),
+        dependeDeTareaIds: z.array(z.string()).optional().describe('IDs de tareas de este mismo proyecto (típicamente del equipo) que deben quedar completadas antes de que esta solicitud aparezca disponible para el cliente.'),
       },
     },
-    async ({ slug, titulo, instrucciones, plazoHoras, fase, antesDeTareaId, despuesDeTareaId }) => {
+    async ({ slug, titulo, instrucciones, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const errorDeps = validarDependencias(p, dependeDeTareaIds)
+      if (errorDeps) return fail(errorDeps)
 
       const esContinuo = p.tipo === 'continuo'
       const posicion = esContinuo
@@ -416,7 +439,7 @@ function buildServer(usuario) {
           esCliente: true,
           instruccionesCliente: instrucciones,
           plazoHoras: plazoHoras ?? null,
-          dependencias: [],
+          dependencias: dependeDeTareaIds || [],
           custom: true,
           estado: 'pendiente',
         },
@@ -424,7 +447,8 @@ function buildServer(usuario) {
       await logEntry(p.id, usuario.nombre, 'Solicitud al cliente creada', titulo)
       emitirCambio(p.id)
 
-      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}.`)
+      const nota = dependeDeTareaIds?.length ? ' (queda oculta para el cliente hasta completar sus dependencias)' : ''
+      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.`)
     },
   )
 
@@ -530,7 +554,7 @@ function buildServer(usuario) {
     'editar_actividad',
     {
       title: 'Editar actividad o solicitud',
-      description: 'Corrige el título, descripción, instrucciones, plazo o posición de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden. Para reordenarla, pasa antesDeTareaId o despuesDeTareaId — mueve la tarea a esa posición. En proyectos "finito" puede cambiar de fase si la tarea de referencia está en otra fase. En proyectos "continuo" puede cambiar de columna del tablero Kanban si la tarea de referencia está en otra columna (equivalente a arrastrarla).',
+      description: 'Corrige el título, descripción, instrucciones, plazo, dependencias o posición de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden. Para reordenarla, pasa antesDeTareaId o despuesDeTareaId — mueve la tarea a esa posición. En proyectos "finito" puede cambiar de fase si la tarea de referencia está en otra fase. En proyectos "continuo" puede cambiar de columna del tablero Kanban si la tarea de referencia está en otra columna (equivalente a arrastrarla).',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a editar'),
@@ -540,20 +564,25 @@ function buildServer(usuario) {
         plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
         antesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo antes de otra (por ID)'),
         despuesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo después de otra (por ID)'),
+        dependeDeTareaIds: z.array(z.string()).optional().describe('Reemplaza la lista de tareas de las que depende esta actividad — mientras no estén todas completadas, esta tarea queda oculta/bloqueada para quien deba trabajarla (si es del cliente, no aparece en su portal). Pasa un array vacío para quitar todas las dependencias.'),
       },
     },
-    async ({ slug, tareaId, titulo, descripcion, instrucciones, plazoHoras, antesDeTareaId, despuesDeTareaId }) => {
+    async ({ slug, tareaId, titulo, descripcion, instrucciones, plazoHoras, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
       const tarea = p.tareas.find((t) => t.id === tareaId)
       if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
 
+      const errorDeps = validarDependencias(p, dependeDeTareaIds, tareaId)
+      if (errorDeps) return fail(errorDeps)
+
       const data = {}
       if (titulo !== undefined) data.titulo = titulo
       if (descripcion !== undefined) data.descripcion = descripcion
       if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
+      if (dependeDeTareaIds !== undefined) data.dependencias = dependeDeTareaIds
 
       if (antesDeTareaId || despuesDeTareaId) {
         const posicion = p.tipo === 'continuo'

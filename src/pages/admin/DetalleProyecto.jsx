@@ -460,6 +460,7 @@ export default function DetalleProyecto() {
         <ModalEditarTarea
           tarea={modalEditar}
           miembrosProyecto={miembrosProyecto}
+          todasLasTareas={proyecto.tareas}
           onGuardar={(cambios) => handleGuardarEdicion(modalEditar.id, cambios)}
           onCerrar={() => setModalEditar(null)}
         />
@@ -470,6 +471,7 @@ export default function DetalleProyecto() {
         <ModalNuevaTarea
           contexto={modalNueva}
           miembrosProyecto={miembrosProyecto}
+          todasLasTareas={proyecto.tareas}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
         />
@@ -761,7 +763,7 @@ const RESPONSABLES = [
   { valor: 'cliente', label: 'Cliente' },
 ]
 
-function ModalEditarTarea({ tarea, miembrosProyecto = [], onGuardar, onCerrar }) {
+function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], onGuardar, onCerrar }) {
   const [form, setForm] = useState({
     titulo: tarea.titulo,
     descripcion: tarea.esCliente ? '' : (tarea.descripcion || ''),
@@ -771,7 +773,9 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], onGuardar, onCerrar })
     esRutaCritica: tarea.esRutaCritica,
     soloKarlaOAdmin: tarea.soloKarlaOAdmin,
     plazoHoras: tarea.plazoHoras || '',
+    dependencias: tarea.dependencias || [],
   })
+  const opcionesDependencia = todasLasTareas.filter((t) => t.id !== tarea.id)
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -842,6 +846,12 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], onGuardar, onCerrar })
             </div>
           )}
 
+          <SelectorDependencias
+            opciones={opcionesDependencia}
+            seleccionadas={form.dependencias}
+            onChange={(dependencias) => setForm({ ...form, dependencias })}
+          />
+
           <div className="flex gap-3 pt-2">
             <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Guardar cambios
@@ -856,7 +866,34 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], onGuardar, onCerrar })
   )
 }
 
-function ModalNuevaTarea({ contexto, miembrosProyecto = [], onGuardar, onCerrar }) {
+// Checklist para elegir de qué tareas depende otra: mientras no estén todas
+// completadas, la tarea queda bloqueada (oculta al cliente si es tarea suya).
+function SelectorDependencias({ opciones, seleccionadas, onChange }) {
+  if (opciones.length === 0) return null
+
+  function toggle(id) {
+    onChange(seleccionadas.includes(id) ? seleccionadas.filter((d) => d !== id) : [...seleccionadas, id])
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+        Depende de <span className="font-normal text-slate-400">(no queda disponible hasta que se completen)</span>
+      </label>
+      <div className="border border-slate-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-slate-50">
+        {opciones.map((t) => (
+          <label key={t.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+            <input type="checkbox" checked={seleccionadas.includes(t.id)} onChange={() => toggle(t.id)} className="accent-brand-500 shrink-0" />
+            <span className="truncate text-slate-700">{t.titulo}</span>
+            {t.esCliente && <span className="ml-auto text-[10px] shrink-0 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Cliente</span>}
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [], onGuardar, onCerrar }) {
   const esContinuo = typeof contexto === 'string'
   const [form, setForm] = useState({
     titulo: '',
@@ -866,6 +903,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], onGuardar, onCerrar 
     esCliente: false,
     plazoHoras: '',
     columna: esContinuo ? contexto : 'todo',
+    dependencias: [],
   })
 
   function handleSubmit(e) {
@@ -880,6 +918,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], onGuardar, onCerrar 
       responsable: form.esCliente ? 'cliente' : form.responsable,
       esCliente: form.esCliente,
       plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null,
+      dependencias: form.dependencias,
     })
   }
 
@@ -944,6 +983,12 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], onGuardar, onCerrar 
               </div>
             </>
           )}
+
+          <SelectorDependencias
+            opciones={todasLasTareas}
+            seleccionadas={form.dependencias}
+            onChange={(dependencias) => setForm({ ...form, dependencias })}
+          />
 
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">

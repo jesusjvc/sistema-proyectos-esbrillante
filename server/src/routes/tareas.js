@@ -193,7 +193,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
   const usuario = req.user.nombre
   const campos = ['titulo', 'descripcion', 'queHacer', 'necesitasAntes', 'plantillaMensaje',
     'queEntregas', 'responsable', 'instruccionesCliente', 'plazoHoras',
-    'esRutaCritica', 'soloKarlaOAdmin', 'esCliente']
+    'esRutaCritica', 'soloKarlaOAdmin', 'esCliente', 'dependencias']
 
   try {
     const p = await getProyecto(slug)
@@ -201,6 +201,14 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
 
     const data = {}
     campos.forEach((c) => { if (req.body[c] !== undefined) data[c] = req.body[c] })
+
+    if (data.dependencias) {
+      const idsProyecto = new Set(p.tareas.map((t) => t.id))
+      const invalidos = data.dependencias.filter((id) => id === tareaId || !idsProyecto.has(id))
+      if (invalidos.length > 0) {
+        return res.status(400).json({ error: `Dependencias inválidas: ${invalidos.join(', ')}` })
+      }
+    }
 
     const tarea = await prisma.tarea.update({ where: { id: tareaId }, data })
     await logEntry(p.id, usuario, 'Tarea editada', tarea.titulo)
@@ -222,13 +230,21 @@ router.post('/', requireAuth, async (req, res) => {
     const p = await getProyecto(slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras } = req.body
+    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias } = req.body
     const esContinuo = p.tipo === 'continuo'
     const faseFinal = esContinuo ? 1 : (fase || 1)
     const estadoFinal = esContinuo && !esCliente ? (estadoDeColumna(columna) || 'pendiente') : 'pendiente'
     const tareasHermanas = esContinuo
       ? await prisma.tarea.findMany({ where: { proyectoId: p.id, estado: estadoFinal } })
       : await prisma.tarea.findMany({ where: { proyectoId: p.id, fase: faseFinal } })
+
+    if (dependencias?.length) {
+      const idsProyecto = new Set(p.tareas.map((t) => t.id))
+      const invalidos = dependencias.filter((id) => !idsProyecto.has(id))
+      if (invalidos.length > 0) {
+        return res.status(400).json({ error: `Dependencias inválidas: ${invalidos.join(', ')}` })
+      }
+    }
 
     const nueva = await prisma.tarea.create({
       data: {
@@ -242,7 +258,7 @@ router.post('/', requireAuth, async (req, res) => {
         responsable: esCliente ? 'cliente' : (responsable || 'equipo'),
         esCliente: esCliente || false,
         plazoHoras: plazoHoras ? Number(plazoHoras) : null,
-        dependencias: [],
+        dependencias: dependencias || [],
         custom: true,
         estado: estadoFinal,
       },
