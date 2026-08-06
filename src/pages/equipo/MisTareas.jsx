@@ -5,13 +5,13 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
 import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
-import { CheckCircle2, ChevronRight, PlayCircle, Search, X } from 'lucide-react'
+import { tareaLeCorresponde, RESPONSABLE_LABEL } from '../../lib/permisos'
+import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
 
 export default function MisTareas() {
   const { user } = useAuth()
   const [proyectos, setProyectos] = useState([])
   const [cargando, setCargando] = useState(true)
-  const [busqueda, setBusqueda] = useState('')
 
   async function cargar() {
     try {
@@ -43,7 +43,7 @@ export default function MisTareas() {
       p.tareas.forEach((t) => {
         if (t.estado === 'completada' || t.estado === 'omitida' || t.esCliente) return
         if (t.soloKarlaOAdmin && !user?.esKarla) return
-        if (!matchRol(t.responsable, user)) return
+        if (!tareaLeCorresponde(t, p.equipo, user)) return
 
         if (t.estado === 'en_proceso') {
           if (t.asignadoA === user?.nombre) tareasEnProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
@@ -64,11 +64,6 @@ export default function MisTareas() {
     .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
     .slice(0, 10)
 
-  const q = busqueda.trim().toLowerCase()
-  const misProyectos = proyectos
-    .filter((p) => p.status === 'activo' || p.status === 'en_pausa')
-    .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q) || p.proyecto.paquete.toLowerCase().includes(q))
-
   return (
     <Layout titulo={`Hola, ${user?.nombre}`}>
       <div className="max-w-2xl space-y-6">
@@ -82,18 +77,21 @@ export default function MisTareas() {
                 <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-brand-50/50">
                   <PlayCircle size={14} className="text-brand-600 mt-1 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-800 text-sm">{t.titulo}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{t.proyectoNombre}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
+                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || t.responsable}</span>
+                    </div>
+                    <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
-                      Ver <ChevronRight size={12} />
+                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
+                      Ver <ChevronRight size={13} />
                     </Link>
                     <button
                       onClick={() => handleCompletar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      <CheckCircle2 size={13} /> Listo
+                      <CheckCircle2 size={14} /> Listo
                     </button>
                   </div>
                 </div>
@@ -121,69 +119,31 @@ export default function MisTareas() {
                 <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-800 text-sm">{t.titulo}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{t.proyectoNombre}</div>
-                    {t.descripcion && <div className="text-xs text-slate-500 mt-1">{t.descripcion}</div>}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
+                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || t.responsable}</span>
+                    </div>
+                    <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
+                    {t.descripcion && <div className="text-sm text-slate-500 mt-1">{t.descripcion}</div>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
-                      Ver <ChevronRight size={12} />
+                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
+                      Ver <ChevronRight size={13} />
                     </Link>
                     <button
                       onClick={() => handleIniciar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-xs border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      <PlayCircle size={13} /> Empezar
+                      <PlayCircle size={14} /> Empezar
                     </button>
                     <button
                       onClick={() => handleCompletar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      <CheckCircle2 size={13} /> Listo
+                      <CheckCircle2 size={14} /> Listo
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Mis proyectos</h2>
-            <div className="relative w-56">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar proyecto..."
-                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-300"
-              />
-              {busqueda && (
-                <button
-                  onClick={() => setBusqueda('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-          {misProyectos.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
-              {q ? `No hay proyectos que coincidan con "${busqueda}"` : 'No tienes proyectos activos'}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {misProyectos.map((p) => (
-                <Link key={p.id} to={`/equipo/proyecto/${p.slug}`} className="flex items-center justify-between bg-white rounded-xl border border-slate-200 px-5 py-4 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 transition-all">
-                  <div>
-                    <div className="font-medium text-slate-800 text-sm">{p.cliente.nombreComercial}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{p.proyecto.paquete}</div>
-                  </div>
-                  <ChevronRight size={16} className="text-slate-300" />
-                </Link>
               ))}
             </div>
           )}
@@ -208,10 +168,4 @@ export default function MisTareas() {
       </div>
     </Layout>
   )
-}
-
-function matchRol(responsable, user) {
-  if (responsable === 'equipo') return true
-  if (responsable === 'admin' || responsable === 'karla') return false
-  return true
 }

@@ -77,6 +77,19 @@ Esto crea/actualiza `.mcp.json` en la raíz del repo (los servidores van bajo la
 
 Verifica la conexión con `claude mcp list` (fuera de una sesión) o `/mcp` (dentro de la sesión de Claude Code) — debe mostrar `esbrillante-seguimiento` conectado con 11 tools.
 
+**Importante:** esta key compartida deja todas las acciones atribuidas a la identidad genérica "Claude Code (MCP)" (equivalente a Admin, sin restricciones de equipo por proyecto). Úsala solo para tu propio Claude Code local o automatizaciones — para que el equipo la use desde Claude Cowork/claude.ai, sigue la sección siguiente en vez de compartir esta key.
+
+## 2.1 Conectar desde Claude Cowork / claude.ai (una identidad por persona)
+
+Si el equipo comparte un workspace de Claude Cowork, el conector MCP se configura una sola vez a nivel de espacio de trabajo — pero **cada persona autoriza su propia conexión** la primera vez que lo usa, con su login individual (mismo correo y contraseña que ya usa para entrar al panel web). Eso es lo que permite que el sistema sepa exactamente quién hizo cada `iniciar_actividad`/`completar_actividad`, en vez de que todo quede a nombre de "Claude Code (MCP)".
+
+1. Un admin agrega el conector en Claude Cowork apuntando a `https://api-proyectos.esbrillante.mx/mcp` (sin la API key — este flujo usa OAuth, no header manual).
+2. La primera vez que cada persona intenta usar una tool de `esbrillante-seguimiento`, Claude le va a mostrar una pantalla de "Conectar con el Sistema de Seguimiento" pidiendo **correo y contraseña** — ahí cada quien mete su propia cuenta (la misma con la que entra a `proyectosweb.esbrillante.mx`), no la API key compartida.
+3. Desde ese momento, las acciones de esa persona vía MCP quedan atribuidas a su nombre real, y respetan el mismo sistema de permisos por proyecto que el panel web: si `iniciar_actividad`/`completar_actividad`/`mover_a_revision` es sobre una tarea que no le corresponde (no está asignada a ella en `proyecto.equipo`, o es un rol de otra especialidad), el MCP responde con un error explicando por qué en vez de ejecutar la acción.
+4. Cuentas inactivas o dadas de baja del sistema pierden acceso al MCP automáticamente (se valida contra la misma tabla de usuarios en cada llamada).
+
+No hace falta pedirle a cada persona una API key distinta ni tocar configuración por usuario — el token OAuth que emite este flujo ya queda ligado a su cuenta real.
+
 ## 3. Identificar (o crear) el proyecto
 
 Si el proyecto del repo ya existe en el Sistema de Seguimiento, pide el slug:

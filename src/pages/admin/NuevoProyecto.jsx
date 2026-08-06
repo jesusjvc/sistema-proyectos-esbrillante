@@ -7,6 +7,7 @@ import { generarMensajeInicio } from '../../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../../data/paquetes'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
+import { EQUIPO_NO_APLICA } from '../../lib/permisos'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, AlertCircle, Kanban, GitBranch } from 'lucide-react'
 
 const COND_DEFAULT = {
@@ -53,10 +54,10 @@ export default function NuevoProyecto() {
   })
   const [condiciones, setCondiciones] = useState(COND_DEFAULT)
   const [equipo, setEquipo] = useState({
-    copy: 'Por asignar',
-    disenador: 'Por asignar',
-    programador: 'No aplica',
-    adminProyecto: '',
+    copy: null,
+    disenador: null,
+    programador: null,
+    adminProyecto: null,
   })
   const [passwordCliente, setPasswordCliente] = useState(generarPasswordSimple())
 
@@ -65,8 +66,8 @@ export default function NuevoProyecto() {
   }, [])
 
   useEffect(() => {
-    if (user?.nombre) {
-      setEquipo((prev) => ({ ...prev, adminProyecto: prev.adminProyecto || user.nombre }))
+    if (user?.id) {
+      setEquipo((prev) => ({ ...prev, adminProyecto: prev.adminProyecto || user.id }))
     }
   }, [user])
 
@@ -462,14 +463,14 @@ export default function NuevoProyecto() {
             ].map(([key, label]) => (
               <Campo key={key} label={label}>
                 <select
-                  value={equipo[key]}
-                  onChange={(e) => setEquipo({ ...equipo, [key]: e.target.value })}
+                  value={equipo[key] ?? ''}
+                  onChange={(e) => setEquipo({ ...equipo, [key]: e.target.value || null })}
                   className={inputCls}
                 >
-                  <option>Por asignar</option>
-                  {key === 'programador' && <option>No aplica</option>}
+                  <option value="">Por asignar</option>
+                  {key === 'programador' && <option value={EQUIPO_NO_APLICA}>No aplica</option>}
                   {miembros.map((m) => (
-                    <option key={m.id} value={m.nombre}>{m.nombre}</option>
+                    <option key={m.id} value={m.id}>{m.nombre}</option>
                   ))}
                 </select>
               </Campo>

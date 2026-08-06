@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { estadoDeColumna } from '../lib/kanban.js'
 import { emitirCambio } from '../lib/eventos.js'
+import { tareaLeCorresponde } from '../lib/permisos.js'
 
 const router = Router({ mergeParams: true })
 
@@ -32,6 +33,9 @@ router.post('/:tareaId/iniciar', requireAuth, async (req, res) => {
 
     const tarea = await prisma.tarea.findFirst({ where: { id: tareaId, proyectoId: p.id } })
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para operar esta tarea' })
+    }
 
     await prisma.tarea.update({
       where: { id: tareaId },
@@ -58,6 +62,9 @@ router.post('/:tareaId/completar', requireAuth, async (req, res) => {
 
     const tarea = await prisma.tarea.findFirst({ where: { id: tareaId, proyectoId: p.id } })
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para operar esta tarea' })
+    }
 
     await prisma.tarea.update({
       where: { id: tareaId },
@@ -141,6 +148,9 @@ router.post('/:tareaId/mover', requireAuth, async (req, res) => {
 
     const tarea = p.tareas.find((t) => t.id === tareaId)
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para operar esta tarea' })
+    }
 
     const refId = antesDeTareaId || despuesDeTareaId
     let orden

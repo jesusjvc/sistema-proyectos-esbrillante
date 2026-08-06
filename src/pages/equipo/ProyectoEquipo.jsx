@@ -10,6 +10,7 @@ import { useEventosProyecto } from '../../hooks/useEventos'
 import KanbanBoard from '../../components/KanbanBoard'
 import PrototiposPanel from '../../components/PrototiposPanel'
 import Avatar from '../../components/Avatar'
+import { tareaLeCorresponde, RESPONSABLE_LABEL } from '../../lib/permisos'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -25,11 +26,13 @@ export default function ProyectoEquipo() {
   const [copiado, setCopiado] = useState(null)
   const [tab, setTab] = useState('tareas')
   const [avatares, setAvatares] = useState({})
+  const [miembrosPorId, setMiembrosPorId] = useState({})
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/equipo'))
     getMiembros().then((ms) => {
       setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
+      setMiembrosPorId(Object.fromEntries(ms.map((m) => [m.id, m.nombre])))
     }).catch(() => {})
   }, [id])
 
@@ -179,11 +182,13 @@ export default function ProyectoEquipo() {
                 <div className="border-t border-slate-100">
                   {fase.tareas.map((t) => {
                     const est = estadoCalculado(t)
-                    const puedoOperar = !t.soloAdmin && (!t.soloKarlaOAdmin || user?.esKarla)
+                    const puedoOperar = !t.soloAdmin && (!t.soloKarlaOAdmin || user?.esKarla) && tareaLeCorresponde(t, proyecto.equipo, user)
                     const puedoEmpezar = est === 'disponible' && puedoOperar
                     const puedoCompletar = (est === 'disponible' || est === 'en_proceso') && puedoOperar
                     const expandida = tareaExpandida === t.id
                     const hayDetalle = tieneDetalle(t)
+                    const idResponsable = ['copy', 'disenador', 'programador'].includes(t.responsable) ? proyecto.equipo?.[t.responsable] : null
+                    const nombreResponsable = idResponsable ? miembrosPorId[idResponsable] : null
 
                     return (
                       <div key={t.id} className={`border-b border-slate-50 last:border-0 ${
@@ -205,6 +210,11 @@ export default function ProyectoEquipo() {
                               <span className={`text-sm ${est === 'completada' ? 'line-through text-slate-400' : est === 'omitida' ? 'text-slate-400' : 'text-slate-800'}`}>
                                 {t.titulo}
                               </span>
+                              {est !== 'completada' && est !== 'omitida' && (
+                                <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
+                                  {RESPONSABLE_LABEL[t.responsable] || t.responsable}{nombreResponsable ? ` — ${nombreResponsable}` : ''}
+                                </span>
+                              )}
                               {t.esCliente && (
                                 <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Cliente</span>
                               )}
@@ -214,22 +224,22 @@ export default function ProyectoEquipo() {
                             </div>
 
                             {est === 'completada' && t.completadaPor && (
-                              <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
-                                <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={16} />
+                              <div className="flex items-center gap-1.5 text-sm text-slate-400 mt-1">
+                                <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={17} />
                                 {t.completadaPor} · {formatFechaHora(t.completadaEn)}
                               </div>
                             )}
                             {est === 'en_proceso' && (
-                              <div className="flex items-center gap-1.5 text-xs text-brand-700 mt-0.5">
-                                {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={16} />}
+                              <div className="flex items-center gap-1.5 text-sm text-brand-700 mt-1">
+                                {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={17} />}
                                 {t.asignadoA ? `${t.asignadoA} está trabajando en esto` : 'En proceso'}
                               </div>
                             )}
                             {est === 'bloqueada_cliente' && (
-                              <div className="text-xs text-amber-600 mt-0.5">Esperando respuesta del cliente</div>
+                              <div className="text-sm text-amber-600 mt-1">Esperando respuesta del cliente</div>
                             )}
                             {est === 'bloqueada_dependencia' && (
-                              <div className="text-xs text-slate-400 mt-0.5">Bloqueada — esperando tareas anteriores</div>
+                              <div className="text-sm text-slate-400 mt-1">Bloqueada — esperando tareas anteriores</div>
                             )}
                           </div>
 
@@ -237,17 +247,17 @@ export default function ProyectoEquipo() {
                             {hayDetalle && est !== 'omitida' && (
                               <button
                                 onClick={() => toggleExpandida(t.id)}
-                                className="text-xs text-slate-400 hover:text-brand-700 transition-colors flex items-center gap-1"
+                                className="text-sm text-slate-400 hover:text-brand-700 transition-colors flex items-center gap-1"
                                 title="Ver instrucciones"
                               >
-                                <ClipboardList size={14} />
-                                {expandida ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                <ClipboardList size={15} />
+                                {expandida ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                               </button>
                             )}
                             {puedoEmpezar && !expandida && (
                               <button
                                 onClick={() => marcarEnProceso(t.id)}
-                                className="text-xs border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
+                                className="text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
                               >
                                 Empezar
                               </button>
@@ -255,7 +265,7 @@ export default function ProyectoEquipo() {
                             {puedoCompletar && !expandida && (
                               <button
                                 onClick={() => marcarCompleta(t.id)}
-                                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                                className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                               >
                                 Listo
                               </button>

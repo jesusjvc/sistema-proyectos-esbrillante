@@ -34,6 +34,7 @@ export const iniciarPausa = (slug, fase) => req('POST', `/api/proyectos/${slug}/
 export const terminarPausa = (slug) => req('DELETE', `/api/proyectos/${slug}/pausa`)
 export const cerrarProyecto = (slug) => req('POST', `/api/proyectos/${slug}/cerrar`)
 export const cambiarTipoProyecto = (slug, tipo) => req('PUT', `/api/proyectos/${slug}/tipo`, { tipo })
+export const actualizarEquipoProyecto = (slug, equipo) => req('PUT', `/api/proyectos/${slug}/equipo`, { equipo })
 export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-visto`)
 
 // ─── Tareas ────────────────────────────────────────────────────────────────

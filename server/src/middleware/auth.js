@@ -1,6 +1,9 @@
 import { timingSafeEqual } from 'crypto'
 import { verificarToken } from '../lib/jwt.js'
 import { baseUrl } from '../lib/baseUrl.js'
+import prisma from '../lib/prisma.js'
+
+const IDENTIDAD_MCP_COMPARTIDA = { id: 'mcp', email: 'mcp@esbrillante.mx', nombre: 'Claude Code (MCP)', rol: 'ADMIN', esKarla: false }
 
 export function requireAuth(req, res, next) {
   const token = req.cookies?.token
@@ -36,17 +39,30 @@ function tieneApiKeyValida(req) {
 }
 
 // Acepta el API key compartido directo (Claude Code/Desktop con config
-// estática), o un access token emitido por el flujo OAuth de /oauth
-// (usado por conectores tipo claude.ai que solo saben hablar OAuth).
-export function requireMcpAuth(req, res, next) {
+// estática — queda con la identidad genérica "mcp", equivalente a Admin), o
+// un access token emitido por el flujo OAuth de /oauth (usado por conectores
+// tipo claude.ai/Cowork). El OAuth queda ligado a la persona que inició
+// sesión con SU cuenta en /oauth/authorize, así que aquí resolvemos su
+// identidad real desde la base — necesario para que el sistema de permisos
+// por proyecto (lib/permisos.js) sepa quién es quién.
+export async function requireMcpAuth(req, res, next) {
   const header = req.headers.authorization || ''
   const [scheme, token] = header.split(' ')
 
   if (scheme === 'Bearer' && token) {
-    if (esApiKeyValida(token)) return next()
+    if (esApiKeyValida(token)) {
+      req.user = IDENTIDAD_MCP_COMPARTIDA
+      return next()
+    }
     try {
       const payload = verificarToken(token)
-      if (payload.tipo === 'mcp_oauth') return next()
+      if (payload.tipo === 'mcp_oauth') {
+        const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+        if (user && user.activo) {
+          req.user = { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, esKarla: user.esKarla }
+          return next()
+        }
+      }
     } catch {
       // Token inválido/expirado: cae al 401 de abajo.
     }
@@ -59,7 +75,7 @@ export function requireMcpAuth(req, res, next) {
 // Acepta la API key del MCP (rol equivalente a Admin) o, si no viene, cae a la sesión de Admin normal.
 export function requireAdminOrApiKey(req, res, next) {
   if (tieneApiKeyValida(req)) {
-    req.user = { id: 'mcp', email: 'mcp@esbrillante.mx', nombre: 'Claude Code (MCP)', rol: 'ADMIN', esKarla: false }
+    req.user = IDENTIDAD_MCP_COMPARTIDA
     return next()
   }
   requireAdmin(req, res, next)

@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
 import { requireMcpAuth } from '../middleware/auth.js'
+import { tareaLeCorresponde } from '../lib/permisos.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
@@ -13,7 +14,6 @@ import { emitirCambio } from '../lib/eventos.js'
 
 const router = Router()
 
-const USUARIO_MCP = 'Claude Code (MCP)'
 const PORTAL_CLIENTE_BASE_URL = 'https://proyectosweb.esbrillante.mx/cliente'
 
 function urlPortalCliente(slug) {
@@ -94,7 +94,7 @@ async function resolverColumnaYOrden(p, { columna, antesDeTareaId, despuesDeTare
   return { estadoFinal, orden: ordenAlFinal(tareasColumna) }
 }
 
-function buildServer() {
+function buildServer(usuario) {
   const server = new McpServer({ name: 'esbrillante-seguimiento', version: '1.0.0' })
 
   server.registerTool(
@@ -181,7 +181,7 @@ function buildServer() {
           tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },
         },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Proyecto creado', `Paquete: ${paqueteFinal}`)
+      await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}`)
       emitirCambio(p.id)
 
       const avisoAnticipo = anticipoConfirmado ? '' : ' Status: "pendiente_anticipo" — confirma el anticipo desde el panel admin cuando corresponda.'
@@ -218,7 +218,7 @@ function buildServer() {
         await prisma.tarea.updateMany({ where: { proyectoId: p.id, estado: 'revision' }, data: { estado: 'en_proceso' } })
       }
 
-      await logEntry(p.id, USUARIO_MCP, 'Tipo de proyecto cambiado', `${p.tipo} → ${tipo}`)
+      await logEntry(p.id, usuario.nombre, 'Tipo de proyecto cambiado', `${p.tipo} → ${tipo}`)
       emitirCambio(p.id)
 
       return ok(`Proyecto "${slug}" convertido a tipo "${tipo}".`)
@@ -259,7 +259,7 @@ function buildServer() {
         where: { id: p.id },
         data: { proyecto: { ...p.proyecto, fases: fasesFinal } },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Fase actualizada', `Fase ${numero} — ${faseActualizada.nombre}`)
+      await logEntry(p.id, usuario.nombre, 'Fase actualizada', `Fase ${numero} — ${faseActualizada.nombre}`)
       emitirCambio(p.id)
 
       return ok(`Fase ${numero} ("${faseActualizada.nombre}") actualizada.`)
@@ -368,11 +368,11 @@ function buildServer() {
           dependencias: [],
           custom: true,
           estado: estadoFinal,
-          completadaPor: marcarCompletada ? USUARIO_MCP : null,
+          completadaPor: marcarCompletada ? usuario.nombre : null,
           completadaEn: marcarCompletada ? new Date() : null,
         },
       })
-      await logEntry(p.id, USUARIO_MCP, marcarCompletada ? 'Tarea agregada y completada' : 'Tarea agregada', titulo)
+      await logEntry(p.id, usuario.nombre, marcarCompletada ? 'Tarea agregada y completada' : 'Tarea agregada', titulo)
       emitirCambio(p.id)
 
       const ubicacion = esContinuo ? `columna "${posicion.estadoFinal}"` : `fase ${posicion.faseFinal}`
@@ -421,7 +421,7 @@ function buildServer() {
           estado: 'pendiente',
         },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Solicitud al cliente creada', titulo)
+      await logEntry(p.id, usuario.nombre, 'Solicitud al cliente creada', titulo)
       emitirCambio(p.id)
 
       return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}.`)
@@ -444,12 +444,15 @@ function buildServer() {
 
       const tarea = p.tareas.find((t) => t.id === tareaId)
       if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
+      if (!tareaLeCorresponde(tarea, p.equipo, usuario)) {
+        return fail(`"${tarea.titulo}" no te corresponde en este proyecto — no estás asignado a él o a ese rol.`)
+      }
 
       await prisma.tarea.update({
         where: { id: tareaId },
-        data: { estado: 'en_proceso', asignadoA: USUARIO_MCP },
+        data: { estado: 'en_proceso', asignadoA: usuario.nombre },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Tarea en proceso', tarea.titulo)
+      await logEntry(p.id, usuario.nombre, 'Tarea en proceso', tarea.titulo)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" marcada en proceso.`)
@@ -473,12 +476,18 @@ function buildServer() {
 
       const tarea = p.tareas.find((t) => t.id === tareaId)
       if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
+      // Cerrar una solicitud al cliente (ej. respondió por WhatsApp) es un
+      // relay, no una tarea de especialidad — cualquiera del equipo puede
+      // hacerlo, no solo quien tenga el rol asignado en proyecto.equipo.
+      if (!tarea.esCliente && !tareaLeCorresponde(tarea, p.equipo, usuario)) {
+        return fail(`"${tarea.titulo}" no te corresponde en este proyecto — no estás asignado a él o a ese rol.`)
+      }
 
       await prisma.tarea.update({
         where: { id: tareaId },
-        data: { estado: 'completada', completadaPor: USUARIO_MCP, completadaEn: new Date() },
+        data: { estado: 'completada', completadaPor: usuario.nombre, completadaEn: new Date() },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Tarea completada', respuesta ? `${tarea.titulo} — Respuesta: ${respuesta}` : tarea.titulo)
+      await logEntry(p.id, usuario.nombre, 'Tarea completada', respuesta ? `${tarea.titulo} — Respuesta: ${respuesta}` : tarea.titulo)
       emitirCambio(p.id)
 
       return ok(`Tarea "${tarea.titulo}" marcada como completada.${respuesta ? ' Respuesta registrada en el log.' : ''}`)
@@ -502,12 +511,15 @@ function buildServer() {
 
       const tarea = p.tareas.find((t) => t.id === tareaId)
       if (!tarea) return fail(`No se encontró la tarjeta "${tareaId}" en el proyecto "${slug}".`)
+      if (!tareaLeCorresponde(tarea, p.equipo, usuario)) {
+        return fail(`"${tarea.titulo}" no te corresponde en este proyecto — no estás asignado a él o a ese rol.`)
+      }
 
       await prisma.tarea.update({
         where: { id: tareaId },
         data: { estado: 'revision', completadaPor: null, completadaEn: null },
       })
-      await logEntry(p.id, USUARIO_MCP, 'Tarjeta movida', `${tarea.titulo} → Revisión`)
+      await logEntry(p.id, usuario.nombre, 'Tarjeta movida', `${tarea.titulo} → Revisión`)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" movida a Revisión.`)
@@ -551,7 +563,7 @@ function buildServer() {
         if (p.tipo === 'continuo') {
           data.estado = posicion.estadoFinal
           if (posicion.estadoFinal === 'completada' && tarea.estado !== 'completada') {
-            data.completadaPor = USUARIO_MCP
+            data.completadaPor = usuario.nombre
             data.completadaEn = new Date()
           } else if (posicion.estadoFinal !== 'completada' && tarea.estado === 'completada') {
             data.completadaPor = null
@@ -566,7 +578,7 @@ function buildServer() {
       if (!Object.keys(data).length) return fail('No se especificó ningún campo para editar.')
 
       await prisma.tarea.update({ where: { id: tareaId }, data })
-      await logEntry(p.id, USUARIO_MCP, 'Tarea editada', tarea.titulo)
+      await logEntry(p.id, usuario.nombre, 'Tarea editada', tarea.titulo)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" actualizada.`)
@@ -592,7 +604,7 @@ function buildServer() {
       if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
 
       await prisma.tarea.update({ where: { id: tareaId }, data: { estado: 'omitida' } })
-      await logEntry(p.id, USUARIO_MCP, 'Tarea cancelada', motivo ? `${tarea.titulo} — ${motivo}` : tarea.titulo)
+      await logEntry(p.id, usuario.nombre, 'Tarea cancelada', motivo ? `${tarea.titulo} — ${motivo}` : tarea.titulo)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" cancelada.`)
@@ -613,7 +625,7 @@ function buildServer() {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
-      await logEntry(p.id, USUARIO_MCP, 'Nota', mensaje)
+      await logEntry(p.id, usuario.nombre, 'Nota', mensaje)
       emitirCambio(p.id)
 
       return ok('Nota interna registrada.')
@@ -626,7 +638,7 @@ function buildServer() {
 // POST /mcp
 router.post('/', requireMcpAuth, async (req, res) => {
   try {
-    const server = buildServer()
+    const server = buildServer(req.user)
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
 
     res.on('close', () => {

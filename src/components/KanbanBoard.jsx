@@ -186,25 +186,25 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares
           </div>
 
           {t.estado === 'en_proceso' && t.asignadoA && (
-            <div className="flex items-center gap-1.5 text-xs text-brand-700 dark:text-brand-400 mt-0.5">
-              <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={15} />
+            <div className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 mt-1">
+              <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={17} />
               {t.asignadoA}
             </div>
           )}
           {t.estado === 'completada' && t.completadaPor && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={15} />
+            <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 mt-1">
+              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={17} />
               Por {t.completadaPor}
             </div>
           )}
 
           {t.descripcion && (
-            <button onClick={() => setExpandida(!expandida)} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1 flex items-center gap-1">
-              <Info size={10} /> {expandida ? 'Ocultar' : 'Ver detalle'}
+            <button onClick={() => setExpandida(!expandida)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1.5 flex items-center gap-1">
+              <Info size={13} /> {expandida ? 'Ocultar' : 'Ver detalle'}
             </button>
           )}
           {expandida && (
-            <div className="mt-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2">{t.descripcion}</div>
+            <div className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2">{t.descripcion}</div>
           )}
         </div>
 

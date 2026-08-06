@@ -6,7 +6,7 @@ import {
   getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
-  cambiarTipoProyecto, eliminarProyecto, getMiembros,
+  cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
@@ -14,6 +14,7 @@ import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
+import { RESPONSABLE_LABEL, EQUIPO_NO_APLICA } from '../../lib/permisos'
 import KanbanBoard from '../../components/KanbanBoard'
 import Avatar from '../../components/Avatar'
 import PrototiposPanel from '../../components/PrototiposPanel'
@@ -39,14 +40,25 @@ export default function DetalleProyecto() {
   const [driveEstado, setDriveEstado] = useState(null)
   const [driveError, setDriveError] = useState('')
   const [avatares, setAvatares] = useState({})
+  const [miembros, setMiembros] = useState([])
+  const [editandoEquipo, setEditandoEquipo] = useState(false)
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/admin'))
     marcarVisto(id).catch(() => {})
     getMiembros().then((ms) => {
+      setMiembros(ms)
       setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
     }).catch(() => {})
   }, [id])
+
+  const miembrosPorId = Object.fromEntries(miembros.map((m) => [m.id, m.nombre]))
+
+  async function handleGuardarEquipo(equipo) {
+    await actualizarEquipoProyecto(proyecto.slug, equipo)
+    setEditandoEquipo(false)
+    await refresh()
+  }
 
   async function refresh() {
     const p = await getProyecto(id)
@@ -356,9 +368,9 @@ export default function DetalleProyecto() {
           <div className="flex justify-end">
             <button
               onClick={() => setModalNueva('todo')}
-              className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 transition-colors"
+              className="flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
             >
-              <Plus size={13} /> Nueva tarjeta
+              <Plus size={16} /> Nueva tarjeta
             </button>
           </div>
           <KanbanBoard
@@ -413,6 +425,8 @@ export default function DetalleProyecto() {
                           tarea={t}
                           estado={est}
                           avatares={avatares}
+                          equipo={proyecto.equipo}
+                          miembrosPorId={miembrosPorId}
                           onCompletar={() => marcarCompleta(t.id)}
                           onReabrir={() => reabrir(t.id)}
                           onOmitir={() => omitir(t.id)}
@@ -425,9 +439,9 @@ export default function DetalleProyecto() {
                     <div className="px-5 py-2.5 border-t border-slate-50">
                       <button
                         onClick={() => setModalNueva(fase.numero)}
-                        className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 transition-colors"
+                        className="flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
                       >
-                        <Plus size={13} /> Agregar tarea a Fase {fase.numero}
+                        <Plus size={16} /> Agregar tarea a Fase {fase.numero}
                       </button>
                     </div>
                   </div>
@@ -491,10 +505,24 @@ export default function DetalleProyecto() {
           </InfoCard>
 
           <InfoCard titulo="Equipo asignado" icono={<Users size={14} />}>
-            <InfoRow label="Copy" valor={proyecto.equipo.copy} />
-            <InfoRow label="Diseñador" valor={proyecto.equipo.disenador} />
-            <InfoRow label="Programador" valor={proyecto.equipo.programador} />
-            <InfoRow label="Coordinador" valor={proyecto.equipo.adminProyecto} />
+            {editandoEquipo ? (
+              <EquipoEditor
+                equipo={proyecto.equipo}
+                miembros={miembros}
+                onGuardar={handleGuardarEquipo}
+                onCancelar={() => setEditandoEquipo(false)}
+              />
+            ) : (
+              <>
+                <InfoRow label="Copy" valor={nombreEquipo(proyecto.equipo.copy, miembrosPorId)} />
+                <InfoRow label="Diseñador" valor={nombreEquipo(proyecto.equipo.disenador, miembrosPorId)} />
+                <InfoRow label="Programador" valor={nombreEquipo(proyecto.equipo.programador, miembrosPorId)} />
+                <InfoRow label="Coordinador" valor={nombreEquipo(proyecto.equipo.adminProyecto, miembrosPorId)} />
+                <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 hover:text-brand-800 font-medium mt-1">
+                  Editar equipo
+                </button>
+              </>
+            )}
           </InfoCard>
 
           <InfoCard titulo="Configuración técnica" icono={<Settings2 size={14} />}>
@@ -569,7 +597,7 @@ export default function DetalleProyecto() {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
   const [expandida, setExpandida] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
 
@@ -601,6 +629,14 @@ function TareaRow({ tarea: t, estado, avatares = {}, onCompletar, onReabrir, onO
             <span className={`text-sm font-medium ${estado === 'completada' ? 'line-through text-slate-400' : estado === 'omitida' ? 'text-slate-400' : 'text-slate-800'}`}>
               {t.titulo}
             </span>
+            {estado !== 'completada' && estado !== 'omitida' && (
+              <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
+                {RESPONSABLE_LABEL[t.responsable] || t.responsable}
+                {['copy', 'disenador', 'programador'].includes(t.responsable) && equipo?.[t.responsable] && miembrosPorId[equipo[t.responsable]]
+                  ? ` — ${miembrosPorId[equipo[t.responsable]]}`
+                  : ''}
+              </span>
+            )}
             {t.esCliente && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>
             )}
@@ -616,24 +652,24 @@ function TareaRow({ tarea: t, estado, avatares = {}, onCompletar, onReabrir, onO
           </div>
 
           {estado === 'completada' && t.completadaPor && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
-              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={16} />
+            <div className="flex items-center gap-1.5 text-sm text-slate-400 mt-1">
+              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={17} />
               Completada por {t.completadaPor} · {formatFechaHora(t.completadaEn)}
             </div>
           )}
           {estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl) && (
-            <div className="mt-1.5 text-xs bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-2 space-y-1">
+            <div className="mt-1.5 text-sm bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-2 space-y-1">
               {t.respuestaTexto && <p className="text-slate-700">{t.respuestaTexto}</p>}
               {t.respuestaArchivoUrl && (
                 <a href={t.respuestaArchivoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-brand-700 hover:text-brand-800 font-medium">
-                  <ExternalLink size={11} /> {t.respuestaArchivoNombre || 'Archivo adjunto'}
+                  <ExternalLink size={13} /> {t.respuestaArchivoNombre || 'Archivo adjunto'}
                 </a>
               )}
             </div>
           )}
           {estado === 'en_proceso' && (
-            <div className="flex items-center gap-1.5 text-xs text-brand-700 mt-0.5">
-              {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={16} />}
+            <div className="flex items-center gap-1.5 text-sm text-brand-700 mt-1">
+              {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={17} />}
               {t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso'}
             </div>
           )}
@@ -641,15 +677,15 @@ function TareaRow({ tarea: t, estado, avatares = {}, onCompletar, onReabrir, onO
           {(t.descripcion || t.instruccionesCliente) && (
             <button
               onClick={() => setExpandida(!expandida)}
-              className="text-xs text-slate-400 hover:text-slate-600 mt-1 flex items-center gap-1"
+              className="text-sm text-slate-400 hover:text-slate-600 mt-1.5 flex items-center gap-1"
             >
-              <Info size={11} />
+              <Info size={13} />
               {expandida ? 'Ocultar' : 'Ver detalles'}
             </button>
           )}
 
           {expandida && (
-            <div className="mt-2 text-xs text-slate-600 bg-slate-100 rounded-lg p-3">
+            <div className="mt-2 text-sm text-slate-600 bg-slate-100 rounded-lg p-3">
               {t.esCliente ? t.instruccionesCliente : t.descripcion}
             </div>
           )}
@@ -917,6 +953,71 @@ function InfoCard({ titulo, icono, children, fullWidth }) {
       </h3>
       <div className="space-y-2">{children}</div>
     </div>
+  )
+}
+
+function nombreEquipo(valor, miembrosPorId) {
+  if (!valor) return null
+  if (valor === EQUIPO_NO_APLICA) return 'No aplica'
+  return miembrosPorId[valor] || '—'
+}
+
+const ROLES_EQUIPO_FORM = [
+  ['copy', 'Copy'],
+  ['disenador', 'Diseñador'],
+  ['programador', 'Programador'],
+  ['adminProyecto', 'Coordinador'],
+]
+
+function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
+  const [form, setForm] = useState({
+    copy: equipo.copy || '',
+    disenador: equipo.disenador || '',
+    programador: equipo.programador || '',
+    adminProyecto: equipo.adminProyecto || '',
+  })
+  const [guardando, setGuardando] = useState(false)
+
+  async function handleGuardar(e) {
+    e.preventDefault()
+    setGuardando(true)
+    try {
+      await onGuardar({
+        copy: form.copy || null,
+        disenador: form.disenador || null,
+        programador: form.programador || null,
+        adminProyecto: form.adminProyecto || null,
+      })
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleGuardar} className="space-y-2">
+      {ROLES_EQUIPO_FORM.map(([key, label]) => (
+        <div key={key} className="flex items-center gap-2">
+          <label className="text-xs text-slate-500 w-24 shrink-0">{label}</label>
+          <select
+            value={form[key]}
+            onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+            className="flex-1 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400"
+          >
+            <option value="">Por asignar</option>
+            {key === 'programador' && <option value={EQUIPO_NO_APLICA}>No aplica</option>}
+            {miembros.map((m) => (
+              <option key={m.id} value={m.id}>{m.nombre}</option>
+            ))}
+          </select>
+        </div>
+      ))}
+      <div className="flex items-center gap-2 pt-1">
+        <button type="submit" disabled={guardando} className="text-xs bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+          {guardando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Guardar
+        </button>
+        <button type="button" onClick={onCancelar} className="text-xs text-slate-500 hover:text-slate-700 px-2">Cancelar</button>
+      </div>
+    </form>
   )
 }
 

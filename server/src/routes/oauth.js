@@ -1,8 +1,8 @@
 import { Router } from 'express'
 import { randomUUID, randomBytes } from 'crypto'
+import bcrypt from 'bcryptjs'
 import prisma from '../lib/prisma.js'
 import { firmarToken } from '../lib/jwt.js'
-import { esApiKeyValida } from '../middleware/auth.js'
 import { guardarCodigo, consumirCodigo } from '../lib/oauthCodes.js'
 import { verificarPkce } from '../lib/pkce.js'
 
@@ -25,7 +25,7 @@ function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
 
-function renderLoginPage({ clientId, redirectUri, state, codeChallenge, error }) {
+function renderLoginPage({ clientId, redirectUri, state, codeChallenge, email, error }) {
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -40,9 +40,9 @@ function renderLoginPage({ clientId, redirectUri, state, codeChallenge, error })
   h1 { font-size: 15px; color: #1e293b; margin: 0 0 4px; }
   p.sub { font-size: 13px; color: #64748b; margin: 0 0 20px; }
   label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
-  input[type=password] { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; }
-  input[type=password]:focus { border-color: #f8be00; box-shadow: 0 0 0 3px rgba(248,190,0,.25); }
-  button { width: 100%; margin-top: 16px; background: #f8be00; color: #1e293b; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  input[type=email], input[type=password] { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; margin-bottom: 14px; }
+  input[type=email]:focus, input[type=password]:focus { border-color: #f8be00; box-shadow: 0 0 0 3px rgba(248,190,0,.25); }
+  button { width: 100%; margin-top: 2px; background: #f8be00; color: #1e293b; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
   button:hover { background: #d9a400; }
   .error { margin-top: 12px; background: #fef2f2; color: #dc2626; font-size: 13px; padding: 8px 12px; border-radius: 8px; }
 </style>
@@ -51,14 +51,16 @@ function renderLoginPage({ clientId, redirectUri, state, codeChallenge, error })
   <div class="card">
     <div class="brand">EsBrillante</div>
     <h1>Conectar con el Sistema de Seguimiento</h1>
-    <p class="sub">Ingresa el API Key para autorizar esta conexión.</p>
+    <p class="sub">Inicia sesión con tu cuenta para autorizar esta conexión — así el sistema sabe que eres tú.</p>
     <form method="POST" action="/oauth/authorize">
       <input type="hidden" name="client_id" value="${escapeHtml(clientId)}" />
       <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}" />
       <input type="hidden" name="state" value="${escapeHtml(state || '')}" />
       <input type="hidden" name="code_challenge" value="${escapeHtml(codeChallenge)}" />
-      <label for="api_key">API Key</label>
-      <input type="password" id="api_key" name="api_key" autofocus required autocomplete="off" />
+      <label for="email">Correo</label>
+      <input type="email" id="email" name="email" value="${escapeHtml(email || '')}" autofocus required autocomplete="username" />
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password" />
       ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
       <button type="submit">Conectar</button>
     </form>
@@ -83,24 +85,30 @@ router.get('/authorize', async (req, res) => {
   res.send(renderLoginPage({ clientId: client_id, redirectUri: redirect_uri, state, codeChallenge: code_challenge }))
 })
 
-// POST /oauth/authorize — valida el API Key ingresado y emite el código.
+// POST /oauth/authorize — valida email+contraseña (misma cuenta que el panel
+// web) y emite el código, ligado a esa persona — así cada quien que conecte
+// el conector queda identificado individualmente, aunque compartan la misma
+// configuración de MCP en su workspace.
 router.post('/authorize', async (req, res) => {
-  const { client_id, redirect_uri, state, code_challenge, api_key } = req.body || {}
+  const { client_id, redirect_uri, state, code_challenge, email, password } = req.body || {}
 
   const cliente = client_id && await prisma.oAuthClient.findUnique({ where: { clientId: client_id } })
   if (!cliente || !cliente.redirectUris.includes(redirect_uri)) {
     return res.status(400).send('Solicitud inválida.')
   }
 
-  if (!esApiKeyValida(api_key)) {
+  const user = email && await prisma.user.findUnique({ where: { email: String(email).toLowerCase().trim() } })
+  const credencialesOk = user && user.activo && await bcrypt.compare(password || '', user.password)
+
+  if (!credencialesOk) {
     return res.status(401).send(renderLoginPage({
-      clientId: client_id, redirectUri: redirect_uri, state, codeChallenge: code_challenge,
-      error: 'API Key incorrecta.',
+      clientId: client_id, redirectUri: redirect_uri, state, codeChallenge: code_challenge, email,
+      error: 'Correo o contraseña incorrectos.',
     }))
   }
 
   const code = randomBytes(32).toString('hex')
-  guardarCodigo(code, { clientId: client_id, redirectUri: redirect_uri, codeChallenge: code_challenge })
+  guardarCodigo(code, { clientId: client_id, redirectUri: redirect_uri, codeChallenge: code_challenge, userId: user.id })
 
   const destino = new URL(redirect_uri)
   destino.searchParams.set('code', code)
@@ -163,7 +171,7 @@ router.post('/token', async (req, res) => {
   }
 
   const expiresIn = 90 * 24 * 60 * 60
-  const accessToken = firmarToken({ tipo: 'mcp_oauth', clientId: client_id }, { expiresIn })
+  const accessToken = firmarToken({ tipo: 'mcp_oauth', clientId: client_id, userId: datos.userId }, { expiresIn })
 
   res.json({
     access_token: accessToken,

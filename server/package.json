@@ -9,6 +9,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node src/seed/index.js",
+    "db:migrar-equipo": "node src/scripts/migrarEquipoAIds.js",
     "db:studio": "prisma studio"
   },
   "dependencies": {

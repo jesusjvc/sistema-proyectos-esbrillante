@@ -38,7 +38,10 @@ export default function Layout({ children, titulo, volver }) {
             </>
           )}
           {esEquipo && (
-            <NavLink to="/equipo" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/equipo'} />
+            <>
+              <NavLink to="/equipo" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/equipo'} />
+              <NavLink to="/equipo/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/equipo/tareas'} />
+            </>
           )}
         </nav>
 
