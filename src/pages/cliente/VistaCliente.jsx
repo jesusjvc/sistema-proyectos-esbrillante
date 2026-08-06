@@ -454,6 +454,19 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             </div>
           )}
 
+          {t.driveFolderUrl && (
+            <a
+              href={t.driveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-base bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 text-brand-700 dark:text-brand-300 rounded-lg px-3 py-2.5 mb-4 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors w-fit"
+            >
+              <FolderOpen size={15} className="shrink-0" />
+              Sube tus archivos aquí
+              <ExternalLink size={11} className="shrink-0" />
+            </a>
+          )}
+
           <textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
