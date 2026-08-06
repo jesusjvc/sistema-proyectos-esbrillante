@@ -5,6 +5,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { KANBAN_COLUMNAS } from '../data/kanban'
+import { infoResponsable } from '../lib/permisos'
 import Avatar from './Avatar'
 import {
   CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical,
@@ -23,7 +24,7 @@ function agrupar(tareas) {
 // portal del cliente, para proyectos de tipo "continuo". El estado local
 // `columnas` se mantiene optimista durante el drag (patrón multi-container
 // de dnd-kit) y se resincroniza desde `tareas` cuando no hay drag activo.
-export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, readOnly = false, avatares = {} }) {
+export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, readOnly = false, avatares = {}, equipo, miembrosPorId = {} }) {
   const [columnas, setColumnas] = useState(() => agrupar(tareas))
   const [activeId, setActiveId] = useState(null)
 
@@ -109,17 +110,19 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, rea
             onEditar={onEditar}
             onEliminar={onEliminar}
             avatares={avatares}
+            equipo={equipo}
+            miembrosPorId={miembrosPorId}
           />
         ))}
       </div>
       <DragOverlay>
-        {tareaActiva && <TareaCard tarea={tareaActiva} readOnly overlay avatares={avatares} />}
+        {tareaActiva && <TareaCard tarea={tareaActiva} readOnly overlay avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} />}
       </DragOverlay>
     </DndContext>
   )
 }
 
-function Columna({ columna, tareas, readOnly, onEditar, onEliminar, avatares }) {
+function Columna({ columna, tareas, readOnly, onEditar, onEliminar, avatares, equipo, miembrosPorId }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
     todo: 'text-slate-500 dark:text-slate-400',
@@ -138,7 +141,7 @@ function Columna({ columna, tareas, readOnly, onEditar, onEliminar, avatares }) 
       <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
           {tareas.map((t) => (
-            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} avatares={avatares} />
+            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} />
           ))}
         </DroppableArea>
       </SortableContext>
@@ -156,9 +159,10 @@ function DroppableArea({ id, children }) {
   return <div ref={setNodeRef} className="flex-1 px-2.5 pb-2.5 space-y-2 min-h-[60px]">{children}</div>
 }
 
-function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares = {} }) {
+function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares = {}, equipo, miembrosPorId = {} }) {
   const [expandida, setExpandida] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
+  const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -184,6 +188,13 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares
             {t.esRutaCritica && <span className="text-[10px] bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300 px-1.5 py-0.5 rounded-full">Ruta crítica</span>}
             {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">Personalizada</span>}
           </div>
+
+          {t.estado !== 'en_proceso' && t.estado !== 'completada' && (
+            <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 mt-1">
+              {responsableInfo.nombre && <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={17} />}
+              {responsableInfo.nombre || responsableInfo.label}
+            </div>
+          )}
 
           {t.estado === 'en_proceso' && t.asignadoA && (
             <div className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 mt-1">

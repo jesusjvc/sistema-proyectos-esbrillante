@@ -79,7 +79,7 @@ export default function MisTareas() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
-                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || t.responsable}</span>
+                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
                     </div>
                     <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
                   </div>
@@ -121,7 +121,7 @@ export default function MisTareas() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
-                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || t.responsable}</span>
+                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
                     </div>
                     <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
                     {t.descripcion && <div className="text-sm text-slate-500 mt-1">{t.descripcion}</div>}

@@ -14,7 +14,7 @@ import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
-import { RESPONSABLE_LABEL, EQUIPO_NO_APLICA } from '../../lib/permisos'
+import { EQUIPO_NO_APLICA, infoResponsable } from '../../lib/permisos'
 import KanbanBoard from '../../components/KanbanBoard'
 import Avatar from '../../components/Avatar'
 import PrototiposPanel from '../../components/PrototiposPanel'
@@ -203,6 +203,7 @@ export default function DetalleProyecto() {
     tareas: proyecto.tareas.filter((t) => t.fase === f.numero).sort((a, b) => a.orden - b.orden),
   }))
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
+  const miembrosProyecto = miembrosDelEquipo(proyecto.equipo, miembros)
 
   return (
     <Layout titulo={proyecto.cliente.nombreComercial} volver="/admin">
@@ -376,6 +377,8 @@ export default function DetalleProyecto() {
           <KanbanBoard
             tareas={proyecto.tareas}
             avatares={avatares}
+            equipo={proyecto.equipo}
+            miembrosPorId={miembrosPorId}
             onMover={handleMoverTarea}
             onEditar={(t) => setModalEditar(t)}
             onEliminar={(t) => handleEliminarTarea(t.id)}
@@ -456,6 +459,7 @@ export default function DetalleProyecto() {
       {modalEditar && (
         <ModalEditarTarea
           tarea={modalEditar}
+          miembrosProyecto={miembrosProyecto}
           onGuardar={(cambios) => handleGuardarEdicion(modalEditar.id, cambios)}
           onCerrar={() => setModalEditar(null)}
         />
@@ -465,6 +469,7 @@ export default function DetalleProyecto() {
       {modalNueva !== null && (
         <ModalNuevaTarea
           contexto={modalNueva}
+          miembrosProyecto={miembrosProyecto}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
         />
@@ -600,6 +605,7 @@ export default function DetalleProyecto() {
 function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
   const [expandida, setExpandida] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+  const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
 
   const iconMap = {
     completada: <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />,
@@ -631,10 +637,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             </span>
             {estado !== 'completada' && estado !== 'omitida' && (
               <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
-                {RESPONSABLE_LABEL[t.responsable] || t.responsable}
-                {['copy', 'disenador', 'programador'].includes(t.responsable) && equipo?.[t.responsable] && miembrosPorId[equipo[t.responsable]]
-                  ? ` — ${miembrosPorId[equipo[t.responsable]]}`
-                  : ''}
+                {responsableInfo.label}{responsableInfo.nombre ? ` — ${responsableInfo.nombre}` : ''}
               </span>
             )}
             {t.esCliente && (
@@ -758,7 +761,7 @@ const RESPONSABLES = [
   { valor: 'cliente', label: 'Cliente' },
 ]
 
-function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
+function ModalEditarTarea({ tarea, miembrosProyecto = [], onGuardar, onCerrar }) {
   const [form, setForm] = useState({
     titulo: tarea.titulo,
     descripcion: tarea.esCliente ? '' : (tarea.descripcion || ''),
@@ -792,7 +795,14 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-              {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
+              <optgroup label="Rol">
+                {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
+              </optgroup>
+              {miembrosProyecto.length > 0 && (
+                <optgroup label="Persona específica">
+                  {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -846,7 +856,7 @@ function ModalEditarTarea({ tarea, onGuardar, onCerrar }) {
   )
 }
 
-function ModalNuevaTarea({ contexto, onGuardar, onCerrar }) {
+function ModalNuevaTarea({ contexto, miembrosProyecto = [], onGuardar, onCerrar }) {
   const esContinuo = typeof contexto === 'string'
   const [form, setForm] = useState({
     titulo: '',
@@ -905,7 +915,14 @@ function ModalNuevaTarea({ contexto, onGuardar, onCerrar }) {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Responsable</label>
                 <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                  {RESPONSABLES.filter(r => r.valor !== 'cliente').map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
+                  <optgroup label="Rol">
+                    {RESPONSABLES.filter(r => r.valor !== 'cliente').map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
+                  </optgroup>
+                  {miembrosProyecto.length > 0 && (
+                    <optgroup label="Persona específica">
+                      {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <div>
@@ -960,6 +977,17 @@ function nombreEquipo(valor, miembrosPorId) {
   if (!valor) return null
   if (valor === EQUIPO_NO_APLICA) return 'No aplica'
   return miembrosPorId[valor] || '—'
+}
+
+// Personas ya asignadas al proyecto (Copy/Diseñador/Programador/Coordinador),
+// para poder asignarles una tarea directamente sin depender de su rol.
+function miembrosDelEquipo(equipo, miembros) {
+  const ids = new Set(
+    ['copy', 'disenador', 'programador', 'adminProyecto']
+      .map((k) => equipo?.[k])
+      .filter((v) => v && v !== EQUIPO_NO_APLICA),
+  )
+  return miembros.filter((m) => ids.has(m.id))
 }
 
 const ROLES_EQUIPO_FORM = [

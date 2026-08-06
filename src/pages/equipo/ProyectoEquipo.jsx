@@ -10,7 +10,7 @@ import { useEventosProyecto } from '../../hooks/useEventos'
 import KanbanBoard from '../../components/KanbanBoard'
 import PrototiposPanel from '../../components/PrototiposPanel'
 import Avatar from '../../components/Avatar'
-import { tareaLeCorresponde, RESPONSABLE_LABEL } from '../../lib/permisos'
+import { tareaLeCorresponde, infoResponsable } from '../../lib/permisos'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -154,7 +154,7 @@ export default function ProyectoEquipo() {
       </div>
 
       {tab === 'tareas' && esContinuo && (
-        <KanbanBoard tareas={proyecto.tareas} avatares={avatares} onMover={handleMoverTarea} />
+        <KanbanBoard tareas={proyecto.tareas} avatares={avatares} equipo={proyecto.equipo} miembrosPorId={miembrosPorId} onMover={handleMoverTarea} />
       )}
 
       {/* Tareas por fase */}
@@ -187,8 +187,7 @@ export default function ProyectoEquipo() {
                     const puedoCompletar = (est === 'disponible' || est === 'en_proceso') && puedoOperar
                     const expandida = tareaExpandida === t.id
                     const hayDetalle = tieneDetalle(t)
-                    const idResponsable = ['copy', 'disenador', 'programador'].includes(t.responsable) ? proyecto.equipo?.[t.responsable] : null
-                    const nombreResponsable = idResponsable ? miembrosPorId[idResponsable] : null
+                    const responsableInfo = infoResponsable(t, proyecto.equipo, miembrosPorId)
 
                     return (
                       <div key={t.id} className={`border-b border-slate-50 last:border-0 ${
@@ -212,7 +211,7 @@ export default function ProyectoEquipo() {
                               </span>
                               {est !== 'completada' && est !== 'omitida' && (
                                 <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
-                                  {RESPONSABLE_LABEL[t.responsable] || t.responsable}{nombreResponsable ? ` — ${nombreResponsable}` : ''}
+                                  {responsableInfo.label}{responsableInfo.nombre ? ` — ${responsableInfo.nombre}` : ''}
                                 </span>
                               )}
                               {t.esCliente && (
