@@ -6,7 +6,7 @@ import {
   getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
-  cambiarTipoProyecto,
+  cambiarTipoProyecto, eliminarProyecto,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
@@ -20,6 +20,7 @@ import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
+  AlertTriangle,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -33,6 +34,7 @@ export default function DetalleProyecto() {
   const [modalEditar, setModalEditar] = useState(null)
   const [modalNueva, setModalNueva] = useState(null)
   const [modalLink, setModalLink] = useState(null)
+  const [modalEliminar, setModalEliminar] = useState(false)
   const [driveEstado, setDriveEstado] = useState(null)
   const [driveError, setDriveError] = useState('')
 
@@ -143,6 +145,11 @@ export default function DetalleProyecto() {
       await cerrarProyecto(proyecto.slug)
       await refresh()
     }
+  }
+
+  async function handleEliminarProyecto() {
+    await eliminarProyecto(proyecto.slug)
+    navigate('/admin')
   }
 
   async function handleCambiarTipo() {
@@ -265,6 +272,11 @@ export default function DetalleProyecto() {
               {proyecto.status !== 'completado' && (
                 <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
                   <XCircle size={16} />
+                </button>
+              )}
+              {user?.rol === 'admin' && (
+                <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
+                  <Trash2 size={16} />
                 </button>
               )}
             </div>
@@ -434,6 +446,15 @@ export default function DetalleProyecto() {
           contexto={modalNueva}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
+        />
+      )}
+
+      {/* ─── Modal: Eliminar proyecto ─── */}
+      {modalEliminar && (
+        <ModalEliminarProyecto
+          nombre={proyecto.cliente.nombreComercial}
+          onConfirmar={handleEliminarProyecto}
+          onCerrar={() => setModalEliminar(false)}
         />
       )}
 
@@ -962,6 +983,62 @@ function LinksClienteEditor({ links, onGuardar, onCrearDrive, driveEstado, drive
         </div>
       )}
     </form>
+  )
+}
+
+function ModalEliminarProyecto({ nombre, onConfirmar, onCerrar }) {
+  const [texto, setTexto] = useState('')
+  const [eliminando, setEliminando] = useState(false)
+  const confirmado = texto.trim() === nombre
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!confirmado) return
+    setEliminando(true)
+    try {
+      await onConfirmar()
+    } catch {
+      setEliminando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <h3 className="flex items-center gap-2 font-semibold text-red-600"><AlertTriangle size={17} /> Eliminar proyecto</h3>
+          <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <p className="text-sm text-slate-600">
+            Esta acción es <span className="font-semibold text-red-600">permanente</span> y elimina el proyecto, sus tareas y su historial. No se puede deshacer.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Escribe <span className="font-semibold">{nombre}</span> para confirmar
+            </label>
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-300 focus:border-transparent"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button
+              type="submit"
+              disabled={!confirmado || eliminando}
+              className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            >
+              {eliminando ? 'Eliminando...' : 'Eliminar proyecto'}
+            </button>
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
