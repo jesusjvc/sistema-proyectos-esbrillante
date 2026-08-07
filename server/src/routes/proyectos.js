@@ -5,14 +5,17 @@ import { generarSlug } from '../lib/slug.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { EQUIPO_NO_APLICA, ROLES_EQUIPO } from '../lib/permisos.js'
 import tareasRouter from './tareas.js'
+import solicitudesRouter from './solicitudes.js'
 
 const router = Router()
 
 router.use('/:slug/tareas', tareasRouter)
+router.use('/:slug/solicitudes', solicitudesRouter)
 
 const INCLUDE = {
   tareas: true,
   log: { orderBy: { fecha: 'desc' }, take: 100 },
+  solicitudes: { orderBy: { creadaEn: 'desc' } },
 }
 
 async function getProyecto(slug) {

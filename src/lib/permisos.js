@@ -58,3 +58,15 @@ export function infoResponsable(tarea, equipo, miembrosPorId = {}) {
   const nombre = miembrosPorId[responsable]
   return { label: nombre || 'Equipo', nombre: null }
 }
+
+// Miembros del sistema que están asignados al equipo de este proyecto
+// (copy/diseñador/programador/adminProyecto) — usado para poblar selectores
+// de "Responsable" limitados a quien ya participa en el proyecto.
+export function miembrosDelEquipo(equipo, miembros) {
+  const ids = new Set(
+    ['copy', 'disenador', 'programador', 'adminProyecto']
+      .map((k) => equipo?.[k])
+      .filter((v) => v && v !== EQUIPO_NO_APLICA),
+  )
+  return miembros.filter((m) => ids.has(m.id))
+}

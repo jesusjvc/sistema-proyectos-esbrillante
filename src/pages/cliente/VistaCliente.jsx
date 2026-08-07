@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getProyectoCliente, loginCliente, completarTareaCliente } from '../../data/api'
+import { getProyectoCliente, loginCliente, completarTareaCliente, crearSolicitudCliente } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
 import KanbanBoard from '../../components/KanbanBoard'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon } from 'lucide-react'
+import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle } from 'lucide-react'
 import logo from '../../assets/logo-esbrillante.svg'
 
 export default function VistaCliente() {
@@ -19,6 +19,7 @@ export default function VistaCliente() {
   const [loginError, setLoginError] = useState('')
   const [loginCargando, setLoginCargando] = useState(false)
   const [seccionAbierta, setSeccionAbierta] = useState('equipo')
+  const [modalSolicitud, setModalSolicitud] = useState(false)
 
   async function cargar() {
     try {
@@ -50,6 +51,12 @@ export default function VistaCliente() {
 
   async function handleCompletar(tareaId, respuesta) {
     await completarTareaCliente(id, tareaId, respuesta)
+    cargar()
+  }
+
+  async function handleNuevaSolicitud(datos) {
+    await crearSolicitudCliente(id, datos)
+    setModalSolicitud(false)
     cargar()
   }
 
@@ -317,11 +324,144 @@ export default function VistaCliente() {
           </div>
         )}
 
+        <SeccionSolicitudes
+          solicitudes={proyecto.solicitudes || []}
+          abierta={seccionAbierta === 'solicitudes'}
+          onToggle={() => setSeccionAbierta(seccionAbierta === 'solicitudes' ? null : 'solicitudes')}
+          onNueva={() => setModalSolicitud(true)}
+        />
+
         <div className="text-center text-sm text-slate-400 dark:text-slate-500 pb-6 space-y-1">
           <p>¿Tienes preguntas? Contáctanos directamente por WhatsApp.</p>
           <p className="font-semibold text-slate-500 dark:text-slate-400">Equipo EsBrillante</p>
         </div>
       </main>
+
+      {modalSolicitud && (
+        <ModalNuevaSolicitud onGuardar={handleNuevaSolicitud} onCerrar={() => setModalSolicitud(false)} />
+      )}
+    </div>
+  )
+}
+
+function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
+  const ESTADO_INFO = {
+    pendiente: { label: 'En revisión', icono: <Clock size={14} className="text-amber-500" />, badge: 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300' },
+    aprobada: { label: 'Se agregó a tus actividades', icono: <CheckCircle2 size={14} className="text-emerald-500" />, badge: 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
+    rechazada: { label: 'No se pudo agregar', icono: <XCircle size={14} className="text-red-400" />, badge: 'bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-300' },
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+        <div className="flex items-center gap-2">
+          <MessageSquarePlus size={16} className="text-slate-500 dark:text-slate-400" />
+          <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">¿Necesitas algo más?</span>
+        </div>
+        {abierta ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
+      </button>
+      {abierta && (
+        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-4 space-y-4">
+          <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+            Si necesitas un cambio específico en tu proyecto, cuéntanos aquí. Cada solicitud se analiza para confirmar que entra dentro del alcance de tu paquete antes de agregarse a las actividades.
+          </p>
+          <button
+            onClick={onNueva}
+            className="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+          >
+            <MessageSquarePlus size={15} /> Solicitar un cambio
+          </button>
+
+          {solicitudes.length > 0 && (
+            <div className="space-y-2 pt-1">
+              {solicitudes.map((s) => {
+                const info = ESTADO_INFO[s.estado]
+                return (
+                  <div key={s.id} className="border border-slate-100 dark:border-slate-800 rounded-lg px-3.5 py-3">
+                    <div className="flex items-start gap-2">
+                      <span className="mt-0.5 shrink-0">{info.icono}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-base font-medium text-slate-800 dark:text-slate-100">{s.titulo}</span>
+                          <span className={`text-sm px-2 py-0.5 rounded-full shrink-0 ${info.badge}`}>{info.label}</span>
+                        </div>
+                        {s.estado === 'rechazada' && s.motivoRechazo && (
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{s.motivoRechazo}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
+  const [titulo, setTitulo] = useState('')
+  const [descripcion, setDescripcion] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  async function enviar(e) {
+    e.preventDefault()
+    if (!titulo.trim()) return
+    setError('')
+    setEnviando(true)
+    try {
+      await onGuardar({ titulo: titulo.trim(), descripcion: descripcion.trim() })
+    } catch {
+      setError('No se pudo enviar tu solicitud. Intenta de nuevo.')
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Solicitar un cambio</h3>
+          <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"><X size={18} /></button>
+        </div>
+        <form onSubmit={enviar} className="p-6 space-y-4">
+          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3.5 py-2.5 text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+            Revisaremos tu solicitud para confirmar que entra dentro del alcance de tu proyecto antes de agregarla a las actividades.
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">¿Qué necesitas? *</label>
+            <input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ej. Cambiar el color del botón principal"
+              className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Cuéntanos más (opcional)</label>
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              rows={4}
+              placeholder="Entre más detalle nos des, más rápido podemos revisarlo..."
+              className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
+            />
+          </div>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <button
+            type="submit"
+            disabled={!titulo.trim() || enviando}
+            className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 py-3 rounded-lg text-base font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+            Enviar solicitud
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

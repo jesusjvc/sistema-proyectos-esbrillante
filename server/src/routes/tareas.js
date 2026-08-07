@@ -1,11 +1,10 @@
 import { Router } from 'express'
-import { randomUUID } from 'crypto'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
-import { estadoDeColumna } from '../lib/kanban.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { tareaLeCorresponde } from '../lib/permisos.js'
+import { crearTareaCustom } from '../lib/tareaHelpers.js'
 
 const router = Router({ mergeParams: true })
 
@@ -231,43 +230,14 @@ router.post('/', requireAuth, async (req, res) => {
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
     const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias } = req.body
-    const esContinuo = p.tipo === 'continuo'
-    const faseFinal = esContinuo ? 1 : (fase || 1)
-    const estadoFinal = esContinuo && !esCliente ? (estadoDeColumna(columna) || 'pendiente') : 'pendiente'
-    const tareasHermanas = esContinuo
-      ? await prisma.tarea.findMany({ where: { proyectoId: p.id, estado: estadoFinal } })
-      : await prisma.tarea.findMany({ where: { proyectoId: p.id, fase: faseFinal } })
 
-    if (dependencias?.length) {
-      const idsProyecto = new Set(p.tareas.map((t) => t.id))
-      const invalidos = dependencias.filter((id) => !idsProyecto.has(id))
-      if (invalidos.length > 0) {
-        return res.status(400).json({ error: `Dependencias inválidas: ${invalidos.join(', ')}` })
-      }
-    }
-
-    const nueva = await prisma.tarea.create({
-      data: {
-        id: randomUUID(),
-        proyectoId: p.id,
-        fase: faseFinal,
-        orden: ordenAlFinal(tareasHermanas),
-        titulo,
-        descripcion: descripcion || '',
-        instruccionesCliente: instruccionesCliente || '',
-        responsable: esCliente ? 'cliente' : (responsable || 'equipo'),
-        esCliente: esCliente || false,
-        plazoHoras: plazoHoras ? Number(plazoHoras) : null,
-        dependencias: dependencias || [],
-        custom: true,
-        estado: estadoFinal,
-      },
-    })
+    const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias })
     await logEntry(p.id, usuario, 'Tarea agregada', nueva.titulo)
 
     emitirCambio(p.id)
     res.status(201).json(nueva)
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
   }
