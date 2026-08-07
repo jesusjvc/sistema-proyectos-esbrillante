@@ -7,6 +7,7 @@ import {
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
+  aprobarSolicitud, rechazarSolicitud,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
@@ -14,10 +15,11 @@ import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
-import { EQUIPO_NO_APLICA, infoResponsable } from '../../lib/permisos'
+import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../../lib/permisos'
 import KanbanBoard from '../../components/KanbanBoard'
 import Avatar from '../../components/Avatar'
 import PrototiposPanel from '../../components/PrototiposPanel'
+import PanelSolicitudes from '../../components/PanelSolicitudes'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -138,6 +140,16 @@ export default function DetalleProyecto() {
     await refresh()
   }
 
+  async function handleAprobarSolicitud(id, datos) {
+    await aprobarSolicitud(proyecto.slug, id, datos)
+    await refresh()
+  }
+
+  async function handleRechazarSolicitud(id, motivo) {
+    await rechazarSolicitud(proyecto.slug, id, motivo)
+    await refresh()
+  }
+
   async function handleMoverTarea(tareaId, datos) {
     await moverTarea(proyecto.slug, tareaId, datos)
     await refresh()
@@ -204,6 +216,7 @@ export default function DetalleProyecto() {
   }))
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
   const miembrosProyecto = miembrosDelEquipo(proyecto.equipo, miembros)
+  const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
 
   return (
     <Layout titulo={proyecto.cliente.nombreComercial} volver="/admin">
@@ -350,18 +363,33 @@ export default function DetalleProyecto() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {[['tareas', 'Tareas'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
+        {[['tareas', 'Tareas'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === t ? 'border-brand-600 text-brand-800' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {l}
+            {t === 'solicitudes' && solicitudesPendientes > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{solicitudesPendientes}</span>
+            )}
           </button>
         ))}
       </div>
+
+      {/* ─── Tab: Solicitudes ─── */}
+      {tab === 'solicitudes' && (
+        <PanelSolicitudes
+          solicitudes={proyecto.solicitudes || []}
+          esContinuo={esContinuo}
+          fases={fases}
+          miembrosProyecto={miembrosProyecto}
+          onAprobar={handleAprobarSolicitud}
+          onRechazar={handleRechazarSolicitud}
+        />
+      )}
 
       {/* ─── Tab: Tareas ─── */}
       {tab === 'tareas' && esContinuo && (
@@ -1026,15 +1054,6 @@ function nombreEquipo(valor, miembrosPorId) {
 
 // Personas ya asignadas al proyecto (Copy/Diseñador/Programador/Coordinador),
 // para poder asignarles una tarea directamente sin depender de su rol.
-function miembrosDelEquipo(equipo, miembros) {
-  const ids = new Set(
-    ['copy', 'disenador', 'programador', 'adminProyecto']
-      .map((k) => equipo?.[k])
-      .filter((v) => v && v !== EQUIPO_NO_APLICA),
-  )
-  return miembros.filter((m) => ids.has(m.id))
-}
-
 const ROLES_EQUIPO_FORM = [
   ['copy', 'Copy'],
   ['disenador', 'Diseñador'],

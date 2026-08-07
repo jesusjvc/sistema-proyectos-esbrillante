@@ -47,6 +47,10 @@ export const moverTarea = (slug, tareaId, data) => req('POST', `/api/proyectos/$
 export const agregarTarea = (slug, data) => req('POST', `/api/proyectos/${slug}/tareas`, data)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
 
+// ─── Solicitudes ───────────────────────────────────────────────────────────
+export const aprobarSolicitud = (slug, id, data) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/aprobar`, data)
+export const rechazarSolicitud = (slug, id, motivo) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/rechazar`, { motivo })
+
 // ─── Prototipos (esbrillante-pages-mcp) ──────────────────────────────────────
 export const getPrototipos = () => req('GET', '/api/prototipos')
 export const crearPrototipo = (data) => req('POST', '/api/prototipos', data)
@@ -63,6 +67,7 @@ export const eliminarMiembro = (id) => req('DELETE', `/api/miembros/${id}`)
 export const loginCliente = (slug, password) => req('POST', '/api/cliente/login', { slug, password })
 export const getProyectoCliente = (slug) => req('GET', `/api/cliente/${slug}`)
 export const logoutCliente = () => req('POST', '/api/cliente/logout')
+export const crearSolicitudCliente = (slug, data) => req('POST', `/api/cliente/${slug}/solicitudes`, data)
 
 // texto y/o archivo son opcionales — completar sin ninguno equivale al "Ya lo hice" simple
 export async function completarTareaCliente(slug, tareaId, { texto, archivo } = {}) {

@@ -14,7 +14,7 @@ const router = Router()
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
     where: { OR: [{ slug }, { id: slug }] },
-    include: { tareas: true },
+    include: { tareas: true, solicitudes: { orderBy: { creadaEn: 'desc' } } },
   })
 }
 
@@ -98,6 +98,37 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
   }
 })
 
+// POST /api/cliente/:slug/solicitudes
+// El cliente levanta una solicitud de cambio específico; queda pendiente de
+// revisión por Admin/Equipo (ver server/src/routes/solicitudes.js).
+router.post('/:slug/solicitudes', requireClienteToken, async (req, res) => {
+  const { slug } = req.params
+  const titulo = req.body?.titulo?.trim()
+  const descripcion = req.body?.descripcion?.trim() || ''
+
+  if (!titulo) return res.status(400).json({ error: 'El título es obligatorio' })
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p || p.id !== req.clienteProyectoId) return res.status(403).json({ error: 'Sin acceso' })
+
+    const solicitud = await prisma.solicitud.create({
+      data: { proyectoId: p.id, titulo, descripcion, estado: 'pendiente' },
+    })
+
+    await prisma.logEntry.create({
+      data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Solicitud enviada', detalle: titulo },
+    })
+
+    emitirCambio(p.id)
+    notificarAdminsNuevaSolicitud(p, solicitud).catch((err) => console.error('Error notificando a admins:', err))
+    res.status(201).json(solicitud)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // POST /api/cliente/logout
 router.post('/logout', (req, res) => {
   res.clearCookie('clienteToken')
@@ -128,6 +159,34 @@ async function notificarAdminsRespuestaCliente(proyecto, tarea, { respuestaTexto
     to: a.email,
     nombreDestino: a.nombre,
     asunto: `💬 ${nombreCliente} respondió — ${tarea.titulo}`,
+    texto,
+    html,
+  })))
+}
+
+async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
+  const admins = await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { email: true, nombre: true } })
+  if (!admins.length) return
+
+  const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
+  const linkProyecto = `${process.env.CLIENT_URL || ''}/admin/proyecto/${proyecto.slug}`
+
+  const texto = [
+    `${nombreCliente} envió una nueva solicitud: "${solicitud.titulo}".`,
+    solicitud.descripcion ? `\n${solicitud.descripcion}` : '',
+    `\nVer proyecto: ${linkProyecto}`,
+  ].join('')
+
+  const html = `
+    <p><strong>${nombreCliente}</strong> envió una nueva solicitud: "<strong>${solicitud.titulo}</strong>".</p>
+    ${solicitud.descripcion ? `<p>${solicitud.descripcion}</p>` : ''}
+    <p><a href="${linkProyecto}">Ver proyecto en el sistema →</a></p>
+  `
+
+  await Promise.all(admins.map((a) => enviarEmail({
+    to: a.email,
+    nombreDestino: a.nombre,
+    asunto: `📝 Nueva solicitud de ${nombreCliente} — ${solicitud.titulo}`,
     texto,
     html,
   })))

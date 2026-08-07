@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { getProyecto, iniciarTarea, completarTarea, moverTarea, getMiembros } from '../../data/api'
+import { getProyecto, iniciarTarea, completarTarea, moverTarea, getMiembros, aprobarSolicitud, rechazarSolicitud } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import KanbanBoard from '../../components/KanbanBoard'
 import PrototiposPanel from '../../components/PrototiposPanel'
+import PanelSolicitudes from '../../components/PanelSolicitudes'
 import Avatar from '../../components/Avatar'
-import { tareaLeCorresponde, infoResponsable } from '../../lib/permisos'
+import { tareaLeCorresponde, infoResponsable, miembrosDelEquipo } from '../../lib/permisos'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, XCircle, PlayCircle,
   ChevronDown, ChevronUp, ClipboardList, Copy, Check,
@@ -27,10 +28,12 @@ export default function ProyectoEquipo() {
   const [tab, setTab] = useState('tareas')
   const [avatares, setAvatares] = useState({})
   const [miembrosPorId, setMiembrosPorId] = useState({})
+  const [miembros, setMiembros] = useState([])
 
   useEffect(() => {
     getProyecto(id).then(setProyecto).catch(() => navigate('/equipo'))
     getMiembros().then((ms) => {
+      setMiembros(ms)
       setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
       setMiembrosPorId(Object.fromEntries(ms.map((m) => [m.id, m.nombre])))
     }).catch(() => {})
@@ -59,9 +62,21 @@ export default function ProyectoEquipo() {
   const avance = calcularAvance(proyecto)
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
   const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+  const miembrosProyecto = miembrosDelEquipo(proyecto.equipo, miembros)
+  const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
 
   async function marcarEnProceso(tareaId) {
     await iniciarTarea(proyecto.slug, tareaId)
+    await refresh()
+  }
+
+  async function handleAprobarSolicitud(id, datos) {
+    await aprobarSolicitud(proyecto.slug, id, datos)
+    await refresh()
+  }
+
+  async function handleRechazarSolicitud(id, motivo) {
+    await rechazarSolicitud(proyecto.slug, id, motivo)
     await refresh()
   }
 
@@ -140,18 +155,32 @@ export default function ProyectoEquipo() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {[['tareas', 'Tareas'], ['prototipos', 'Prototipos']].map(([t, l]) => (
+        {[['tareas', 'Tareas'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === t ? 'border-brand-600 text-brand-800' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
             {l}
+            {t === 'solicitudes' && solicitudesPendientes > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{solicitudesPendientes}</span>
+            )}
           </button>
         ))}
       </div>
+
+      {tab === 'solicitudes' && (
+        <PanelSolicitudes
+          solicitudes={proyecto.solicitudes || []}
+          esContinuo={esContinuo}
+          fases={fases}
+          miembrosProyecto={miembrosProyecto}
+          onAprobar={handleAprobarSolicitud}
+          onRechazar={handleRechazarSolicitud}
+        />
+      )}
 
       {tab === 'tareas' && esContinuo && (
         <KanbanBoard tareas={proyecto.tareas} avatares={avatares} equipo={proyecto.equipo} miembrosPorId={miembrosPorId} onMover={handleMoverTarea} />

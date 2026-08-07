@@ -43,8 +43,9 @@ model Proyecto {
   tiempos             Json     @default("{}")
   passwordCliente     String
 
-  tareas Tarea[]
-  log    LogEntry[]
+  tareas      Tarea[]
+  log         LogEntry[]
+  solicitudes Solicitud[]
 
   creadoEn DateTime @default(now())
 
@@ -88,6 +89,25 @@ model Tarea {
   respuestaArchivoNombre String?
 
   @@map("tareas")
+}
+
+model Solicitud {
+  id         String   @id @default(cuid())
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  titulo      String
+  descripcion String
+
+  estado        String    @default("pendiente") // pendiente | aprobada | rechazada
+  motivoRechazo String?
+  resueltaPor   String?
+  resueltaEn    DateTime?
+  tareaId       String? // referencia informativa a la Tarea creada al aprobar (sin FK, la tarea se puede eliminar)
+
+  creadaEn DateTime @default(now())
+
+  @@map("solicitudes")
 }
 
 // Clientes MCP registrados dinámicamente (RFC 7591) al conectar desde
