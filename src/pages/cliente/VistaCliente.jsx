@@ -5,7 +5,6 @@ import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
-import KanbanBoard from '../../components/KanbanBoard'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle } from 'lucide-react'
 import logo from '../../assets/logo-esbrillante.svg'
 
@@ -130,6 +129,14 @@ export default function VistaCliente() {
   const equipoEnProceso = tareasEquipoVisibles.filter((t) => t.estado === 'en_proceso')
   const equipoPendientes = tareasEquipoVisibles.filter((t) => t.estado === 'pendiente')
 
+  const tareasContinuoEquipo = esContinuo ? proyecto.tareas.filter((t) => !t.esCliente && t.estado !== 'omitida') : []
+  const continuoEnProceso = tareasContinuoEquipo.filter((t) => t.estado === 'en_proceso')
+  const continuoPendientes = tareasContinuoEquipo.filter((t) => t.estado === 'pendiente').sort((a, b) => a.orden - b.orden)
+  const continuoCompletadas = tareasContinuoEquipo
+    .filter((t) => t.estado === 'completada')
+    .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
+    .slice(0, 5)
+
   const tareasPorFaseCliente = esContinuo
     ? [{ numero: 1, nombre: null, tareasCliente: proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden) }].filter((f) => f.tareasCliente.length > 0)
     : fases.map((f) => ({
@@ -225,9 +232,22 @@ export default function VistaCliente() {
         )}
 
         {esContinuo && !completado && (
-          <div>
-            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3">¿En qué estamos trabajando?</h2>
-            <KanbanBoard tareas={proyecto.tareas} readOnly />
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="px-5 py-4">
+              <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg">¿En qué estamos trabajando?</h2>
+            </div>
+            {tareasContinuoEquipo.length === 0 ? (
+              <div className="px-5 pb-4 text-base text-slate-500 dark:text-slate-400">Aún no hay actividades registradas.</div>
+            ) : (
+              <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800">
+                {continuoEnProceso.length > 0 && <GrupoActividad titulo="En proceso ahora" tareas={continuoEnProceso} estado="en_proceso" />}
+                {continuoPendientes.length > 0 && <GrupoActividad titulo="Próximamente" tareas={continuoPendientes} estado="pendiente" />}
+                {continuoCompletadas.length > 0 && <GrupoActividad titulo="Completadas recientemente" tareas={continuoCompletadas} estado="completada" />}
+                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/60">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
