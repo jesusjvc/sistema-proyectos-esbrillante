@@ -422,6 +422,17 @@ function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
                         {s.estado === 'rechazada' && s.motivoRechazo && (
                           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{s.motivoRechazo}</p>
                         )}
+                        {s.archivoUrl && (
+                          <a
+                            href={s.archivoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 mt-1.5 w-fit"
+                          >
+                            <Paperclip size={12} className="shrink-0" />
+                            {s.archivoNombre || 'Ver archivo adjunto'}
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -438,6 +449,7 @@ function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
 function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
   const [titulo, setTitulo] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [archivo, setArchivo] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
@@ -447,7 +459,7 @@ function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
     setError('')
     setEnviando(true)
     try {
-      await onGuardar({ titulo: titulo.trim(), descripcion: descripcion.trim() })
+      await onGuardar({ titulo: titulo.trim(), descripcion: descripcion.trim(), archivo: archivo || undefined })
     } catch {
       setError('No se pudo enviar tu solicitud. Intenta de nuevo.')
       setEnviando(false)
@@ -484,6 +496,23 @@ function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
               placeholder="Entre más detalle nos des, más rápido podemos revisarlo..."
               className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
             />
+          </div>
+          <div>
+            {archivo ? (
+              <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                <Paperclip size={12} className="text-slate-400 shrink-0" />
+                <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{archivo.name}</span>
+                <button type="button" onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 cursor-pointer w-fit">
+                <Paperclip size={12} />
+                Adjuntar un archivo (opcional)
+                <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
+              </label>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button
