@@ -32,7 +32,7 @@ function fail(text) {
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
     where: { OR: [{ slug }, { id: slug }] },
-    include: { tareas: true },
+    include: { tareas: true, solicitudes: { orderBy: { creadaEn: 'desc' } } },
   })
 }
 
@@ -286,7 +286,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente) y las respuestas recientes que el cliente ya envió desde su portal (texto y/o link de archivo — los archivos nunca se transfieren por MCP, solo el link para descargarlos). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done).',
+      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done).',
       inputSchema: { slug: z.string().describe('Slug o ID del proyecto') },
     },
     async ({ slug }) => {
@@ -337,6 +337,16 @@ function buildServer(usuario) {
           archivoUrl: t.respuestaArchivoUrl || null,
           archivoNombre: t.respuestaArchivoNombre || null,
           respondidoEn: t.completadaEn,
+        }))
+      resumen.solicitudesPendientes = p.solicitudes
+        .filter((s) => s.estado === 'pendiente')
+        .map((s) => ({
+          id: s.id,
+          titulo: s.titulo,
+          descripcion: s.descripcion || null,
+          archivoUrl: s.archivoUrl || null,
+          archivoNombre: s.archivoNombre || null,
+          creadaEn: s.creadaEn,
         }))
 
       return ok(JSON.stringify(resumen, null, 2))
