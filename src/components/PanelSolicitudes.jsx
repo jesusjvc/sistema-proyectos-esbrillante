@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KANBAN_COLUMNAS } from '../data/kanban'
 import { formatFechaHora } from '../data/storage'
-import { AlertCircle, CheckCircle2, XCircle, Clock, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, XCircle, Clock, X, Paperclip } from 'lucide-react'
 
 const RESPONSABLES = [
   { valor: 'equipo', label: 'Equipo (cualquiera)' },
@@ -45,6 +45,17 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
           </div>
           <div className="px-5 py-4">
             {s.descripcion && <p className="text-sm text-slate-700 leading-relaxed mb-4 whitespace-pre-wrap">{s.descripcion}</p>}
+            {s.archivoUrl && (
+              <a
+                href={s.archivoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 mb-4 w-fit"
+              >
+                <Paperclip size={12} className="shrink-0" />
+                {s.archivoNombre || 'Ver archivo adjunto'}
+              </a>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => setModalAprobar(s)}
@@ -79,6 +90,17 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
                 </span>
               </div>
               {s.descripcion && <p className="text-sm text-slate-500 mt-1.5 ml-6 whitespace-pre-wrap">{s.descripcion}</p>}
+              {s.archivoUrl && (
+                <a
+                  href={s.archivoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 mt-1.5 ml-6 w-fit"
+                >
+                  <Paperclip size={12} className="shrink-0" />
+                  {s.archivoNombre || 'Ver archivo adjunto'}
+                </a>
+              )}
               {s.estado === 'rechazada' && s.motivoRechazo && (
                 <p className="text-sm text-red-600 mt-1.5 ml-6"><strong>Motivo:</strong> {s.motivoRechazo}</p>
               )}

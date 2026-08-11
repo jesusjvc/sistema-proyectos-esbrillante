@@ -106,6 +106,9 @@ model Solicitud {
   resueltaEn    DateTime?
   tareaId       String? // referencia informativa a la Tarea creada al aprobar (sin FK, la tarea se puede eliminar)
 
+  archivoUrl    String?
+  archivoNombre String?
+
   creadaEn DateTime @default(now())
 
   @@map("solicitudes")

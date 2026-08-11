@@ -67,7 +67,26 @@ export const eliminarMiembro = (id) => req('DELETE', `/api/miembros/${id}`)
 export const loginCliente = (slug, password) => req('POST', '/api/cliente/login', { slug, password })
 export const getProyectoCliente = (slug) => req('GET', `/api/cliente/${slug}`)
 export const logoutCliente = () => req('POST', '/api/cliente/logout')
-export const crearSolicitudCliente = (slug, data) => req('POST', `/api/cliente/${slug}/solicitudes`, data)
+// titulo es obligatorio; descripcion y archivo son opcionales
+export async function crearSolicitudCliente(slug, { titulo, descripcion, archivo } = {}) {
+  const form = new FormData()
+  form.append('titulo', titulo)
+  if (descripcion) form.append('descripcion', descripcion)
+  if (archivo) form.append('archivo', archivo)
+
+  const res = await fetch(`${BASE}/api/cliente/${slug}/solicitudes`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const error = new Error(err.error || `Error ${res.status}`)
+    error.status = res.status
+    throw error
+  }
+  return res.json()
+}
 
 // texto y/o archivo son opcionales — completar sin ninguno equivale al "Ya lo hice" simple
 export async function completarTareaCliente(slug, tareaId, { texto, archivo } = {}) {
