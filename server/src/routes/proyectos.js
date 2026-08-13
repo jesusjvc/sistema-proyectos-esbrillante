@@ -173,6 +173,25 @@ router.post('/:slug/marcar-visto', requireAuth, async (req, res) => {
   }
 })
 
+// POST /api/proyectos/:slug/drive
+// Genera (o reutiliza, es idempotente) la carpeta de Drive del proyecto —
+// para proyectos creados antes de que esto se hiciera automático al crear.
+router.post('/:slug/drive', requireAuth, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!driveConfigurado()) return res.status(503).json({ error: 'Drive no está configurado en el servidor' })
+
+    const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+    if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+    emitirCambio(p.id)
+    res.json({ ok: true, driveRespuestasId: carpetaId })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error al crear la carpeta de Drive' })
+  }
+})
+
 // PUT /api/proyectos/:slug/links
 router.put('/:slug/links', requireAuth, async (req, res) => {
   try {

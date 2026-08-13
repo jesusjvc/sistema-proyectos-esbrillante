@@ -7,14 +7,13 @@ import {
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
-  aprobarSolicitud, rechazarSolicitud, actualizarDescripcion,
+  aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { useEventosProyecto } from '../../hooks/useEventos'
-import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../../lib/permisos'
 import KanbanBoard from '../../components/KanbanBoard'
 import Avatar from '../../components/Avatar'
@@ -90,10 +89,7 @@ export default function DetalleProyecto() {
     setDriveEstado('cargando')
     setDriveError('')
     try {
-      const links = await crearCarpetasCliente(proyecto.cliente.nombreComercial)
-      await actualizarLinks(proyecto.slug, { drive: links.drive })
-      const tareaDrive = proyecto.tareas.find((t) => t.linkTipo === 'drive' && t.estado !== 'completada')
-      if (tareaDrive) await completarTarea(proyecto.slug, tareaDrive.id)
+      await crearCarpetaDriveProyecto(proyecto.slug)
       setDriveEstado('ok')
       await refresh()
     } catch (err) {
@@ -538,10 +534,42 @@ export default function DetalleProyecto() {
             <LinksClienteEditor
               links={proyecto.linksCliente || {}}
               onGuardar={async (cambios) => { await actualizarLinks(proyecto.slug, cambios); await refresh() }}
-              onCrearDrive={driveConfigurado() ? handleCrearDrive : null}
-              driveEstado={driveEstado}
-              driveError={driveError}
             />
+          </InfoCard>
+
+          <InfoCard titulo="Carpeta de Drive" icono={<FolderOpen size={14} />}>
+            {proyecto.driveRespuestasId ? (
+              <>
+                <div className="text-sm text-emerald-700 flex items-center gap-1.5 mb-2">
+                  <Check size={13} /> Carpeta creada
+                </div>
+                <a
+                  href={`https://drive.google.com/drive/folders/${proyecto.driveRespuestasId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-brand-700 hover:text-brand-800 underline decoration-dotted flex items-center gap-1 w-fit"
+                >
+                  Abrir en Drive <ExternalLink size={11} />
+                </a>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-400 mb-2">Este proyecto todavía no tiene carpeta de Drive.</p>
+                <button
+                  onClick={handleCrearDrive}
+                  disabled={driveEstado === 'cargando'}
+                  className="text-xs bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  {driveEstado === 'cargando'
+                    ? <><Loader2 size={12} className="animate-spin" /> Generando...</>
+                    : <><FolderOpen size={12} /> Generar carpeta de Drive</>
+                  }
+                </button>
+                {driveEstado === 'error' && (
+                  <div className="text-xs text-red-500 mt-1.5">{driveError}</div>
+                )}
+              </>
+            )}
           </InfoCard>
 
           <InfoCard titulo="Equipo asignado" icono={<Users size={14} />}>
@@ -1125,7 +1153,7 @@ const LINK_LABELS = {
   diseno: { label: 'Sitio para revisión', placeholder: 'https://staging.ejemplo.com' },
 }
 
-function LinksClienteEditor({ links, onGuardar, onCrearDrive, driveEstado, driveError }) {
+function LinksClienteEditor({ links, onGuardar }) {
   const [form, setForm] = useState({ drive: links.drive || '', brief: links.brief || '', boceto: links.boceto || '', diseno: links.diseno || '' })
   const [guardado, setGuardado] = useState(false)
 
@@ -1163,32 +1191,7 @@ function LinksClienteEditor({ links, onGuardar, onCrearDrive, driveEstado, drive
         <button type="submit" className="text-xs bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
           {guardado ? <><Check size={12} /> Guardado</> : <><Link2 size={12} /> Guardar links</>}
         </button>
-
-        {onCrearDrive && (
-          <button
-            type="button"
-            onClick={onCrearDrive}
-            disabled={driveEstado === 'cargando'}
-            className="text-xs border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {driveEstado === 'cargando'
-              ? <><Loader2 size={12} className="animate-spin" /> Creando carpetas...</>
-              : <><FolderOpen size={12} /> {!links.drive ? 'Crear carpetas en Drive' : 'Recrear carpetas en Drive'}</>
-            }
-          </button>
-        )}
       </div>
-
-      {driveEstado === 'ok' && (
-        <div className="text-xs text-emerald-600 flex items-center gap-1.5">
-          <Check size={12} /> Carpetas creadas y link de Drive guardado
-        </div>
-      )}
-      {driveEstado === 'error' && (
-        <div className="text-xs text-red-500">
-          Error al crear carpetas: {driveError}
-        </div>
-      )}
     </form>
   )
 }
