@@ -149,6 +149,7 @@ function buildServer(usuario) {
         contactoNombre: z.string().optional().describe('Nombre del contacto principal del cliente'),
         correo: z.string().optional().describe('Correo del contacto principal'),
         paquete: z.string().optional().describe('Nombre del paquete/tipo de proyecto. Default: "Personalizado"'),
+        descripcion: z.string().optional().describe('Descripción libre de qué trata el proyecto y qué se busca lograr — le da contexto al equipo. Se puede editar después con editar_proyecto.'),
         tipo: z.enum(['finito', 'continuo']).optional().describe('Tipo de proyecto. "finito" (default): tiene fases y converge a una entrega. "continuo": servicio recurrente sin fecha de cierre, se gestiona con un tablero Kanban (Todo/Doing/Revisión/Done) en vez de fases — en este modo se ignoran fases y fechaEstimadaEntrega.'),
         fases: z.array(z.object({
           numero: z.number().int(),
@@ -164,7 +165,7 @@ function buildServer(usuario) {
         passwordCliente: z.string().optional().describe('Contraseña de acceso al portal del cliente. Si se omite, se genera una automáticamente.'),
       },
     },
-    async ({ clienteNombre, contactoNombre, correo, paquete, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente }) => {
+    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente }) => {
       const slug = generarSlug(clienteNombre)
       const tipoFinal = tipo === 'continuo' ? 'continuo' : 'finito'
       const fasesFinal = tipoFinal === 'continuo' ? [] : (fases?.length ? fases : [
@@ -183,6 +184,7 @@ function buildServer(usuario) {
           cliente: { nombreComercial: clienteNombre, contactoNombre: contactoNombre || '', correo: correo || '', whatsapp: '', participantes: [] },
           proyecto: {
             paquete: paqueteFinal,
+            descripcion: descripcion || '',
             fases: fasesFinal,
             extras: [],
             fechaInicio: fechaInicio || new Date().toISOString().slice(0, 10),
@@ -282,6 +284,31 @@ function buildServer(usuario) {
   )
 
   server.registerTool(
+    'editar_proyecto',
+    {
+      title: 'Editar descripción del proyecto',
+      description: 'Actualiza la descripción libre de qué trata el proyecto y qué se busca lograr — le da contexto al equipo. Sobreescribe la descripción existente por completo (no la concatena).',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        descripcion: z.string().describe('Nueva descripción del proyecto'),
+      },
+    },
+    async ({ slug, descripcion }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      await prisma.proyecto.update({
+        where: { id: p.id },
+        data: { proyecto: { ...p.proyecto, descripcion } },
+      })
+      await logEntry(p.id, usuario.nombre, 'Descripción del proyecto actualizada')
+      emitirCambio(p.id)
+
+      return ok(`Descripción del proyecto "${slug}" actualizada.`)
+    },
+  )
+
+  server.registerTool(
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
@@ -298,6 +325,7 @@ function buildServer(usuario) {
         tipo: p.tipo,
         cliente: p.cliente?.nombreComercial || '(sin nombre)',
         paquete: p.proyecto?.paquete || '(sin paquete)',
+        descripcion: p.proyecto?.descripcion || null,
         status: p.status,
       }
 

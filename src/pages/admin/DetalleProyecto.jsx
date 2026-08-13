@@ -7,7 +7,7 @@ import {
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
-  aprobarSolicitud, rechazarSolicitud,
+  aprobarSolicitud, rechazarSolicitud, actualizarDescripcion,
 } from '../../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
@@ -20,6 +20,7 @@ import KanbanBoard from '../../components/KanbanBoard'
 import Avatar from '../../components/Avatar'
 import PrototiposPanel from '../../components/PrototiposPanel'
 import PanelSolicitudes from '../../components/PanelSolicitudes'
+import DescripcionProyecto from '../../components/DescripcionProyecto'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -240,6 +241,10 @@ export default function DetalleProyecto() {
             </div>
             <h2 className="text-xl font-bold text-slate-800">{proyecto.cliente.nombreComercial}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
+            <DescripcionProyecto
+              descripcion={proyecto.proyecto?.descripcion}
+              onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
+            />
 
             {esContinuo ? (
               <div className="mt-4 flex items-center gap-3 flex-wrap">

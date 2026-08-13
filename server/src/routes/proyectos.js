@@ -178,6 +178,25 @@ router.put('/:slug/links', requireAuth, async (req, res) => {
   }
 })
 
+// PUT /api/proyectos/:slug/descripcion
+router.put('/:slug/descripcion', requireAuth, async (req, res) => {
+  const { descripcion } = req.body
+  if (typeof descripcion !== 'string') return res.status(400).json({ error: 'descripcion inválida' })
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const proyecto = { ...p.proyecto, descripcion: descripcion.trim() }
+    await prisma.proyecto.update({ where: { id: p.id }, data: { proyecto } })
+    emitirCambio(p.id)
+    res.json({ ok: true, descripcion: proyecto.descripcion })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/proyectos/:slug/equipo
 router.put('/:slug/equipo', requireAdmin, async (req, res) => {
   const { equipo } = req.body

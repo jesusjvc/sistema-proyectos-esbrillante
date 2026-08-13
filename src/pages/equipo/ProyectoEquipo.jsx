@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { getProyecto, iniciarTarea, completarTarea, moverTarea, getMiembros, aprobarSolicitud, rechazarSolicitud } from '../../data/api'
+import { getProyecto, iniciarTarea, completarTarea, moverTarea, getMiembros, aprobarSolicitud, rechazarSolicitud, actualizarDescripcion } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFechaHora } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
@@ -10,6 +10,7 @@ import { useEventosProyecto } from '../../hooks/useEventos'
 import KanbanBoard from '../../components/KanbanBoard'
 import PrototiposPanel from '../../components/PrototiposPanel'
 import PanelSolicitudes from '../../components/PanelSolicitudes'
+import DescripcionProyecto from '../../components/DescripcionProyecto'
 import Avatar from '../../components/Avatar'
 import { tareaLeCorresponde, infoResponsable, miembrosDelEquipo } from '../../lib/permisos'
 import {
@@ -129,6 +130,10 @@ export default function ProyectoEquipo() {
     <Layout titulo={proyecto.cliente.nombreComercial} volver="/equipo">
       {/* Progreso */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+        <DescripcionProyecto
+          descripcion={proyecto.proyecto?.descripcion}
+          onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
+        />
         {esContinuo ? (
           <div className="flex items-center gap-3 flex-wrap text-sm">
             {KANBAN_COLUMNAS.map((c) => (

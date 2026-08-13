@@ -48,6 +48,7 @@ export default function NuevoProyecto() {
     paquete: '',
     plantillaId: '',
     extras: [],
+    descripcion: '',
     fechaInicio: new Date().toISOString().split('T')[0],
     fechaEstimadaEntrega: '',
     anticipoConfirmado: false,
@@ -121,6 +122,7 @@ export default function NuevoProyecto() {
           fechaInicio: proyectoData.fechaInicio,
           fechaEstimadaEntrega: esContinuo ? null : proyectoData.fechaEstimadaEntrega,
           anticipoConfirmado: proyectoData.anticipoConfirmado,
+          descripcion: proyectoData.descripcion.trim(),
         },
         condicionesTecnicas: condiciones,
         equipo,
@@ -296,6 +298,16 @@ export default function NuevoProyecto() {
               <input value={proyectoData.paquete} onChange={(e) => setProyectoData({ ...proyectoData, paquete: e.target.value })} className={inputCls} placeholder="Mantenimiento mensual" />
             </Campo>
 
+            <Campo label="Descripción del proyecto (opcional)">
+              <textarea
+                value={proyectoData.descripcion}
+                onChange={(e) => setProyectoData({ ...proyectoData, descripcion: e.target.value })}
+                className={inputCls + ' resize-none'}
+                rows={3}
+                placeholder="De qué trata el proyecto y qué se busca lograr — le da contexto al equipo"
+              />
+            </Campo>
+
             <Campo label="Fecha de inicio">
               <input type="date" value={proyectoData.fechaInicio} onChange={(e) => setProyectoData({ ...proyectoData, fechaInicio: e.target.value })} className={inputCls} />
             </Campo>
@@ -371,6 +383,16 @@ export default function NuevoProyecto() {
                   </label>
                 ))}
               </div>
+            </Campo>
+
+            <Campo label="Descripción del proyecto (opcional)">
+              <textarea
+                value={proyectoData.descripcion}
+                onChange={(e) => setProyectoData({ ...proyectoData, descripcion: e.target.value })}
+                className={inputCls + ' resize-none'}
+                rows={3}
+                placeholder="De qué trata el proyecto y qué se busca lograr — le da contexto al equipo"
+              />
             </Campo>
 
             <div className="grid grid-cols-2 gap-4">
