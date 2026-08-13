@@ -5,8 +5,7 @@ import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
-import KanbanBoard from '../../components/KanbanBoard'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle, Eye } from 'lucide-react'
 import logo from '../../assets/logo-esbrillante.svg'
 
 export default function VistaCliente() {
@@ -20,6 +19,7 @@ export default function VistaCliente() {
   const [loginCargando, setLoginCargando] = useState(false)
   const [seccionAbierta, setSeccionAbierta] = useState('equipo')
   const [modalSolicitud, setModalSolicitud] = useState(false)
+  const [historialCompleto, setHistorialCompleto] = useState(false)
 
   async function cargar() {
     try {
@@ -130,6 +130,15 @@ export default function VistaCliente() {
   const equipoEnProceso = tareasEquipoVisibles.filter((t) => t.estado === 'en_proceso')
   const equipoPendientes = tareasEquipoVisibles.filter((t) => t.estado === 'pendiente')
 
+  const tareasContinuoEquipo = esContinuo ? proyecto.tareas.filter((t) => !t.esCliente && t.estado !== 'omitida') : []
+  const continuoEnProceso = tareasContinuoEquipo.filter((t) => t.estado === 'en_proceso')
+  const continuoEnRevision = tareasContinuoEquipo.filter((t) => t.estado === 'revision')
+  const continuoPendientes = tareasContinuoEquipo.filter((t) => t.estado === 'pendiente').sort((a, b) => a.orden - b.orden)
+  const continuoCompletadasTodas = tareasContinuoEquipo
+    .filter((t) => t.estado === 'completada')
+    .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
+  const continuoCompletadas = historialCompleto ? continuoCompletadasTodas : continuoCompletadasTodas.slice(0, 5)
+
   const tareasPorFaseCliente = esContinuo
     ? [{ numero: 1, nombre: null, tareasCliente: proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden) }].filter((f) => f.tareasCliente.length > 0)
     : fases.map((f) => ({
@@ -225,9 +234,34 @@ export default function VistaCliente() {
         )}
 
         {esContinuo && !completado && (
-          <div>
-            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3">¿En qué estamos trabajando?</h2>
-            <KanbanBoard tareas={proyecto.tareas} readOnly />
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="px-5 py-4">
+              <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg">¿En qué estamos trabajando?</h2>
+            </div>
+            {tareasContinuoEquipo.length === 0 ? (
+              <div className="px-5 pb-4 text-base text-slate-500 dark:text-slate-400">Aún no hay actividades registradas.</div>
+            ) : (
+              <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800">
+                {continuoEnProceso.length > 0 && <GrupoActividad titulo="En proceso ahora" tareas={continuoEnProceso} estado="en_proceso" />}
+                {continuoEnRevision.length > 0 && <GrupoActividad titulo="En revisión" tareas={continuoEnRevision} estado="revision" />}
+                {continuoPendientes.length > 0 && <GrupoActividad titulo="Próximamente" tareas={continuoPendientes} estado="pendiente" />}
+                {continuoCompletadas.length > 0 && (
+                  <GrupoActividad titulo={historialCompleto ? 'Historial de completadas' : 'Completadas recientemente'} tareas={continuoCompletadas} estado="completada">
+                    {continuoCompletadasTodas.length > 5 && (
+                      <button
+                        onClick={() => setHistorialCompleto(!historialCompleto)}
+                        className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium mt-2.5"
+                      >
+                        {historialCompleto ? 'Ver solo recientes' : `Ver historial completo (${continuoCompletadasTodas.length})`}
+                      </button>
+                    )}
+                  </GrupoActividad>
+                )}
+                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/60">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -388,6 +422,17 @@ function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
                         {s.estado === 'rechazada' && s.motivoRechazo && (
                           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{s.motivoRechazo}</p>
                         )}
+                        {s.archivoUrl && (
+                          <a
+                            href={s.archivoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 mt-1.5 w-fit"
+                          >
+                            <Paperclip size={12} className="shrink-0" />
+                            {s.archivoNombre || 'Ver archivo adjunto'}
+                          </a>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -404,6 +449,7 @@ function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
 function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
   const [titulo, setTitulo] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [archivo, setArchivo] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
@@ -413,7 +459,7 @@ function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
     setError('')
     setEnviando(true)
     try {
-      await onGuardar({ titulo: titulo.trim(), descripcion: descripcion.trim() })
+      await onGuardar({ titulo: titulo.trim(), descripcion: descripcion.trim(), archivo: archivo || undefined })
     } catch {
       setError('No se pudo enviar tu solicitud. Intenta de nuevo.')
       setEnviando(false)
@@ -450,6 +496,23 @@ function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
               placeholder="Entre más detalle nos des, más rápido podemos revisarlo..."
               className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
             />
+          </div>
+          <div>
+            {archivo ? (
+              <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                <Paperclip size={12} className="text-slate-400 shrink-0" />
+                <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{archivo.name}</span>
+                <button type="button" onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 cursor-pointer w-fit">
+                <Paperclip size={12} />
+                Adjuntar un archivo (opcional)
+                <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
+              </label>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button
@@ -535,7 +598,7 @@ function RecursosProyecto({ links }) {
   )
 }
 
-function GrupoActividad({ titulo, tareas, estado }) {
+function GrupoActividad({ titulo, tareas, estado, children }) {
   return (
     <div className="px-5 py-3">
       <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{titulo}</div>
@@ -544,12 +607,14 @@ function GrupoActividad({ titulo, tareas, estado }) {
           <div key={t.id} className="flex items-center gap-2.5">
             {estado === 'completada' && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
             {estado === 'en_proceso' && <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin shrink-0" />}
+            {estado === 'revision' && <Eye size={14} className="text-amber-500 shrink-0" />}
             {estado === 'pendiente' && <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 dark:border-slate-600 shrink-0" />}
-            <span className={`text-base ${estado === 'completada' ? 'text-slate-500 dark:text-slate-500 line-through' : estado === 'en_proceso' ? 'text-slate-800 dark:text-slate-100 font-medium' : 'text-slate-600 dark:text-slate-300'}`}>{t.titulo}</span>
+            <span className={`text-base ${estado === 'completada' ? 'text-slate-500 dark:text-slate-500 line-through' : estado === 'en_proceso' ? 'text-slate-800 dark:text-slate-100 font-medium' : estado === 'revision' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-600 dark:text-slate-300'}`}>{t.titulo}</span>
             <span className="ml-auto text-sm text-slate-400 dark:text-slate-500 shrink-0">Equipo EsBrillante</span>
           </div>
         ))}
       </div>
+      {children}
     </div>
   )
 }
@@ -592,6 +657,19 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
               <Clock size={12} />
               Tiempo sugerido: {t.plazoHoras} horas
             </div>
+          )}
+
+          {t.driveFolderUrl && (
+            <a
+              href={t.driveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-base bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 text-brand-700 dark:text-brand-300 rounded-lg px-3 py-2.5 mb-4 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors w-fit"
+            >
+              <FolderOpen size={15} className="shrink-0" />
+              Sube tus archivos aquí
+              <ExternalLink size={11} className="shrink-0" />
+            </a>
           )}
 
           <textarea

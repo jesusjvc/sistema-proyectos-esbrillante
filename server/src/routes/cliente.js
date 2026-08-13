@@ -101,7 +101,8 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
 // POST /api/cliente/:slug/solicitudes
 // El cliente levanta una solicitud de cambio específico; queda pendiente de
 // revisión por Admin/Equipo (ver server/src/routes/solicitudes.js).
-router.post('/:slug/solicitudes', requireClienteToken, async (req, res) => {
+// Acepta multipart/form-data opcional: campo "archivo" (ej. captura o documento con observaciones).
+router.post('/:slug/solicitudes', requireClienteToken, upload.single('archivo'), async (req, res) => {
   const { slug } = req.params
   const titulo = req.body?.titulo?.trim()
   const descripcion = req.body?.descripcion?.trim() || ''
@@ -112,12 +113,22 @@ router.post('/:slug/solicitudes', requireClienteToken, async (req, res) => {
     const p = await getProyecto(slug)
     if (!p || p.id !== req.clienteProyectoId) return res.status(403).json({ error: 'Sin acceso' })
 
-    const solicitud = await prisma.solicitud.create({
-      data: { proyectoId: p.id, titulo, descripcion, estado: 'pendiente' },
-    })
+    const data = { proyectoId: p.id, titulo, descripcion, estado: 'pendiente' }
 
+    if (req.file) {
+      if (!driveConfigurado()) return res.status(503).json({ error: 'La subida de archivos todavía no está configurada. Por ahora, describe tu solicitud sin adjuntar archivo.' })
+      const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+      if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+      const subido = await subirArchivo({ carpetaId, nombre: req.file.originalname, mimeType: req.file.mimetype, buffer: req.file.buffer })
+      data.archivoUrl = subido.url
+      data.archivoNombre = subido.nombre
+    }
+
+    const solicitud = await prisma.solicitud.create({ data })
+
+    const detalle = data.archivoNombre ? `${titulo} — Archivo: ${data.archivoNombre}` : titulo
     await prisma.logEntry.create({
-      data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Solicitud enviada', detalle: titulo },
+      data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Solicitud enviada', detalle },
     })
 
     emitirCambio(p.id)
@@ -174,12 +185,14 @@ async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
   const texto = [
     `${nombreCliente} envió una nueva solicitud: "${solicitud.titulo}".`,
     solicitud.descripcion ? `\n${solicitud.descripcion}` : '',
+    solicitud.archivoNombre ? `\nArchivo adjunto: ${solicitud.archivoNombre}${solicitud.archivoUrl ? ` (${solicitud.archivoUrl})` : ''}` : '',
     `\nVer proyecto: ${linkProyecto}`,
   ].join('')
 
   const html = `
     <p><strong>${nombreCliente}</strong> envió una nueva solicitud: "<strong>${solicitud.titulo}</strong>".</p>
     ${solicitud.descripcion ? `<p>${solicitud.descripcion}</p>` : ''}
+    ${solicitud.archivoUrl ? `<p>📎 <a href="${solicitud.archivoUrl}">${solicitud.archivoNombre}</a></p>` : ''}
     <p><a href="${linkProyecto}">Ver proyecto en el sistema →</a></p>
   `
 

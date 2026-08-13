@@ -87,6 +87,7 @@ model Tarea {
   respuestaTexto       String?
   respuestaArchivoUrl  String?
   respuestaArchivoNombre String?
+  driveFolderUrl       String?
 
   @@map("tareas")
 }
@@ -104,6 +105,9 @@ model Solicitud {
   resueltaPor   String?
   resueltaEn    DateTime?
   tareaId       String? // referencia informativa a la Tarea creada al aprobar (sin FK, la tarea se puede eliminar)
+
+  archivoUrl    String?
+  archivoNombre String?
 
   creadaEn DateTime @default(now())
 

@@ -11,6 +11,7 @@ import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
+import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 
 const router = Router()
 
@@ -31,7 +32,7 @@ function fail(text) {
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
     where: { OR: [{ slug }, { id: slug }] },
-    include: { tareas: true },
+    include: { tareas: true, solicitudes: { orderBy: { creadaEn: 'desc' } } },
   })
 }
 
@@ -312,7 +313,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente) y las respuestas recientes que el cliente ya envió desde su portal (texto y/o link de archivo — los archivos nunca se transfieren por MCP, solo el link para descargarlos). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done).',
+      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done).',
       inputSchema: { slug: z.string().describe('Slug o ID del proyecto') },
     },
     async ({ slug }) => {
@@ -364,6 +365,16 @@ function buildServer(usuario) {
           archivoUrl: t.respuestaArchivoUrl || null,
           archivoNombre: t.respuestaArchivoNombre || null,
           respondidoEn: t.completadaEn,
+        }))
+      resumen.solicitudesPendientes = p.solicitudes
+        .filter((s) => s.estado === 'pendiente')
+        .map((s) => ({
+          id: s.id,
+          titulo: s.titulo,
+          descripcion: s.descripcion || null,
+          archivoUrl: s.archivoUrl || null,
+          archivoNombre: s.archivoNombre || null,
+          creadaEn: s.creadaEn,
         }))
 
       return ok(JSON.stringify(resumen, null, 2))
@@ -431,7 +442,7 @@ function buildServer(usuario) {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero (ej. "revisa este prototipo" solo tiene sentido una vez diseñado), usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas.',
+      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero (ej. "revisa este prototipo" solo tiene sentido una vez diseñado), usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) (fotos, logo, documentos, materiales), usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto y aparezca directo en su tarjeta.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
@@ -441,9 +452,10 @@ function buildServer(usuario) {
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta solicitud'),
         despuesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto después de la cual debe quedar esta solicitud'),
         dependeDeTareaIds: z.array(z.string()).optional().describe('IDs de tareas de este mismo proyecto (típicamente del equipo) que deben quedar completadas antes de que esta solicitud aparezca disponible para el cliente.'),
+        pedirArchivos: z.boolean().optional().describe('True si se le va a pedir al cliente subir archivo(s) (fotos, logo, documentos, materiales). Crea o reutiliza la carpeta de Drive del proyecto y adjunta el link directo en la tarjeta de la solicitud.'),
       },
     },
-    async ({ slug, titulo, instrucciones, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
+    async ({ slug, titulo, instrucciones, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds, pedirArchivos }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -455,6 +467,18 @@ function buildServer(usuario) {
         ? await resolverColumnaYOrden(p, { columna: 'todo', antesDeTareaId, despuesDeTareaId })
         : await resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
       if (posicion.error) return fail(posicion.error)
+
+      let driveFolderUrl = null
+      let avisoDrive = ''
+      if (pedirArchivos) {
+        if (driveConfigurado()) {
+          const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+          if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+          driveFolderUrl = `https://drive.google.com/drive/folders/${carpetaId}`
+        } else {
+          avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
+        }
+      }
 
       await prisma.tarea.create({
         data: {
@@ -470,13 +494,14 @@ function buildServer(usuario) {
           dependencias: dependeDeTareaIds || [],
           custom: true,
           estado: 'pendiente',
+          driveFolderUrl,
         },
       })
       await logEntry(p.id, usuario.nombre, 'Solicitud al cliente creada', titulo)
       emitirCambio(p.id)
 
       const nota = dependeDeTareaIds?.length ? ' (queda oculta para el cliente hasta completar sus dependencias)' : ''
-      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.`)
+      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive}`)
     },
   )
 
