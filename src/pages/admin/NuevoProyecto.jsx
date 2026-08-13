@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
-import { crearProyecto, getMiembros, actualizarLinks, completarTarea } from '../../data/api'
+import { crearProyecto, getMiembros } from '../../data/api'
 import { generarMensajeInicio } from '../../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../../data/paquetes'
-import { crearCarpetasCliente, driveConfigurado } from '../../data/googleDrive'
 import { EQUIPO_NO_APLICA } from '../../lib/permisos'
-import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, AlertCircle, Kanban, GitBranch } from 'lucide-react'
+import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch } from 'lucide-react'
 
 const COND_DEFAULT = {
   tieneDominio: false,
@@ -31,8 +30,6 @@ export default function NuevoProyecto() {
   const [paso, setPaso] = useState(1)
   const [mensajeCopiado, setMensajeCopiado] = useState(false)
   const [proyectoCreado, setProyectoCreado] = useState(null)
-  const [driveEstado, setDriveEstado] = useState(null) // null | 'cargando' | 'ok' | 'error'
-  const [driveError, setDriveError] = useState('')
   const [creando, setCreando] = useState(false)
   const [errorCrear, setErrorCrear] = useState('')
 
@@ -132,20 +129,6 @@ export default function NuevoProyecto() {
       })
       setProyectoCreado(p)
       setPaso(4)
-
-      if (driveConfigurado()) {
-        setDriveEstado('cargando')
-        try {
-          const links = await crearCarpetasCliente(cliente.nombreComercial)
-          await actualizarLinks(p.slug, { drive: links.drive })
-          const tareaDrive = p.tareas.find((t) => t.linkTipo === 'drive')
-          if (tareaDrive) await completarTarea(p.slug, tareaDrive.id)
-          setDriveEstado('ok')
-        } catch (err) {
-          setDriveEstado('error')
-          setDriveError(err.message || 'Error desconocido')
-        }
-      }
     } catch (err) {
       setErrorCrear(err.message || 'Error al crear el proyecto')
     } finally {
@@ -549,25 +532,10 @@ export default function NuevoProyecto() {
               )}
             </div>
 
-            {driveEstado === 'cargando' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-blue-700">
-                <Loader2 size={16} className="animate-spin shrink-0" />
-                Creando carpetas en Google Drive...
-              </div>
-            )}
-            {driveEstado === 'ok' && (
+            {proyectoCreado.driveRespuestasId && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-emerald-700">
                 <FolderOpen size={16} className="shrink-0" />
-                Carpetas en Google Drive creadas y link guardado en el proyecto.
-              </div>
-            )}
-            {driveEstado === 'error' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertCircle size={15} className="shrink-0" />
-                  No se pudieron crear las carpetas en Drive. Puedes crearlas manualmente desde el proyecto.
-                </div>
-                {driveError && <div className="text-xs text-amber-500 mt-1">{driveError}</div>}
+                Carpeta de Drive del proyecto creada automáticamente.
               </div>
             )}
 

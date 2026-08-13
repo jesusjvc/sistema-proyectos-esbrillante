@@ -200,10 +200,22 @@ function buildServer(usuario) {
         },
       })
       await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}`)
+
+      let avisoDrive = ''
+      if (driveConfigurado()) {
+        try {
+          const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+          await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+        } catch (err) {
+          console.error('Error creando carpeta de Drive al crear proyecto:', err)
+          avisoDrive = ' (No se pudo crear la carpeta de Drive automáticamente — revisa los logs del servidor.)'
+        }
+      }
+
       emitirCambio(p.id)
 
       const avisoAnticipo = anticipoConfirmado ? '' : ' Status: "pendiente_anticipo" — confirma el anticipo desde el panel admin cuando corresponda.'
-      return ok(`Proyecto "${clienteNombre}" creado (tipo: ${tipoFinal}). slug: "${p.slug}". Contraseña del portal del cliente: "${password}". urlPortalCliente: "${urlPortalCliente(p.slug)}".${avisoAnticipo}`)
+      return ok(`Proyecto "${clienteNombre}" creado (tipo: ${tipoFinal}). slug: "${p.slug}". Contraseña del portal del cliente: "${password}". urlPortalCliente: "${urlPortalCliente(p.slug)}".${avisoAnticipo}${avisoDrive}`)
     },
   )
 

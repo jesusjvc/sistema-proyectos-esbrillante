@@ -4,6 +4,7 @@ import { requireAuth, requireAdmin, requireAdminOrApiKey } from '../middleware/a
 import { generarSlug } from '../lib/slug.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { EQUIPO_NO_APLICA, ROLES_EQUIPO } from '../lib/permisos.js'
+import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 
@@ -125,6 +126,16 @@ router.post('/', requireAdminOrApiKey, async (req, res) => {
 
       return tx.proyecto.findUnique({ where: { id: p.id }, include: INCLUDE })
     })
+
+    if (driveConfigurado()) {
+      try {
+        const carpetaId = await obtenerOCrearCarpetaProyecto(result)
+        result.driveRespuestasId = carpetaId
+        await prisma.proyecto.update({ where: { id: result.id }, data: { driveRespuestasId: carpetaId } })
+      } catch (err) {
+        console.error('Error creando carpeta de Drive al crear proyecto:', err)
+      }
+    }
 
     emitirCambio(result.id)
     res.status(201).json(result)
