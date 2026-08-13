@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, Users, Package, Sun, Moon, LayoutTemplate } from 'lucide-react'
+import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, Users, Package, Sun, Moon, LayoutTemplate, Terminal } from 'lucide-react'
 import logo from '../assets/logo-esbrillante.svg'
 import AvatarUploader from './AvatarUploader'
 
@@ -35,12 +35,14 @@ export default function Layout({ children, titulo, volver }) {
               <NavLink to="/admin/paquetes" icon={<Package size={16} />} label="Paquetes" active={location.pathname.startsWith('/admin/paquetes')} />
               <NavLink to="/admin/equipo" icon={<Users size={16} />} label="Equipo" active={location.pathname === '/admin/equipo'} />
               <NavLink to="/admin/prototipos" icon={<LayoutTemplate size={16} />} label="Prototipos" active={location.pathname === '/admin/prototipos'} />
+              <NavLink to="/admin/mcp" icon={<Terminal size={16} />} label="Conectar Claude Code" active={location.pathname === '/admin/mcp'} />
             </>
           )}
           {esEquipo && (
             <>
               <NavLink to="/equipo" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/equipo'} />
               <NavLink to="/equipo/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/equipo/tareas'} />
+              <NavLink to="/equipo/mcp" icon={<Terminal size={16} />} label="Conectar Claude Code" active={location.pathname === '/equipo/mcp'} />
             </>
           )}
         </nav>

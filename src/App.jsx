@@ -9,9 +9,11 @@ import Equipo from './pages/admin/Equipo'
 import Prototipos from './pages/admin/Prototipos'
 import Paquetes from './pages/admin/Paquetes'
 import EditarPaquete from './pages/admin/EditarPaquete'
+import McpAdmin from './pages/admin/Mcp'
 import Proyectos from './pages/equipo/Proyectos'
 import MisTareas from './pages/equipo/MisTareas'
 import ProyectoEquipo from './pages/equipo/ProyectoEquipo'
+import McpEquipo from './pages/equipo/Mcp'
 import AccesoCliente from './pages/cliente/AccesoCliente'
 import VistaCliente from './pages/cliente/VistaCliente'
 
@@ -34,10 +36,12 @@ export default function App() {
       <Route path="/admin/prototipos" element={<RequireAuth rol="admin"><Prototipos /></RequireAuth>} />
       <Route path="/admin/paquetes" element={<RequireAuth rol="admin"><Paquetes /></RequireAuth>} />
       <Route path="/admin/paquetes/:id" element={<RequireAuth rol="admin"><EditarPaquete /></RequireAuth>} />
+      <Route path="/admin/mcp" element={<RequireAuth rol="admin"><McpAdmin /></RequireAuth>} />
 
       <Route path="/equipo" element={<RequireAuth rol="equipo"><Proyectos /></RequireAuth>} />
       <Route path="/equipo/tareas" element={<RequireAuth rol="equipo"><MisTareas /></RequireAuth>} />
       <Route path="/equipo/proyecto/:id" element={<RequireAuth rol="equipo"><ProyectoEquipo /></RequireAuth>} />
+      <Route path="/equipo/mcp" element={<RequireAuth rol="equipo"><McpEquipo /></RequireAuth>} />
 
       <Route path="/cliente" element={<AccesoCliente />} />
       <Route path="/cliente/:id" element={<VistaCliente />} />
