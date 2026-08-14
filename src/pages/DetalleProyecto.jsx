@@ -673,6 +673,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
   const hayDetalle = t.queHacer || t.necesitasAntes || t.plantillaMensaje || t.queEntregas || t.descripcion || t.instruccionesCliente
+  const sinResponsableClaro = !t.esCliente && responsableInfo.label === 'Equipo'
 
   function copiarPlantilla() {
     navigator.clipboard.writeText(t.plantillaMensaje)
@@ -708,10 +709,16 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             <span className={`text-sm font-medium ${estado === 'completada' ? 'line-through text-slate-400' : estado === 'omitida' ? 'text-slate-400' : 'text-slate-800'}`}>
               {t.titulo}
             </span>
-            {estado !== 'completada' && estado !== 'omitida' && (
-              <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
-                {responsableInfo.label}{responsableInfo.nombre ? ` — ${responsableInfo.nombre}` : ''}
-              </span>
+            {estado !== 'completada' && estado !== 'omitida' && !t.esCliente && (
+              sinResponsableClaro ? (
+                <span className="flex items-center gap-1 text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700" title="No tiene un rol o persona específica asignada — le aparece a todo el equipo del proyecto en Mis tareas">
+                  <AlertTriangle size={10} /> Sin responsable
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
+                  {responsableInfo.label}{responsableInfo.nombre ? ` — ${responsableInfo.nombre}` : ''}
+                </span>
+              )
             )}
             {t.esCliente && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>

@@ -8,7 +8,7 @@ import { KANBAN_COLUMNAS } from '../data/kanban'
 import { infoResponsable } from '../lib/permisos'
 import Avatar from './Avatar'
 import {
-  CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical,
+  CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical, AlertTriangle,
 } from 'lucide-react'
 
 function agrupar(tareas) {
@@ -163,6 +163,7 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares
   const [expandida, setExpandida] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
+  const sinResponsableClaro = responsableInfo.label === 'Equipo'
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -190,10 +191,16 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares
           </div>
 
           {t.estado !== 'en_proceso' && t.estado !== 'completada' && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 mt-1">
-              {responsableInfo.nombre && <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={17} />}
-              {responsableInfo.nombre || responsableInfo.label}
-            </div>
+            sinResponsableClaro ? (
+              <div className="flex items-center gap-1 text-sm text-amber-600 dark:text-amber-500 mt-1" title="No tiene un rol o persona específica asignada">
+                <AlertTriangle size={13} /> Sin responsable
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 mt-1">
+                {responsableInfo.nombre && <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={17} />}
+                {responsableInfo.nombre || responsableInfo.label}
+              </div>
+            )
           )}
 
           {t.estado === 'en_proceso' && t.asignadoA && (

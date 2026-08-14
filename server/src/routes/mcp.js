@@ -325,7 +325,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done).',
+      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done). Cada tarea en tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador).',
       inputSchema: { slug: z.string().describe('Slug o ID del proyecto') },
     },
     async ({ slug }) => {
@@ -361,7 +361,7 @@ function buildServer(usuario) {
       resumen.tareasPendientesEquipo = p.tareas
         .filter((t) => !t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo }))
+        .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, responsable: t.responsable }))
       resumen.tareasPendientesCliente = p.tareas
         .filter((t) => t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
@@ -402,6 +402,7 @@ function buildServer(usuario) {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de la actividad'),
         descripcion: z.string().optional().describe('Detalle interno de la actividad'),
+        responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'karla', 'admin']).optional().describe('A quién le corresponde esta actividad. "copy"/"disenador"/"programador" apuntan a quien ocupe ese rol en ESTE proyecto específico (así solo le aparece en "Mis tareas" a la persona correcta, no a todo el equipo). "karla"/"admin" son fijos. Usa "equipo" (default si se omite) solo cuando de verdad le pueda tocar a cualquiera del equipo asignado — abusar de este valor es lo que hace que a la gente le aparezcan en "Mis tareas" actividades que no son lo suyo.'),
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo" (usa columna en su lugar).'),
         completada: z.boolean().optional().describe('Si es false, la actividad queda pendiente en vez de completada. Default: true. Se ignora en proyectos "continuo" (usa columna en su lugar).'),
         columna: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Solo para proyectos tipo "continuo": columna del tablero Kanban donde debe caer la tarjeta. Default: "todo". Se ignora si se da antesDeTareaId/despuesDeTareaId (se usa la columna de esa tarjeta de referencia).'),
@@ -410,7 +411,7 @@ function buildServer(usuario) {
         dependeDeTareaIds: z.array(z.string()).optional().describe('IDs de tareas de este mismo proyecto que deben quedar completadas antes de que esta actividad se considere disponible.'),
       },
     },
-    async ({ slug, titulo, descripcion, fase, completada, columna, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
+    async ({ slug, titulo, descripcion, responsable, fase, completada, columna, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -434,7 +435,7 @@ function buildServer(usuario) {
           orden: posicion.orden,
           titulo,
           descripcion: descripcion || '',
-          responsable: 'equipo',
+          responsable: responsable || 'equipo',
           dependencias: dependeDeTareaIds || [],
           custom: true,
           estado: estadoFinal,
@@ -619,12 +620,13 @@ function buildServer(usuario) {
     'editar_actividad',
     {
       title: 'Editar actividad o solicitud',
-      description: 'Corrige el título, descripción, instrucciones, plazo, dependencias o posición de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden. Para reordenarla, pasa antesDeTareaId o despuesDeTareaId — mueve la tarea a esa posición. En proyectos "finito" puede cambiar de fase si la tarea de referencia está en otra fase. En proyectos "continuo" puede cambiar de columna del tablero Kanban si la tarea de referencia está en otra columna (equivalente a arrastrarla).',
+      description: 'Corrige el título, descripción, instrucciones, responsable, plazo, dependencias o posición de una tarea ya creada (del equipo o del cliente). Solo actualiza los campos que se manden. Para reordenarla, pasa antesDeTareaId o despuesDeTareaId — mueve la tarea a esa posición. En proyectos "finito" puede cambiar de fase si la tarea de referencia está en otra fase. En proyectos "continuo" puede cambiar de columna del tablero Kanban si la tarea de referencia está en otra columna (equivalente a arrastrarla).',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a editar'),
         titulo: z.string().optional().describe('Nuevo título'),
         descripcion: z.string().optional().describe('Nueva descripción interna'),
+        responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'karla', 'admin']).optional().describe('Reasignar a quién le corresponde esta actividad (ver_proyecto no marca cuáles quedaron en "equipo" genérico, pero son las que más vale la pena revisar y reasignar a un rol específico — "copy"/"disenador"/"programador" resuelven a quien ocupe ese rol en este proyecto).'),
         instrucciones: z.string().optional().describe('Nuevas instrucciones para el cliente (solo aplica a solicitudes al cliente)'),
         plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
         antesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo antes de otra (por ID)'),
@@ -632,7 +634,7 @@ function buildServer(usuario) {
         dependeDeTareaIds: z.array(z.string()).optional().describe('Reemplaza la lista de tareas de las que depende esta actividad — mientras no estén todas completadas, esta tarea queda oculta/bloqueada para quien deba trabajarla (si es del cliente, no aparece en su portal). Pasa un array vacío para quitar todas las dependencias.'),
       },
     },
-    async ({ slug, tareaId, titulo, descripcion, instrucciones, plazoHoras, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
+    async ({ slug, tareaId, titulo, descripcion, responsable, instrucciones, plazoHoras, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -645,6 +647,7 @@ function buildServer(usuario) {
       const data = {}
       if (titulo !== undefined) data.titulo = titulo
       if (descripcion !== undefined) data.descripcion = descripcion
+      if (responsable !== undefined) data.responsable = responsable
       if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
       if (dependeDeTareaIds !== undefined) data.dependencias = dependeDeTareaIds
