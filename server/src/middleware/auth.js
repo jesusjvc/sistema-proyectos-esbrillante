@@ -81,6 +81,15 @@ export function requireAdminOrApiKey(req, res, next) {
   requireAdmin(req, res, next)
 }
 
+// Acepta la API key del MCP (rol equivalente a Admin) o, si no viene, cualquier sesión de staff (Admin o Equipo) normal.
+export function requireAuthOrApiKey(req, res, next) {
+  if (tieneApiKeyValida(req)) {
+    req.user = IDENTIDAD_MCP_COMPARTIDA
+    return next()
+  }
+  requireAuth(req, res, next)
+}
+
 export function requireClienteToken(req, res, next) {
   const token = req.cookies?.clienteToken
   if (!token) return res.status(401).json({ error: 'No autenticado' })

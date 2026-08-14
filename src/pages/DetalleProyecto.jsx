@@ -1,25 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import Layout from '../../components/Layout'
-import { useAuth } from '../../context/AuthContext'
+import Layout from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
 import {
   getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
-} from '../../data/api'
-import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../../data/storage'
-import { FASES_WEB } from '../../data/plantillas'
-import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
-import { generarMensajeInicio } from '../../data/mensajes'
-import { useEventosProyecto } from '../../hooks/useEventos'
-import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../../lib/permisos'
-import KanbanBoard from '../../components/KanbanBoard'
-import Avatar from '../../components/Avatar'
-import PrototiposPanel from '../../components/PrototiposPanel'
-import PanelSolicitudes from '../../components/PanelSolicitudes'
-import DescripcionProyecto from '../../components/DescripcionProyecto'
+} from '../data/api'
+import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../data/storage'
+import { FASES_WEB } from '../data/plantillas'
+import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
+import { generarMensajeInicio } from '../data/mensajes'
+import { useEventosProyecto } from '../hooks/useEventos'
+import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../lib/permisos'
+import KanbanBoard from '../components/KanbanBoard'
+import Avatar from '../components/Avatar'
+import PrototiposPanel from '../components/PrototiposPanel'
+import PanelSolicitudes from '../components/PanelSolicitudes'
+import DescripcionProyecto from '../components/DescripcionProyecto'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -44,10 +44,12 @@ export default function DetalleProyecto() {
   const [avatares, setAvatares] = useState({})
   const [miembros, setMiembros] = useState([])
   const [editandoEquipo, setEditandoEquipo] = useState(false)
+  const esAdminRol = user?.rol === 'admin'
+  const base = esAdminRol ? '/admin' : '/equipo'
 
   useEffect(() => {
-    getProyecto(id).then(setProyecto).catch(() => navigate('/admin'))
-    marcarVisto(id).catch(() => {})
+    getProyecto(id).then(setProyecto).catch(() => navigate(base))
+    if (esAdminRol) marcarVisto(id).catch(() => {})
     getMiembros().then((ms) => {
       setMiembros(ms)
       setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
@@ -71,7 +73,7 @@ export default function DetalleProyecto() {
 
   if (!proyecto) {
     return (
-      <Layout titulo="Proyecto" volver="/admin">
+      <Layout titulo="Proyecto" volver={base}>
         <div className="flex justify-center py-12">
           <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -175,7 +177,7 @@ export default function DetalleProyecto() {
 
   async function handleEliminarProyecto() {
     await eliminarProyecto(proyecto.slug)
-    navigate('/admin')
+    navigate(base)
   }
 
   async function handleCambiarTipo() {
@@ -216,7 +218,7 @@ export default function DetalleProyecto() {
   const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
 
   return (
-    <Layout titulo={proyecto.cliente.nombreComercial} volver="/admin">
+    <Layout titulo={proyecto.cliente.nombreComercial} volver={base}>
       {/* Header del proyecto */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
         <div className="flex flex-col lg:flex-row items-start gap-6">
@@ -283,7 +285,7 @@ export default function DetalleProyecto() {
           {/* Columna derecha: acciones + acceso del cliente */}
           <div className="w-full lg:w-72 shrink-0 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              {proyecto.status === 'pendiente_anticipo' && (
+              {proyecto.status === 'pendiente_anticipo' && esAdminRol && (
                 <button
                   onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
                   className="flex-1 text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -306,7 +308,7 @@ export default function DetalleProyecto() {
                   <XCircle size={16} />
                 </button>
               )}
-              {user?.rol === 'admin' && (
+              {esAdminRol && (
                 <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
                   <Trash2 size={16} />
                 </button>
@@ -668,7 +670,15 @@ export default function DetalleProyecto() {
 function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
   const [expandida, setExpandida] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+  const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
+  const hayDetalle = t.queHacer || t.necesitasAntes || t.plantillaMensaje || t.queEntregas || t.descripcion || t.instruccionesCliente
+
+  function copiarPlantilla() {
+    navigator.clipboard.writeText(t.plantillaMensaje)
+    setCopiadoPlantilla(true)
+    setTimeout(() => setCopiadoPlantilla(false), 2000)
+  }
 
   const iconMap = {
     completada: <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />,
@@ -740,7 +750,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             </div>
           )}
 
-          {(t.descripcion || t.instruccionesCliente) && (
+          {hayDetalle && (
             <button
               onClick={() => setExpandida(!expandida)}
               className="text-sm text-slate-400 hover:text-slate-600 mt-1.5 flex items-center gap-1"
@@ -750,9 +760,42 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             </button>
           )}
 
-          {expandida && (
-            <div className="mt-2 text-sm text-slate-600 bg-slate-100 rounded-lg p-3">
-              {t.esCliente ? t.instruccionesCliente : t.descripcion}
+          {expandida && hayDetalle && (
+            <div className="mt-2 rounded-xl border border-brand-100 bg-brand-50 overflow-hidden">
+              {t.queHacer && (
+                <DetalleSeccion titulo="¿Qué hay que hacer?">
+                  <TextoFormateado texto={t.queHacer} />
+                </DetalleSeccion>
+              )}
+              {t.necesitasAntes && (
+                <DetalleSeccion titulo="Antes de empezar">
+                  <TextoFormateado texto={t.necesitasAntes} />
+                </DetalleSeccion>
+              )}
+              {t.plantillaMensaje && (
+                <DetalleSeccion titulo="Plantilla de mensaje">
+                  <div className="relative">
+                    <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans bg-white border border-slate-200 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
+                    <button
+                      onClick={copiarPlantilla}
+                      className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 transition-colors"
+                      title="Copiar plantilla"
+                    >
+                      {copiadoPlantilla ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                    </button>
+                  </div>
+                </DetalleSeccion>
+              )}
+              {t.queEntregas && (
+                <DetalleSeccion titulo="Al completar esta tarea entrego">
+                  <TextoFormateado texto={t.queEntregas} />
+                </DetalleSeccion>
+              )}
+              {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
+                <div className="px-4 py-3 text-sm text-slate-600">
+                  {t.esCliente ? t.instruccionesCliente : t.descripcion}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1324,4 +1367,25 @@ function statusBadge(status) {
 function statusLabel(status) {
   const m = { activo: 'Activo', en_pausa: 'En pausa', pendiente_anticipo: 'Pendiente anticipo', completado: 'Completado', cancelado: 'Cancelado' }
   return m[status] || status
+}
+
+function DetalleSeccion({ titulo, children }) {
+  return (
+    <div className="px-4 pt-3 pb-1">
+      <div className="text-xs font-semibold text-brand-800 uppercase tracking-wide mb-1.5">{titulo}</div>
+      {children}
+    </div>
+  )
+}
+
+function TextoFormateado({ texto }) {
+  return (
+    <div className="text-xs text-slate-700 space-y-0.5">
+      {texto.split('\n').map((linea, i) => (
+        <div key={i} className={linea === '' ? 'h-1' : ''}>
+          {linea}
+        </div>
+      ))}
+    </div>
+  )
 }

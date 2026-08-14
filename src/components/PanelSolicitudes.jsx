@@ -16,7 +16,7 @@ const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm 
 
 /**
  * Lista de solicitudes de cambio levantadas por el cliente. Se usa tanto en
- * DetalleProyecto (admin) como en ProyectoEquipo — ambos pueden aprobar
+ * DetalleProyecto, usado tanto por admin como por equipo — ambos pueden aprobar
  * (crea una Tarea real) o rechazar (con motivo).
  */
 export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miembrosProyecto = [], onAprobar, onRechazar }) {

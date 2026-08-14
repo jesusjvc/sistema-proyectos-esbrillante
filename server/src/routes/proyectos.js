@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
-import { requireAuth, requireAdmin, requireAdminOrApiKey } from '../middleware/auth.js'
+import { requireAuth, requireAdmin, requireAdminOrApiKey, requireAuthOrApiKey } from '../middleware/auth.js'
 import { generarSlug } from '../lib/slug.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { EQUIPO_NO_APLICA, ROLES_EQUIPO } from '../lib/permisos.js'
@@ -57,7 +57,7 @@ router.get('/:slug', requireAuth, async (req, res) => {
 })
 
 // POST /api/proyectos
-router.post('/', requireAdminOrApiKey, async (req, res) => {
+router.post('/', requireAuthOrApiKey, async (req, res) => {
   const { tipo, cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor } = req.body
   const slug = generarSlug(cliente.nombreComercial)
 
@@ -228,7 +228,7 @@ router.put('/:slug/descripcion', requireAuth, async (req, res) => {
 })
 
 // PUT /api/proyectos/:slug/equipo
-router.put('/:slug/equipo', requireAdmin, async (req, res) => {
+router.put('/:slug/equipo', requireAuth, async (req, res) => {
   const { equipo } = req.body
   if (!equipo || typeof equipo !== 'object') return res.status(400).json({ error: 'equipo inválido' })
 
@@ -323,7 +323,7 @@ router.delete('/:slug/pausa', requireAuth, async (req, res) => {
 })
 
 // POST /api/proyectos/:slug/cerrar
-router.post('/:slug/cerrar', requireAdmin, async (req, res) => {
+router.post('/:slug/cerrar', requireAuth, async (req, res) => {
   try {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
@@ -346,7 +346,7 @@ router.post('/:slug/cerrar', requireAdmin, async (req, res) => {
 // a finito, todas las tareas quedan en fase 1 (el admin las reorganiza a
 // mano) y cualquier tarea en "revision" (estado exclusivo de Kanban) pasa a
 // "en_proceso", que es lo más cercano que reconoce el flujo por fases.
-router.put('/:slug/tipo', requireAdmin, async (req, res) => {
+router.put('/:slug/tipo', requireAuth, async (req, res) => {
   const { tipo } = req.body
   if (tipo !== 'finito' && tipo !== 'continuo') return res.status(400).json({ error: 'tipo inválido' })
 

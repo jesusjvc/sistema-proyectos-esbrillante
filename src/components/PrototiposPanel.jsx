@@ -7,7 +7,7 @@ import { ExternalLink, Download, Trash2, Plus, MessageCircle } from 'lucide-reac
 
 /**
  * Lista de prototipos de un proyecto (esbrillante-pages-mcp es la fuente de verdad).
- * Se usa tanto en DetalleProyecto (admin) como en ProyectoEquipo.
+ * Se usa desde DetalleProyecto, la misma página tanto para admin como equipo.
  */
 export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
   const { user } = useAuth()

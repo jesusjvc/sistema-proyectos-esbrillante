@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Layout from '../../components/Layout'
-import { useAuth } from '../../context/AuthContext'
-import { crearProyecto, getMiembros } from '../../data/api'
-import { generarMensajeInicio } from '../../data/mensajes'
-import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../../data/plantillas'
-import { EXTRAS_DISPONIBLES } from '../../data/paquetes'
-import { EQUIPO_NO_APLICA } from '../../lib/permisos'
+import Layout from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
+import { crearProyecto, getMiembros } from '../data/api'
+import { generarMensajeInicio } from '../data/mensajes'
+import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../data/plantillas'
+import { EXTRAS_DISPONIBLES } from '../data/paquetes'
+import { EQUIPO_NO_APLICA } from '../lib/permisos'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch } from 'lucide-react'
 
 const COND_DEFAULT = {
@@ -24,6 +24,7 @@ const COND_DEFAULT = {
 export default function NuevoProyecto() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const base = user?.rol === 'admin' ? '/admin' : '/equipo'
   const plantillas = getPlantillas()
 
   const [miembros, setMiembros] = useState([])
@@ -149,7 +150,7 @@ export default function NuevoProyecto() {
   const valido3 = true
 
   return (
-    <Layout titulo="Nuevo proyecto" volver="/admin">
+    <Layout titulo="Nuevo proyecto" volver={base}>
       {/* Steps */}
       <div className="flex items-center gap-2 mb-8">
         {['Cliente', 'Proyecto', 'Equipo', 'Listo'].map((s, i) => (
@@ -587,13 +588,13 @@ export default function NuevoProyecto() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => navigate(`/admin/proyecto/${proyectoCreado.slug}`)}
+                onClick={() => navigate(`${base}/proyecto/${proyectoCreado.slug}`)}
                 className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-3 rounded-lg text-sm font-semibold transition-colors"
               >
                 Ver proyecto →
               </button>
               <button
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate(base)}
                 className="px-6 py-3 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors"
               >
                 Ir al dashboard
