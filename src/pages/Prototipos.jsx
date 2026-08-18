@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import Layout from '../../components/Layout'
-import { getPrototipos, getProyectos, actualizarPrototipo, eliminarPrototipo } from '../../data/api'
-import { ESTADO_CONFIG, ESTADO_OPCIONES } from '../../data/prototipos'
-import ModalNuevoPrototipo from '../../components/ModalNuevoPrototipo'
+import Layout from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
+import { getPrototipos, getProyectos, actualizarPrototipo, eliminarPrototipo } from '../data/api'
+import { ESTADO_CONFIG, ESTADO_OPCIONES } from '../data/prototipos'
+import ModalNuevoPrototipo from '../components/ModalNuevoPrototipo'
 import { ExternalLink, Download, Trash2, Plus, MessageCircle } from 'lucide-react'
 
 export default function Prototipos() {
+  const { user } = useAuth()
+  const base = user?.rol === 'admin' ? '/admin' : '/equipo'
   const [prototipos, setPrototipos] = useState(null)
   const [proyectos, setProyectos] = useState([])
   const [error, setError] = useState('')
@@ -89,7 +92,7 @@ export default function Prototipos() {
               <div key={key}>
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800 mb-2">
                   {proyecto ? (
-                    <Link to={`/admin/proyecto/${proyecto.slug}`} className="hover:text-brand-700">{titulo}</Link>
+                    <Link to={`${base}/proyecto/${proyecto.slug}`} className="hover:text-brand-700">{titulo}</Link>
                   ) : titulo}
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                     {items.length} prototipo{items.length === 1 ? '' : 's'}

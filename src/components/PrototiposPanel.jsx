@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../context/AuthContext'
 import { getPrototipos, actualizarPrototipo, eliminarPrototipo } from '../data/api'
 import { ESTADO_CONFIG, ESTADO_OPCIONES } from '../data/prototipos'
 import ModalNuevoPrototipo from './ModalNuevoPrototipo'
@@ -10,8 +9,6 @@ import { ExternalLink, Download, Trash2, Plus, MessageCircle } from 'lucide-reac
  * Se usa desde DetalleProyecto, la misma página tanto para admin como equipo.
  */
 export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
-  const { user } = useAuth()
-  const esAdmin = user?.rol === 'admin'
   const [prototipos, setPrototipos] = useState(null)
   const [error, setError] = useState('')
   const [modalNuevo, setModalNuevo] = useState(false)
@@ -43,7 +40,7 @@ export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
       <div className="flex justify-end">
         <button
           onClick={() => setModalNuevo(true)}
-          className="flex items-center gap-1.5 text-xs text-brand-700 hover:text-brand-800 transition-colors"
+          className="flex items-center gap-1.5 text-xs font-medium bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-lg transition-colors"
         >
           <Plus size={13} /> Nuevo prototipo
         </button>
@@ -83,9 +80,7 @@ export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
                   {p.archivo && (
                     <a href={`${p.url}/download`} className="text-slate-400 hover:text-brand-700" title="Descargar HTML"><Download size={15} /></a>
                   )}
-                  {esAdmin && (
-                    <button onClick={() => handleEliminar(p)} className="text-slate-400 hover:text-red-600" title="Eliminar"><Trash2 size={15} /></button>
-                  )}
+                  <button onClick={() => handleEliminar(p)} className="text-slate-400 hover:text-red-600" title="Eliminar"><Trash2 size={15} /></button>
                 </div>
               </div>
             )

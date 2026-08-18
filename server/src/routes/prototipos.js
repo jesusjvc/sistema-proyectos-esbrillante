@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { timingSafeEqual } from 'crypto'
-import { requireAuth, requireAdmin } from '../middleware/auth.js'
+import { requireAuth } from '../middleware/auth.js'
 import {
   listarPrototipos,
   crearPrototipo,
@@ -61,8 +61,8 @@ router.patch('/:slug', requireAuth, async (req, res) => {
   }
 })
 
-// DELETE /api/prototipos/:slug — solo Admin, es irreversible
-router.delete('/:slug', requireAdmin, async (req, res) => {
+// DELETE /api/prototipos/:slug — es irreversible, pero admin y equipo comparten la gestión de prototipos
+router.delete('/:slug', requireAuth, async (req, res) => {
   try {
     res.json(await eliminarPrototipo(req.params.slug))
   } catch (err) {
