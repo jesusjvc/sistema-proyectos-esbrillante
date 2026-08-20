@@ -7,6 +7,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { KANBAN_COLUMNAS } from '../data/kanban'
 import { infoResponsable } from '../lib/permisos'
 import Avatar from './Avatar'
+import TextoEnriquecido from './TextoEnriquecido'
 import {
   CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical, AlertTriangle,
 } from 'lucide-react'
@@ -222,7 +223,7 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares
             </button>
           )}
           {expandida && (
-            <div className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2">{t.descripcion}</div>
+            <TextoEnriquecido html={t.descripcion} className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2" />
           )}
         </div>
 

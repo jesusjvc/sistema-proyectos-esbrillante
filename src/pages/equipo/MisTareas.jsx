@@ -6,6 +6,7 @@ import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
 import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { tareaLeCorresponde, RESPONSABLE_LABEL } from '../../lib/permisos'
+import TextoEnriquecido from '../../components/TextoEnriquecido'
 import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
 
 export default function MisTareas() {
@@ -124,7 +125,7 @@ export default function MisTareas() {
                       <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
                     </div>
                     <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
-                    {t.descripcion && <div className="text-sm text-slate-500 mt-1">{t.descripcion}</div>}
+                    {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 mt-1" />}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">

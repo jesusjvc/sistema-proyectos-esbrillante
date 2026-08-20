@@ -11,6 +11,7 @@ import {
   Pencil, Trash2, Plus, Check, X, ChevronDown, ChevronUp,
   ChevronUp as MoveUp, ChevronDown as MoveDown, GripVertical, Info, AlertCircle,
 } from 'lucide-react'
+import EditorEnriquecido from '../../components/EditorEnriquecido'
 
 const RESPONSABLES = [
   { valor: 'admin', label: 'Admin' },
@@ -377,7 +378,7 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
               </div>
               <div>
                 <label className={labelCls}>Descripción breve</label>
-                <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} className={inputCls + ' resize-none'} rows={2} placeholder="Resumen en una línea..." />
+                <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Resumen en una línea..." minHeight="3rem" />
               </div>
               <div>
                 <label className={labelCls}>¿Qué hay que hacer? (instrucciones detalladas)</label>
@@ -402,7 +403,7 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
             <>
               <div>
                 <label className={labelCls}>Instrucciones para el cliente</label>
-                <textarea value={form.instruccionesCliente} onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })} className={inputCls + ' resize-none'} rows={4} placeholder="Texto que verá el cliente en su portal..." />
+                <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente en su portal..." minHeight="6rem" />
               </div>
               <div>
                 <label className={labelCls}>Plazo sugerido (horas)</label>
