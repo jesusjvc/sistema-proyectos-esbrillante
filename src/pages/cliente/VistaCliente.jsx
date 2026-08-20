@@ -5,6 +5,7 @@ import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
+import TextoEnriquecido from '../../components/TextoEnriquecido'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle, Eye } from 'lucide-react'
 import logo from '../../assets/logo-esbrillante.svg'
 
@@ -651,7 +652,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
       </div>
       {expandida && (
         <div className="px-5 py-4">
-          <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed mb-4">{t.instruccionesCliente}</p>
+          <TextoEnriquecido html={t.instruccionesCliente} className="text-base text-slate-700 dark:text-slate-300 leading-relaxed mb-4" />
           {t.plazoHoras && (
             <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
               <Clock size={12} />

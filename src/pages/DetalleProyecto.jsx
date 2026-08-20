@@ -20,6 +20,8 @@ import Avatar from '../components/Avatar'
 import PrototiposPanel from '../components/PrototiposPanel'
 import PanelSolicitudes from '../components/PanelSolicitudes'
 import DescripcionProyecto from '../components/DescripcionProyecto'
+import EditorEnriquecido from '../components/EditorEnriquecido'
+import TextoEnriquecido from '../components/TextoEnriquecido'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -799,9 +801,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                 </DetalleSeccion>
               )}
               {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
-                <div className="px-4 py-3 text-sm text-slate-600">
-                  {t.esCliente ? t.instruccionesCliente : t.descripcion}
-                </div>
+                <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600" />
               )}
             </div>
           )}
@@ -924,14 +924,14 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
           {!form.esCliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Descripción interna</label>
-              <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} className={inputCls + ' resize-none'} rows={3} placeholder="Instrucciones para el equipo..." />
+              <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
             </div>
           )}
 
           {form.esCliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Instrucciones para el cliente</label>
-              <textarea value={form.instruccionesCliente} onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })} className={inputCls + ' resize-none'} rows={4} placeholder="Texto que verá el cliente..." />
+              <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente..." minHeight="6rem" />
             </div>
           )}
 
@@ -1077,7 +1077,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Descripción interna</label>
-                <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} className={inputCls + ' resize-none'} rows={3} placeholder="¿Qué hay que hacer exactamente?" />
+                <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="¿Qué hay que hacer exactamente?" />
               </div>
             </>
           )}
@@ -1086,7 +1086,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
             <>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Instrucciones para el cliente</label>
-                <textarea value={form.instruccionesCliente} onChange={(e) => setForm({ ...form, instruccionesCliente: e.target.value })} className={inputCls + ' resize-none'} rows={4} placeholder="Texto que verá el cliente en su portal..." />
+                <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente en su portal..." minHeight="6rem" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Plazo sugerido (horas)</label>
