@@ -12,6 +12,7 @@ import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
+import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 
 const router = Router()
 
@@ -739,6 +740,91 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       return ok('Nota interna registrada.')
+    },
+  )
+
+  server.registerTool(
+    'listar_prototipos',
+    {
+      title: 'Listar prototipos y páginas web',
+      description: 'Lista los prototipos/páginas web publicados en prototipos.esbrillante.mx (con su slug, tipo, estado y cuántos comentarios pendientes tiene cada uno) — úsala para encontrar el slug de un prototipo antes de leer o resolver sus comentarios con ver_comentarios_prototipo/resolver_comentario_prototipo. Nota: el slug de un prototipo es independiente del slug del proyecto en este sistema de seguimiento.',
+      inputSchema: {
+        proyectoSlug: z.string().optional().describe('Si se da, solo devuelve los prototipos ligados a este proyecto. Si se omite, devuelve todos.'),
+      },
+    },
+    async ({ proyectoSlug }) => {
+      let paginas;
+      try {
+        paginas = await listarPrototiposPages()
+      } catch (err) {
+        return fail(`No se pudo consultar prototipos.esbrillante.mx: ${err instanceof Error ? err.message : String(err)}`)
+      }
+      const filtradas = proyectoSlug ? paginas.filter((p) => p.proyectoSlug === proyectoSlug) : paginas
+      const resumen = filtradas.map((p) => ({
+        slug: p.slug,
+        nombre: p.nombre_original,
+        tipo: p.tipo,
+        estado: p.estado,
+        comentariosPendientes: p.comentariosPendientes ?? 0,
+        url: p.url,
+        proyectoSlug: p.proyectoSlug || null,
+      }))
+      return ok(JSON.stringify(resumen, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'ver_comentarios_prototipo',
+    {
+      title: 'Ver comentarios de un prototipo',
+      description: 'Lista los comentarios/anotaciones que el cliente o el equipo dejaron en el widget de revisión de un prototipo (ver_proyecto no los incluye — son de otro sistema). Cada uno trae quién lo dejó, su rol, el texto, y si es una sugerencia de cambio de texto trae texto_original/texto_sugerido, o si es una acción rápida trae "accion" (me_gusta/eliminar). Usa listar_prototipos primero para encontrar el slug del prototipo. Después de implementar un comentario, márcalo con resolver_comentario_prototipo.',
+      inputSchema: {
+        prototipoSlug: z.string().describe('Slug del prototipo (no el del proyecto) — ver listar_prototipos'),
+        estado: z.enum(['pendiente', 'resuelto']).optional().describe('Filtra por estado; si se omite, trae todos'),
+      },
+    },
+    async ({ prototipoSlug, estado }) => {
+      let anotaciones;
+      try {
+        anotaciones = await listarAnotacionesPrototipo(prototipoSlug, estado)
+      } catch (err) {
+        return fail(`No se pudo consultar los comentarios de "${prototipoSlug}": ${err instanceof Error ? err.message : String(err)}`)
+      }
+      const resumen = anotaciones.map((a) => ({
+        id: a.id,
+        numero: a.numero,
+        autor: a.autor,
+        rol: a.rol,
+        tipo: a.tipo,
+        estado: a.estado,
+        fecha: a.fecha,
+        texto: a.contenido?.texto || null,
+        texto_original: a.contenido?.texto_original || null,
+        texto_sugerido: a.contenido?.texto_sugerido || null,
+        texto_citado: a.contenido?.texto_citado || null,
+        accion: a.contenido?.accion || null,
+      }))
+      return ok(JSON.stringify(resumen, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'resolver_comentario_prototipo',
+    {
+      title: 'Marcar comentario de prototipo como resuelto',
+      description: 'Marca como resuelto un comentario/anotación de un prototipo (ver_comentarios_prototipo) una vez que ya se implementó lo que pedía. Desaparece de la lista de pendientes en el widget de revisión.',
+      inputSchema: {
+        prototipoSlug: z.string().describe('Slug del prototipo (no el del proyecto)'),
+        anotacionId: z.string().describe('ID del comentario a resolver (ver_comentarios_prototipo lista los IDs)'),
+      },
+    },
+    async ({ prototipoSlug, anotacionId }) => {
+      try {
+        await resolverAnotacionPrototipo(prototipoSlug, anotacionId)
+      } catch (err) {
+        return fail(`No se pudo resolver el comentario "${anotacionId}" en "${prototipoSlug}": ${err instanceof Error ? err.message : String(err)}`)
+      }
+      return ok(`Comentario "${anotacionId}" marcado como resuelto.`)
     },
   )
 
