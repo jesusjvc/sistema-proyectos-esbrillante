@@ -20,7 +20,7 @@ function BotonToolbar({ activo, onClick, title, children }) {
   )
 }
 
-export default function EditorEnriquecido({ value, onChange, placeholder, minHeight = '4.5rem' }) {
+export default function EditorEnriquecido({ value, onChange, placeholder, minHeight = '4.5rem', maxHeight = '16rem' }) {
   // El contenido inicial se toma una sola vez: Tiptap administra el documento de ahí en
   // adelante, así que no debe re-sincronizarse con `value` en cada render (eso dispara
   // setOptions en cada tecleo y puede perder contenido bajo tecleo muy rápido).
@@ -60,7 +60,7 @@ export default function EditorEnriquecido({ value, onChange, placeholder, minHei
           <ListOrdered size={14} />
         </BotonToolbar>
       </div>
-      <EditorContent editor={editor} className="rich-text px-3 py-2.5" style={{ minHeight }} />
+      <EditorContent editor={editor} className="rich-text px-3 py-2.5 overflow-y-auto" style={{ minHeight, maxHeight }} />
     </div>
   )
 }

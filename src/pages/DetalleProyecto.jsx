@@ -726,7 +726,8 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                   <AlertTriangle size={10} /> Sin responsable
                 </span>
               ) : (
-                <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
+                <span className="flex items-center gap-1 text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
+                  {responsableInfo.nombre && <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={14} />}
                   {responsableInfo.label}{responsableInfo.nombre ? ` — ${responsableInfo.nombre}` : ''}
                 </span>
               )
@@ -913,7 +914,7 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="font-semibold text-slate-800">Editar tarea</h3>
           <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
@@ -1052,7 +1053,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="font-semibold text-slate-800">{esContinuo ? 'Nueva tarjeta' : `Nueva tarea — Fase ${contexto}`}</h3>
           <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
