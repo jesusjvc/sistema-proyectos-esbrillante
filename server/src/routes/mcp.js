@@ -325,7 +325,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done). Cada tarea en tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador).',
+      description: 'Devuelve status, las tareas pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done). Cada tarea en tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado.',
       inputSchema: { slug: z.string().describe('Slug o ID del proyecto') },
     },
     async ({ slug }) => {
@@ -356,6 +356,15 @@ function buildServer(usuario) {
         resumen.avance = calcularAvance(p)
         resumen.faseActual = fase
         resumen.faseNombre = fases.find((f) => f.numero === fase)?.nombre || ''
+        // Resumen por fase — útil para diagnosticar cuando el avance no
+        // coincide con lo esperado (ej. una tarea con un estado atípico
+        // atorando el cálculo de faseActual).
+        resumen.resumenFases = fases.map((f) => {
+          const tareasF = p.tareas.filter((t) => t.fase === f.numero)
+          const porEstado = {}
+          for (const t of tareasF) porEstado[t.estado] = (porEstado[t.estado] || 0) + 1
+          return { numero: f.numero, nombre: f.nombre, totalTareas: tareasF.length, porEstado }
+        })
       }
 
       resumen.tareasPendientesEquipo = p.tareas
