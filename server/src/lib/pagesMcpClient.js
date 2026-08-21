@@ -19,3 +19,11 @@ export const listarPrototipos = () => req('GET', '/api/prototipos')
 export const crearPrototipo = (data) => req('POST', '/api/prototipos', data)
 export const actualizarPrototipo = (slug, data) => req('PATCH', `/api/prototipos/${slug}`, data)
 export const eliminarPrototipo = (slug) => req('DELETE', `/api/prototipos/${slug}`)
+
+// Anotaciones (comentarios que deja el cliente/equipo en el widget de revisión de un prototipo).
+// Estas rutas de pages-mcp son públicas (sin API key) porque el propio widget del cliente las usa,
+// pero las llamamos igual con el mismo header por consistencia.
+export const listarAnotacionesPrototipo = (slug, estado) =>
+  req('GET', `/api/anotaciones/${slug}${estado ? `?estado=${estado}` : ''}`)
+export const resolverAnotacionPrototipo = (slug, id) =>
+  req('PATCH', `/api/anotaciones/${slug}/${id}`, { estado: 'resuelto' })
