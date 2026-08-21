@@ -28,7 +28,7 @@ import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
-  AlertTriangle,
+  AlertTriangle, Flag, UserX,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -710,33 +710,32 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
     omitida: 'bg-slate-50 opacity-50',
   }
 
+  const mostrarAvatarPropio = estado !== 'completada' && estado !== 'omitida' && estado !== 'en_proceso' && !t.esCliente
+  const numComentarios = t.comentarios?.length || 0
+
   return (
     <div className={`px-5 py-3.5 border-b border-slate-50 last:border-0 ${bgMap[estado]}`}>
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{iconMap[estado]}</div>
+
+        {mostrarAvatarPropio && (
+          sinResponsableClaro ? (
+            <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="Sin responsable claro — le aparece a todo el equipo del proyecto en Mis tareas">
+              <UserX size={14} className="text-amber-500" />
+            </div>
+          ) : responsableInfo.nombre ? (
+            <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={30} />
+          ) : null
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-sm font-medium ${estado === 'completada' ? 'line-through text-slate-400' : estado === 'omitida' ? 'text-slate-400' : 'text-slate-800'}`}>
               {t.titulo}
             </span>
-            {estado !== 'completada' && estado !== 'omitida' && !t.esCliente && (
-              sinResponsableClaro ? (
-                <span className="flex items-center gap-1 text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700" title="No tiene un rol o persona específica asignada — le aparece a todo el equipo del proyecto en Mis tareas">
-                  <AlertTriangle size={10} /> Sin responsable
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">
-                  {responsableInfo.nombre && <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={14} />}
-                  {responsableInfo.label}{responsableInfo.nombre ? ` — ${responsableInfo.nombre}` : ''}
-                </span>
-              )
-            )}
+            {t.esRutaCritica && <Flag size={13} className="text-rose-500 shrink-0" title="Ruta crítica" />}
             {t.esCliente && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>
-            )}
-            {t.esRutaCritica && (
-              <span className="text-xs bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full">Ruta crítica</span>
             )}
             {t.soloKarlaOAdmin && (
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>
@@ -745,6 +744,16 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
               <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Personalizada</span>
             )}
           </div>
+
+          {mostrarAvatarPropio && (
+            sinResponsableClaro ? (
+              <div className="text-sm text-amber-600 mt-0.5">Sin responsable</div>
+            ) : (
+              <div className="text-sm text-slate-500 mt-0.5">
+                {responsableInfo.nombre || responsableInfo.label}
+              </div>
+            )
+          )}
 
           {estado === 'completada' && t.completadaPor && (
             <div className="flex items-center gap-1.5 text-sm text-slate-400 mt-1">
@@ -769,14 +778,20 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             </div>
           )}
 
-          <button
-            onClick={() => setExpandida(!expandida)}
-            className="text-sm text-slate-400 hover:text-slate-600 mt-1.5 flex items-center gap-1"
-          >
-            <Info size={13} />
-            {expandida ? 'Ocultar' : 'Ver detalles'}
-            {!expandida && t.comentarios?.length > 0 && ` · ${t.comentarios.length} comentario${t.comentarios.length === 1 ? '' : 's'}`}
-          </button>
+          <div className="flex items-center gap-3 mt-1.5">
+            <button
+              onClick={() => setExpandida(!expandida)}
+              className="text-sm text-slate-400 hover:text-slate-600 flex items-center gap-1"
+            >
+              <Info size={13} />
+              {expandida ? 'Ocultar' : 'Ver detalles'}
+            </button>
+            {numComentarios > 0 && (
+              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                <MessageCircle size={12} /> {numComentarios}
+              </span>
+            )}
+          </div>
 
           {expandida && (
             <div className="mt-2 rounded-xl border border-brand-100 bg-brand-50 overflow-hidden">
