@@ -24,10 +24,18 @@ export function getFaseActual(proyecto) {
 
   for (let fase = 1; fase <= totalFases; fase++) {
     const tareasF = tareas.filter((t) => t.fase === fase && t.estado !== 'omitida')
-    // Una fase sin tareas todavía no cuenta como completada — evita saltar
-    // de largo a la última fase en proyectos con checklist vacío (ej. los
-    // que arma el MCP con actividades libres en vez de un paquete predefinido).
-    const completa = tareasF.length > 0 && tareasF.every((t) => t.estado === 'completada')
+    if (tareasF.length === 0) {
+      // Una fase sin tareas todavía no cuenta como completada — evita saltar
+      // de largo a la última fase en proyectos con checklist vacío (ej. los
+      // que arma el MCP con actividades libres en vez de un paquete
+      // predefinido). Pero si ya hay actividad registrada en una fase
+      // posterior, esta fase claramente quedó atrás aunque nunca se haya
+      // llevado su checklist en el sistema — no debe bloquear el avance.
+      const hayActividadDespues = tareas.some((t) => t.fase > fase && t.estado !== 'omitida')
+      if (hayActividadDespues) continue
+      return fase
+    }
+    const completa = tareasF.every((t) => t.estado === 'completada')
     if (!completa) return fase
   }
   return totalFases
