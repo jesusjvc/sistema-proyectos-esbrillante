@@ -8,6 +8,7 @@ import { KANBAN_COLUMNAS } from '../data/kanban'
 import { infoResponsable } from '../lib/permisos'
 import Avatar from './Avatar'
 import TextoEnriquecido from './TextoEnriquecido'
+import HiloComentarios from './HiloComentarios'
 import {
   CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical, AlertTriangle,
 } from 'lucide-react'
@@ -25,7 +26,7 @@ function agrupar(tareas) {
 // portal del cliente, para proyectos de tipo "continuo". El estado local
 // `columnas` se mantiene optimista durante el drag (patrón multi-container
 // de dnd-kit) y se resincroniza desde `tareas` cuando no hay drag activo.
-export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, readOnly = false, avatares = {}, equipo, miembrosPorId = {} }) {
+export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onComentar, readOnly = false, avatares = {}, equipo, miembrosPorId = {} }) {
   const [columnas, setColumnas] = useState(() => agrupar(tareas))
   const [activeId, setActiveId] = useState(null)
 
@@ -110,6 +111,7 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, rea
             readOnly={readOnly}
             onEditar={onEditar}
             onEliminar={onEliminar}
+            onComentar={onComentar}
             avatares={avatares}
             equipo={equipo}
             miembrosPorId={miembrosPorId}
@@ -123,7 +125,7 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, rea
   )
 }
 
-function Columna({ columna, tareas, readOnly, onEditar, onEliminar, avatares, equipo, miembrosPorId }) {
+function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, avatares, equipo, miembrosPorId }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
     todo: 'text-slate-500 dark:text-slate-400',
@@ -142,7 +144,7 @@ function Columna({ columna, tareas, readOnly, onEditar, onEliminar, avatares, eq
       <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
           {tareas.map((t) => (
-            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} />
+            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} onComentar={onComentar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} />
           ))}
         </DroppableArea>
       </SortableContext>
@@ -160,7 +162,7 @@ function DroppableArea({ id, children }) {
   return <div ref={setNodeRef} className="flex-1 px-2.5 pb-2.5 space-y-2 min-h-[60px]">{children}</div>
 }
 
-function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares = {}, equipo, miembrosPorId = {} }) {
+function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overlay, avatares = {}, equipo, miembrosPorId = {} }) {
   const [expandida, setExpandida] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
@@ -217,13 +219,22 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, overlay, avatares
             </div>
           )}
 
-          {t.descripcion && (
-            <button onClick={() => setExpandida(!expandida)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1.5 flex items-center gap-1">
-              <Info size={13} /> {expandida ? 'Ocultar' : 'Ver detalle'}
-            </button>
-          )}
+          <button onClick={() => setExpandida(!expandida)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1.5 flex items-center gap-1">
+            <Info size={13} />
+            {expandida ? 'Ocultar' : 'Ver detalle'}
+            {!expandida && t.comentarios?.length > 0 && ` · ${t.comentarios.length} comentario${t.comentarios.length === 1 ? '' : 's'}`}
+          </button>
           {expandida && (
-            <TextoEnriquecido html={t.descripcion} className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2" />
+            <div className="mt-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2">
+              {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-slate-300" />}
+              {onComentar && (
+                <HiloComentarios
+                  comentarios={t.comentarios}
+                  miembrosPorId={miembrosPorId}
+                  onEnviar={(texto, mencionados) => onComentar(t.id, texto, mencionados)}
+                />
+              )}
+            </div>
           )}
         </div>
 

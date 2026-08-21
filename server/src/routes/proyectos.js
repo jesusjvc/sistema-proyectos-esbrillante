@@ -14,7 +14,7 @@ router.use('/:slug/tareas', tareasRouter)
 router.use('/:slug/solicitudes', solicitudesRouter)
 
 const INCLUDE = {
-  tareas: true,
+  tareas: { include: { comentarios: { orderBy: { creadoEn: 'asc' } } } },
   log: { orderBy: { fecha: 'desc' }, take: 100 },
   solicitudes: { orderBy: { creadaEn: 'desc' } },
 }

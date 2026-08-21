@@ -89,7 +89,24 @@ model Tarea {
   respuestaArchivoNombre String?
   driveFolderUrl       String?
 
+  comentarios Comentario[]
+
   @@map("tareas")
+}
+
+model Comentario {
+  id      String @id @default(cuid())
+  tareaId String
+  tarea   Tarea  @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+
+  autor       String
+  autorId     String
+  texto       String
+  mencionados String[] @default([])
+
+  creadoEn DateTime @default(now())
+
+  @@map("comentarios_tarea")
 }
 
 model Solicitud {

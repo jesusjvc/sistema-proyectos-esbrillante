@@ -32,6 +32,7 @@ export default function Layout({ children, titulo, volver }) {
             <>
               <NavLink to="/admin" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/admin'} />
               <NavLink to="/admin/proyecto/nuevo" icon={<PlusCircle size={16} />} label="Nuevo proyecto" active={location.pathname === '/admin/proyecto/nuevo'} />
+              <NavLink to="/admin/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/admin/tareas'} />
               <NavLink to="/admin/paquetes" icon={<Package size={16} />} label="Paquetes" active={location.pathname.startsWith('/admin/paquetes')} />
               <NavLink to="/admin/equipo" icon={<Users size={16} />} label="Equipo" active={location.pathname === '/admin/equipo'} />
               <NavLink to="/admin/prototipos" icon={<LayoutTemplate size={16} />} label="Prototipos" active={location.pathname === '/admin/prototipos'} />

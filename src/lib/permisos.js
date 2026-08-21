@@ -32,6 +32,14 @@ export function tareaLeCorresponde(tarea, equipo, user) {
   return equipo?.[responsable] === user.id // copy | disenador | programador
 }
 
+// Para bandejas personales tipo "Mis tareas": a diferencia de tareaLeCorresponde
+// (que da acceso total a cualquier admin, porque sirve para AUTORIZAR operaciones),
+// esta solo dice si la tarea está asignada directamente a esa persona — útil para
+// que un admin vea en su bandeja solo lo suyo, no todas las tareas del sistema.
+export function tareaAsignadaDirectamente(tarea, userId) {
+  return tarea.responsable === userId
+}
+
 export const RESPONSABLE_LABEL = {
   copy: 'Copy',
   disenador: 'Diseño',

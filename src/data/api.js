@@ -48,6 +48,8 @@ export const editarTarea = (slug, tareaId, data) => req('PUT', `/api/proyectos/$
 export const moverTarea = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/mover`, data)
 export const agregarTarea = (slug, data) => req('POST', `/api/proyectos/${slug}/tareas`, data)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
+export const listarComentarios = (slug, tareaId) => req('GET', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`)
+export const crearComentario = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`, data)
 
 // ─── Solicitudes ───────────────────────────────────────────────────────────
 export const aprobarSolicitud = (slug, id, data) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/aprobar`, data)

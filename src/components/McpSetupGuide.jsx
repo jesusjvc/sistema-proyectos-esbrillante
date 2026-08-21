@@ -176,6 +176,7 @@ const TOOLS = [
   ['completar_actividad', 'Marcar como lista una tarea ya existente'],
   ['editar_actividad', 'Corregir una tarea ya creada sin cancelarla y volver a crearla'],
   ['nota_interna', 'Nota libre solo para el panel admin, nunca visible al cliente'],
+  ['comentar_actividad', 'Dejar un comentario interno en una tarea (nunca lo ve el cliente) — puedes mencionar a alguien y le llega un correo'],
   ['listar_prototipos', 'Ver los prototipos/páginas web de un proyecto y cuántos comentarios pendientes tiene cada uno'],
   ['ver_comentarios_prototipo', 'Leer los comentarios que el cliente o el equipo dejaron en un prototipo, para implementarlos'],
   ['resolver_comentario_prototipo', 'Marcar un comentario de prototipo como resuelto una vez implementado'],
