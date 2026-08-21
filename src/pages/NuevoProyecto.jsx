@@ -7,6 +7,7 @@ import { generarMensajeInicio } from '../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../data/paquetes'
 import { EQUIPO_NO_APLICA } from '../lib/permisos'
+import EditorEnriquecido from '../components/EditorEnriquecido'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch } from 'lucide-react'
 
 const COND_DEFAULT = {
@@ -283,11 +284,9 @@ export default function NuevoProyecto() {
             </Campo>
 
             <Campo label="Descripción del proyecto (opcional)">
-              <textarea
+              <EditorEnriquecido
                 value={proyectoData.descripcion}
-                onChange={(e) => setProyectoData({ ...proyectoData, descripcion: e.target.value })}
-                className={inputCls + ' resize-none'}
-                rows={3}
+                onChange={(html) => setProyectoData({ ...proyectoData, descripcion: html })}
                 placeholder="De qué trata el proyecto y qué se busca lograr — le da contexto al equipo"
               />
             </Campo>
@@ -370,11 +369,9 @@ export default function NuevoProyecto() {
             </Campo>
 
             <Campo label="Descripción del proyecto (opcional)">
-              <textarea
+              <EditorEnriquecido
                 value={proyectoData.descripcion}
-                onChange={(e) => setProyectoData({ ...proyectoData, descripcion: e.target.value })}
-                className={inputCls + ' resize-none'}
-                rows={3}
+                onChange={(html) => setProyectoData({ ...proyectoData, descripcion: html })}
                 placeholder="De qué trata el proyecto y qué se busca lograr — le da contexto al equipo"
               />
             </Campo>
