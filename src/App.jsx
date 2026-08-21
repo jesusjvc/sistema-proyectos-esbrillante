@@ -36,6 +36,7 @@ export default function App() {
       <Route path="/admin/paquetes" element={<RequireAuth rol="admin"><Paquetes /></RequireAuth>} />
       <Route path="/admin/paquetes/:id" element={<RequireAuth rol="admin"><EditarPaquete /></RequireAuth>} />
       <Route path="/admin/mcp" element={<RequireAuth rol="admin"><McpAdmin /></RequireAuth>} />
+      <Route path="/admin/tareas" element={<RequireAuth rol="admin"><MisTareas /></RequireAuth>} />
 
       <Route path="/equipo" element={<RequireAuth rol="equipo"><Proyectos /></RequireAuth>} />
       <Route path="/equipo/tareas" element={<RequireAuth rol="equipo"><MisTareas /></RequireAuth>} />

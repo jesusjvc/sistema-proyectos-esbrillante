@@ -8,6 +8,7 @@ import {
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
+  crearComentario,
 } from '../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
@@ -22,6 +23,7 @@ import PanelSolicitudes from '../components/PanelSolicitudes'
 import DescripcionProyecto from '../components/DescripcionProyecto'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import TextoEnriquecido from '../components/TextoEnriquecido'
+import HiloComentarios from '../components/HiloComentarios'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -121,6 +123,11 @@ export default function DetalleProyecto() {
 
   async function reabrir(tareaId) {
     await reabrirTarea(proyecto.slug, tareaId)
+    await refresh()
+  }
+
+  async function comentar(tareaId, texto, mencionados) {
+    await crearComentario(proyecto.slug, tareaId, { texto, mencionados })
     await refresh()
   }
 
@@ -415,6 +422,7 @@ export default function DetalleProyecto() {
             onMover={handleMoverTarea}
             onEditar={(t) => setModalEditar(t)}
             onEliminar={(t) => handleEliminarTarea(t.id)}
+            onComentar={comentar}
           />
         </div>
       )}
@@ -464,6 +472,7 @@ export default function DetalleProyecto() {
                           equipo={proyecto.equipo}
                           miembrosPorId={miembrosPorId}
                           onCompletar={() => marcarCompleta(t.id)}
+                          onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                           onReabrir={() => reabrir(t.id)}
                           onOmitir={() => omitir(t.id)}
                           onEditar={() => setModalEditar(t)}
@@ -669,7 +678,7 @@ export default function DetalleProyecto() {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onComentar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
   const [expandida, setExpandida] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
@@ -759,49 +768,57 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             </div>
           )}
 
-          {hayDetalle && (
-            <button
-              onClick={() => setExpandida(!expandida)}
-              className="text-sm text-slate-400 hover:text-slate-600 mt-1.5 flex items-center gap-1"
-            >
-              <Info size={13} />
-              {expandida ? 'Ocultar' : 'Ver detalles'}
-            </button>
-          )}
+          <button
+            onClick={() => setExpandida(!expandida)}
+            className="text-sm text-slate-400 hover:text-slate-600 mt-1.5 flex items-center gap-1"
+          >
+            <Info size={13} />
+            {expandida ? 'Ocultar' : 'Ver detalles'}
+            {!expandida && t.comentarios?.length > 0 && ` · ${t.comentarios.length} comentario${t.comentarios.length === 1 ? '' : 's'}`}
+          </button>
 
-          {expandida && hayDetalle && (
+          {expandida && (
             <div className="mt-2 rounded-xl border border-brand-100 bg-brand-50 overflow-hidden">
-              {t.queHacer && (
-                <DetalleSeccion titulo="¿Qué hay que hacer?">
-                  <TextoFormateado texto={t.queHacer} />
-                </DetalleSeccion>
+              {hayDetalle && (
+                <>
+                  {t.queHacer && (
+                    <DetalleSeccion titulo="¿Qué hay que hacer?">
+                      <TextoFormateado texto={t.queHacer} />
+                    </DetalleSeccion>
+                  )}
+                  {t.necesitasAntes && (
+                    <DetalleSeccion titulo="Antes de empezar">
+                      <TextoFormateado texto={t.necesitasAntes} />
+                    </DetalleSeccion>
+                  )}
+                  {t.plantillaMensaje && (
+                    <DetalleSeccion titulo="Plantilla de mensaje">
+                      <div className="relative">
+                        <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans bg-white border border-slate-200 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
+                        <button
+                          onClick={copiarPlantilla}
+                          className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 transition-colors"
+                          title="Copiar plantilla"
+                        >
+                          {copiadoPlantilla ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                        </button>
+                      </div>
+                    </DetalleSeccion>
+                  )}
+                  {t.queEntregas && (
+                    <DetalleSeccion titulo="Al completar esta tarea entrego">
+                      <TextoFormateado texto={t.queEntregas} />
+                    </DetalleSeccion>
+                  )}
+                  {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
+                    <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600" />
+                  )}
+                </>
               )}
-              {t.necesitasAntes && (
-                <DetalleSeccion titulo="Antes de empezar">
-                  <TextoFormateado texto={t.necesitasAntes} />
-                </DetalleSeccion>
-              )}
-              {t.plantillaMensaje && (
-                <DetalleSeccion titulo="Plantilla de mensaje">
-                  <div className="relative">
-                    <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans bg-white border border-slate-200 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
-                    <button
-                      onClick={copiarPlantilla}
-                      className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 transition-colors"
-                      title="Copiar plantilla"
-                    >
-                      {copiadoPlantilla ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                    </button>
-                  </div>
-                </DetalleSeccion>
-              )}
-              {t.queEntregas && (
-                <DetalleSeccion titulo="Al completar esta tarea entrego">
-                  <TextoFormateado texto={t.queEntregas} />
-                </DetalleSeccion>
-              )}
-              {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
-                <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600" />
+              {onComentar && (
+                <div className="px-4 py-3">
+                  <HiloComentarios comentarios={t.comentarios} miembrosPorId={miembrosPorId} onEnviar={onComentar} />
+                </div>
               )}
             </div>
           )}

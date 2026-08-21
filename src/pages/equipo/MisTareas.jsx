@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
 import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
-import { tareaLeCorresponde, RESPONSABLE_LABEL } from '../../lib/permisos'
+import { tareaLeCorresponde, tareaAsignadaDirectamente, RESPONSABLE_LABEL } from '../../lib/permisos'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
 import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
 
@@ -35,6 +35,9 @@ export default function MisTareas() {
     cargar()
   }
 
+  const esAdmin = user?.rol === 'admin' || user?.rol === 'ADMIN'
+  const base = esAdmin ? '/admin' : '/equipo'
+
   const tareasDisponibles = []
   const tareasEnProceso = []
   proyectos
@@ -43,8 +46,11 @@ export default function MisTareas() {
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
       p.tareas.forEach((t) => {
         if (t.estado === 'completada' || t.estado === 'omitida' || t.esCliente) return
-        if (t.soloKarlaOAdmin && !user?.esKarla) return
-        if (!tareaLeCorresponde(t, p.equipo, user)) return
+        if (t.soloKarlaOAdmin && !user?.esKarla && !esAdmin) return
+        // Un admin ve solo lo que tiene asignado a su persona directamente — no
+        // "todo" (tareaLeCorresponde da acceso total a cualquier admin porque esa
+        // función sirve para autorizar operaciones, no para armar esta bandeja).
+        if (esAdmin ? !tareaAsignadaDirectamente(t, user.id) : !tareaLeCorresponde(t, p.equipo, user)) return
 
         if (t.estado === 'en_proceso') {
           if (t.asignadoA === user?.nombre) tareasEnProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
@@ -85,7 +91,7 @@ export default function MisTareas() {
                     <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
+                    <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
                       Ver <ChevronRight size={13} />
                     </Link>
                     <button
@@ -128,7 +134,7 @@ export default function MisTareas() {
                     {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 mt-1" />}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Link to={`/equipo/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
+                    <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
                       Ver <ChevronRight size={13} />
                     </Link>
                     <button

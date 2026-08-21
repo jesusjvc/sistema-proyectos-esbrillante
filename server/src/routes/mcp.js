@@ -13,6 +13,7 @@ import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
+import { notificarMencion } from '../lib/notificaciones.js'
 
 const router = Router()
 
@@ -825,6 +826,59 @@ function buildServer(usuario) {
         return fail(`No se pudo resolver el comentario "${anotacionId}" en "${prototipoSlug}": ${err instanceof Error ? err.message : String(err)}`)
       }
       return ok(`Comentario "${anotacionId}" marcado como resuelto.`)
+    },
+  )
+
+  server.registerTool(
+    'comentar_actividad',
+    {
+      title: 'Comentar una actividad',
+      description: 'Deja un comentario interno sobre una tarea de este proyecto (nunca visible para el cliente, ni siquiera en tareas que él sí ve en su portal) — para dar contexto de qué se está haciendo, dejar una nota para el equipo, o avisar de un problema. Úsala mientras trabajas una actividad para que quede transparencia de tu avance sin que dependa de que alguien te pregunte. Si el comentario es para alguien en particular, usa "mencionar" con su nombre — le llega un correo.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        tareaId: z.string().describe('ID de la tarea a comentar'),
+        mensaje: z.string().describe('Contenido del comentario'),
+        mencionar: z.array(z.string()).optional().describe('Nombres de compañeros a notificar por correo (no IDs) — se busca coincidencia contra los usuarios activos del sistema.'),
+      },
+    },
+    async ({ slug, tareaId, mensaje, mencionar }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const tarea = p.tareas.find((t) => t.id === tareaId)
+      if (!tarea) return fail(`No se encontró la tarea "${tareaId}" en el proyecto "${slug}".`)
+
+      const activos = await prisma.user.findMany({ where: { activo: true }, select: { id: true, nombre: true, email: true, rol: true } })
+      let usuariosMencionados = []
+      if (mencionar?.length) {
+        usuariosMencionados = activos.filter((u) =>
+          mencionar.some((nombre) => u.nombre.toLowerCase().includes(nombre.toLowerCase()))
+        )
+      }
+
+      const comentario = await prisma.comentario.create({
+        data: {
+          tareaId,
+          autor: usuario.nombre,
+          autorId: usuario.id,
+          texto: mensaje,
+          mencionados: usuariosMencionados.map((u) => u.id),
+        },
+      })
+
+      if (usuariosMencionados.length) {
+        notificarMencion(p, tarea, usuario.nombre, mensaje, usuariosMencionados).catch((err) => {
+          process.stderr.write(`[mcp] Error notificando mención: ${String(err)}\n`)
+        })
+      }
+      emitirCambio(p.id)
+
+      const aviso = mencionar?.length && !usuariosMencionados.length
+        ? ` (no se encontró a nadie activo que coincida con: ${mencionar.join(', ')})`
+        : usuariosMencionados.length
+          ? ` — se avisó por correo a ${usuariosMencionados.map((u) => u.nombre).join(', ')}`
+          : ''
+      return ok(`Comentario agregado a "${tarea.titulo}"${aviso}.`)
     },
   )
 

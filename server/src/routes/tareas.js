@@ -5,8 +5,11 @@ import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { tareaLeCorresponde } from '../lib/permisos.js'
 import { crearTareaCustom } from '../lib/tareaHelpers.js'
+import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
+
+router.use('/:tareaId/comentarios', comentariosRouter)
 
 const ESTADOS_TABLERO = ['pendiente', 'en_proceso', 'revision', 'completada']
 
