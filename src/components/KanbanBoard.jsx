@@ -10,7 +10,8 @@ import Avatar from './Avatar'
 import TextoEnriquecido from './TextoEnriquecido'
 import HiloComentarios from './HiloComentarios'
 import {
-  CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical, AlertTriangle,
+  CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical,
+  Flag, UserX, MessageCircle,
 } from 'lucide-react'
 
 function agrupar(tareas) {
@@ -174,6 +175,9 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
     opacity: isDragging ? 0.4 : 1,
   }
 
+  const mostrarAvatarPropio = t.estado !== 'en_proceso' && t.estado !== 'completada'
+  const numComentarios = t.comentarios?.length || 0
+
   return (
     <div
       ref={setNodeRef}
@@ -186,21 +190,29 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
             <GripVertical size={14} />
           </button>
         )}
+
+        {mostrarAvatarPropio && (
+          sinResponsableClaro ? (
+            <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
+              <UserX size={13} className="text-amber-500" />
+            </div>
+          ) : responsableInfo.nombre ? (
+            <div className="mt-0.5"><Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={28} /></div>
+          ) : null
+        )}
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{t.titulo}</span>
-            {t.esRutaCritica && <span className="text-[10px] bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300 px-1.5 py-0.5 rounded-full">Ruta crítica</span>}
+            {t.esRutaCritica && <Flag size={12} className="text-rose-500 shrink-0" title="Ruta crítica" />}
             {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">Personalizada</span>}
           </div>
 
-          {t.estado !== 'en_proceso' && t.estado !== 'completada' && (
+          {mostrarAvatarPropio && (
             sinResponsableClaro ? (
-              <div className="flex items-center gap-1 text-sm text-amber-600 dark:text-amber-500 mt-1" title="No tiene un rol o persona específica asignada">
-                <AlertTriangle size={13} /> Sin responsable
-              </div>
+              <div className="text-sm text-amber-600 dark:text-amber-500 mt-0.5">Sin responsable</div>
             ) : (
-              <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 mt-1">
-                {responsableInfo.nombre && <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={17} />}
+              <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                 {responsableInfo.nombre || responsableInfo.label}
               </div>
             )
@@ -219,11 +231,17 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
             </div>
           )}
 
-          <button onClick={() => setExpandida(!expandida)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 mt-1.5 flex items-center gap-1">
-            <Info size={13} />
-            {expandida ? 'Ocultar' : 'Ver detalle'}
-            {!expandida && t.comentarios?.length > 0 && ` · ${t.comentarios.length} comentario${t.comentarios.length === 1 ? '' : 's'}`}
-          </button>
+          <div className="flex items-center gap-3 mt-1.5">
+            <button onClick={() => setExpandida(!expandida)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1">
+              <Info size={13} />
+              {expandida ? 'Ocultar' : 'Ver detalle'}
+            </button>
+            {numComentarios > 0 && (
+              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+                <MessageCircle size={12} /> {numComentarios}
+              </span>
+            )}
+          </div>
           {expandida && (
             <div className="mt-1.5 bg-slate-100 dark:bg-slate-700/60 rounded-lg p-2">
               {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-slate-300" />}
