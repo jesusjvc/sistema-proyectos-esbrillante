@@ -684,7 +684,6 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
   const hayDetalle = t.queHacer || t.necesitasAntes || t.plantillaMensaje || t.queEntregas || t.descripcion || t.instruccionesCliente
-  const sinResponsableClaro = !t.esCliente && responsableInfo.label === 'Equipo'
 
   function copiarPlantilla() {
     navigator.clipboard.writeText(t.plantillaMensaje)
@@ -710,7 +709,9 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
     omitida: 'bg-slate-50 opacity-50',
   }
 
-  const mostrarAvatarPropio = estado !== 'completada' && estado !== 'omitida' && estado !== 'en_proceso' && !t.esCliente
+  const personaAsignada = estado === 'completada' ? t.completadaPor : estado === 'en_proceso' ? t.asignadoA : responsableInfo.nombre
+  const mostrarAvatarPropio = !t.esCliente
+  const sinPersonaClara = mostrarAvatarPropio && !personaAsignada
   const numComentarios = t.comentarios?.length || 0
 
   return (
@@ -719,13 +720,13 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
         <div className="mt-0.5">{iconMap[estado]}</div>
 
         {mostrarAvatarPropio && (
-          sinResponsableClaro ? (
+          sinPersonaClara ? (
             <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="Sin responsable claro — le aparece a todo el equipo del proyecto en Mis tareas">
               <UserX size={14} className="text-amber-500" />
             </div>
-          ) : responsableInfo.nombre ? (
-            <Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={30} />
-          ) : null
+          ) : (
+            <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
+          )
         )}
 
         <div className="flex-1 min-w-0">
@@ -746,21 +747,17 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
           </div>
 
           {mostrarAvatarPropio && (
-            sinResponsableClaro ? (
-              <div className="text-sm text-amber-600 mt-0.5">Sin responsable</div>
-            ) : (
-              <div className="text-sm text-slate-500 mt-0.5">
-                {responsableInfo.nombre || responsableInfo.label}
-              </div>
-            )
-          )}
-
-          {estado === 'completada' && t.completadaPor && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-400 mt-1">
-              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={17} />
-              Completada por {t.completadaPor} · {formatFechaHora(t.completadaEn)}
+            <div className={`text-sm mt-0.5 ${estado === 'en_proceso' ? 'text-brand-700' : sinPersonaClara ? 'text-amber-600' : 'text-slate-500'}`}>
+              {estado === 'completada'
+                ? `Completada por ${t.completadaPor} · ${formatFechaHora(t.completadaEn)}`
+                : estado === 'en_proceso'
+                ? (t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso')
+                : sinPersonaClara
+                ? 'Sin responsable'
+                : (responsableInfo.nombre || responsableInfo.label)}
             </div>
           )}
+
           {estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl) && (
             <div className="mt-1.5 text-sm bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-2 space-y-1">
               {t.respuestaTexto && <p className="text-slate-700">{t.respuestaTexto}</p>}
@@ -769,12 +766,6 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                   <ExternalLink size={13} /> {t.respuestaArchivoNombre || 'Archivo adjunto'}
                 </a>
               )}
-            </div>
-          )}
-          {estado === 'en_proceso' && (
-            <div className="flex items-center gap-1.5 text-sm text-brand-700 mt-1">
-              {t.asignadoA && <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={17} />}
-              {t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso'}
             </div>
           )}
 
