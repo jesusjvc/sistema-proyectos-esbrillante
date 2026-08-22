@@ -167,7 +167,6 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
   const [expandida, setExpandida] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
-  const sinResponsableClaro = responsableInfo.label === 'Equipo'
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -175,7 +174,8 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
     opacity: isDragging ? 0.4 : 1,
   }
 
-  const mostrarAvatarPropio = t.estado !== 'en_proceso' && t.estado !== 'completada'
+  const personaAsignada = t.estado === 'completada' ? t.completadaPor : t.estado === 'en_proceso' ? t.asignadoA : responsableInfo.nombre
+  const sinPersonaClara = !personaAsignada
   const numComentarios = t.comentarios?.length || 0
 
   return (
@@ -191,14 +191,12 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
           </button>
         )}
 
-        {mostrarAvatarPropio && (
-          sinResponsableClaro ? (
-            <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
-              <UserX size={13} className="text-amber-500" />
-            </div>
-          ) : responsableInfo.nombre ? (
-            <div className="mt-0.5"><Avatar nombre={responsableInfo.nombre} avatarUrl={avatares[responsableInfo.nombre]} size={28} /></div>
-          ) : null
+        {sinPersonaClara ? (
+          <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
+            <UserX size={13} className="text-amber-500" />
+          </div>
+        ) : (
+          <div className="mt-0.5"><Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={28} /></div>
         )}
 
         <div className="flex-1 min-w-0">
@@ -208,28 +206,15 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
             {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">Personalizada</span>}
           </div>
 
-          {mostrarAvatarPropio && (
-            sinResponsableClaro ? (
-              <div className="text-sm text-amber-600 dark:text-amber-500 mt-0.5">Sin responsable</div>
-            ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                {responsableInfo.nombre || responsableInfo.label}
-              </div>
-            )
-          )}
-
-          {t.estado === 'en_proceso' && t.asignadoA && (
-            <div className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 mt-1">
-              <Avatar nombre={t.asignadoA} avatarUrl={avatares[t.asignadoA]} size={17} />
-              {t.asignadoA}
-            </div>
-          )}
-          {t.estado === 'completada' && t.completadaPor && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 mt-1">
-              <Avatar nombre={t.completadaPor} avatarUrl={avatares[t.completadaPor]} size={17} />
-              Por {t.completadaPor}
-            </div>
-          )}
+          <div className={`text-sm mt-0.5 ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+            {t.estado === 'completada'
+              ? `Completada por ${t.completadaPor}`
+              : t.estado === 'en_proceso'
+              ? (t.asignadoA ? `En proceso — ${t.asignadoA}` : 'En proceso')
+              : sinPersonaClara
+              ? 'Sin responsable'
+              : (responsableInfo.nombre || responsableInfo.label)}
+          </div>
 
           <div className="flex items-center gap-3 mt-1.5">
             <button onClick={() => setExpandida(!expandida)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1">
