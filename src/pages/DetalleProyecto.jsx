@@ -8,7 +8,7 @@ import {
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
-  crearComentario,
+  crearComentario, regenerarPasswordCliente,
 } from '../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
@@ -28,7 +28,7 @@ import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
-  AlertTriangle, Flag, UserX,
+  AlertTriangle, Flag, UserX, RefreshCw,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -206,6 +206,12 @@ export default function DetalleProyecto() {
     setTimeout(() => setCopiado(false), 2000)
   }
 
+  async function handleRegenerarPassword() {
+    if (!confirm('¿Generar una nueva contraseña de acceso? La anterior dejará de funcionar.')) return
+    await regenerarPasswordCliente(proyecto.slug)
+    await refresh()
+  }
+
   function estadoCalculado(t) {
     if (t.estado === 'completada') return 'completada'
     if (t.estado === 'omitida') return 'omitida'
@@ -349,18 +355,27 @@ export default function DetalleProyecto() {
                   <ExternalLink size={13} className="text-slate-400" />
                 </a>
               </div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(proyecto.passwordCliente)
-                  setCopiado('pass')
-                  setTimeout(() => setCopiado(false), 2000)
-                }}
-                className="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left"
-                title="Copiar contraseña"
-              >
-                <code className="text-xs text-slate-700 truncate">{proyecto.passwordCliente}</code>
-                {copiado === 'pass' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
-              </button>
+              <div className="flex items-stretch gap-1.5">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(proyecto.passwordCliente)
+                    setCopiado('pass')
+                    setTimeout(() => setCopiado(false), 2000)
+                  }}
+                  className="flex-1 flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
+                  title="Copiar contraseña"
+                >
+                  <code className="text-xs text-slate-700 truncate">{proyecto.passwordCliente}</code>
+                  {copiado === 'pass' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
+                </button>
+                <button
+                  onClick={handleRegenerarPassword}
+                  className="flex items-center justify-center bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
+                  title="Generar nueva contraseña"
+                >
+                  <RefreshCw size={13} className="text-slate-400" />
+                </button>
+              </div>
               <button
                 onClick={copiarMensaje}
                 className="w-full flex items-center justify-center gap-1.5 text-xs font-medium bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-md transition-colors"

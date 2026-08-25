@@ -619,6 +619,5 @@ function generarPasswordSimple() {
   const palabras = ['cielo', 'verde', 'azul', 'rio', 'sol', 'luna', 'mar', 'viento']
   const n = Math.floor(100 + Math.random() * 900)
   const p = palabras[Math.floor(Math.random() * palabras.length)]
-  const q = palabras[Math.floor(Math.random() * palabras.length)]
-  return `${p}${n}${q}`
+  return `${p}${n}`
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
+import { generarPasswordSimple } from '../lib/passwords.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
@@ -176,7 +177,7 @@ function buildServer(usuario) {
         { numero: 2, nombre: 'Desarrollo' },
         { numero: 3, nombre: 'Entrega' },
       ])
-      const password = passwordCliente || randomUUID().slice(0, 8)
+      const password = passwordCliente || generarPasswordSimple()
       const paqueteFinal = paquete || 'Personalizado'
 
       const p = await prisma.proyecto.create({
