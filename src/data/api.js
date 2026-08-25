@@ -38,6 +38,7 @@ export const cerrarProyecto = (slug) => req('POST', `/api/proyectos/${slug}/cerr
 export const cambiarTipoProyecto = (slug, tipo) => req('PUT', `/api/proyectos/${slug}/tipo`, { tipo })
 export const actualizarEquipoProyecto = (slug, equipo) => req('PUT', `/api/proyectos/${slug}/equipo`, { equipo })
 export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-visto`)
+export const regenerarPasswordCliente = (slug) => req('POST', `/api/proyectos/${slug}/regenerar-password`)
 
 // ─── Tareas ────────────────────────────────────────────────────────────────
 export const iniciarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/iniciar`)

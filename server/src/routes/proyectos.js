@@ -2,6 +2,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin, requireAdminOrApiKey, requireAuthOrApiKey } from '../middleware/auth.js'
 import { generarSlug } from '../lib/slug.js'
+import { generarPasswordSimple } from '../lib/passwords.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { EQUIPO_NO_APLICA, ROLES_EQUIPO } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
@@ -72,7 +73,7 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
           proyecto,
           condicionesTecnicas,
           equipo,
-          passwordCliente,
+          passwordCliente: passwordCliente || generarPasswordSimple(),
           linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
           tiempos: {
             inicio: proyecto.anticipoConfirmado ? new Date().toISOString() : null,
@@ -251,6 +252,23 @@ router.put('/:slug/equipo', requireAuth, async (req, res) => {
     await prisma.proyecto.update({ where: { id: p.id }, data: { equipo: nuevoEquipo } })
     emitirCambio(p.id)
     res.json({ ok: true, equipo: nuevoEquipo })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/proyectos/:slug/regenerar-password
+router.post('/:slug/regenerar-password', requireAuth, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const passwordCliente = generarPasswordSimple()
+    await prisma.proyecto.update({ where: { id: p.id }, data: { passwordCliente } })
+    await logEntry(p.id, req.user.nombre, 'Contraseña de cliente regenerada')
+    emitirCambio(p.id)
+    res.json({ ok: true, passwordCliente })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
