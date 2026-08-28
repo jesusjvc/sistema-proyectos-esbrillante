@@ -38,6 +38,8 @@ export default function DetalleProyecto() {
   const { user } = useAuth()
   const [proyecto, setProyecto] = useState(null)
   const [faseAbierta, setFaseAbierta] = useState(null)
+  const [headerExpandido, setHeaderExpandido] = useState(false)
+  const [faseOcultarCompletadas, setFaseOcultarCompletadas] = useState({})
   const [tab, setTab] = useState('tareas')
   const [copiado, setCopiado] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
@@ -236,7 +238,33 @@ export default function DetalleProyecto() {
   return (
     <Layout titulo={proyecto.cliente.nombreComercial} volver={base}>
       {/* Header del proyecto */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+      <div className="bg-white rounded-xl border border-slate-200 mb-5 overflow-hidden">
+        <button
+          onClick={() => setHeaderExpandido((v) => !v)}
+          className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
+        >
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusBadge(proyecto.status)}`}>
+            {statusLabel(proyecto.status)}
+          </span>
+          <div className="flex-1 min-w-0">
+            <span className="font-bold text-slate-800">{proyecto.cliente.nombreComercial}</span>
+            <span className="text-sm text-slate-500 ml-2 truncate">
+              {esContinuo ? 'Servicio continuo' : `Fase ${faseActual} — ${fases.find((f) => f.numero === faseActual)?.nombre}`}
+              {!esContinuo && ` · ${avance}%`} · Entrega {esContinuo ? 'continua' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}
+            </span>
+          </div>
+          {!esContinuo && (
+            <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0 hidden sm:block">
+              <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
+            </div>
+          )}
+          <span className="flex items-center gap-1 text-sm text-slate-500 shrink-0">
+            Detalles {headerExpandido ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </span>
+        </button>
+
+        {headerExpandido && (
+        <div className="border-t border-slate-100 p-5">
         <div className="flex flex-col lg:flex-row items-start gap-6">
           {/* Columna izquierda: identidad + progreso + métricas */}
           <div className="flex-1 min-w-0 w-full">
@@ -387,6 +415,8 @@ export default function DetalleProyecto() {
             </div>
           </div>
         </div>
+        </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -449,14 +479,21 @@ export default function DetalleProyecto() {
             const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
             const total = fase.tareas.length
             const abierta = faseAbierta === fase.numero || fase.numero === faseActual
+            const ocultarCompletadas = faseOcultarCompletadas[fase.numero] !== false
+            const tareasVisibles = ocultarCompletadas
+              ? fase.tareas.filter((t) => t.estado !== 'completada' && t.estado !== 'omitida')
+              : fase.tareas
 
             return (
               <div key={fase.numero} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setFaseAbierta(abierta ? null : fase.numero)}
-                  className={`w-full flex items-center justify-between px-5 py-4 transition-colors ${abierta ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
+                  onKeyDown={(e) => e.key === 'Enter' && setFaseAbierta(abierta ? null : fase.numero)}
+                  className={`w-full flex items-center justify-between px-5 py-4 cursor-pointer transition-colors ${abierta ? 'bg-slate-50' : 'hover:bg-slate-50'}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-wrap">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                       completadas === total && total > 0 ? 'bg-emerald-100 text-emerald-700' :
                       fase.numero === faseActual ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500'
@@ -472,12 +509,25 @@ export default function DetalleProyecto() {
                       </span>
                     )}
                   </div>
-                  {abierta ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {completadas > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: !ocultarCompletadas })) }}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
+                          ocultarCompletadas ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500'
+                        }`}
+                        title={ocultarCompletadas ? 'Mostrar tareas completadas' : 'Ocultar tareas completadas'}
+                      >
+                        Ocultar completadas
+                      </button>
+                    )}
+                    {abierta ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                  </div>
+                </div>
 
                 {abierta && (
                   <div className="border-t border-slate-100">
-                    {fase.tareas.map((t) => {
+                    {tareasVisibles.map((t) => {
                       const est = estadoCalculado(t)
                       return (
                         <TareaRow
@@ -497,6 +547,14 @@ export default function DetalleProyecto() {
                         />
                       )
                     })}
+                    {ocultarCompletadas && completadas > 0 && (
+                      <button
+                        onClick={() => setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: false }))}
+                        className="w-full flex items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 py-3 border-t border-slate-50 transition-colors"
+                      >
+                        <ChevronDown size={13} /> {completadas} tarea{completadas > 1 ? 's' : ''} completada{completadas > 1 ? 's' : ''} — Mostrar
+                      </button>
+                    )}
                     <div className="px-5 py-2.5 border-t border-slate-50">
                       <button
                         onClick={() => setModalNueva(fase.numero)}
