@@ -333,6 +333,18 @@ export function contarPendientesCliente(proyecto) {
   return proyecto.tareas.filter((t) => t.esCliente && t.estado === 'pendiente').length
 }
 
+// true si una tarea de cliente ya superó su plazoHoras desde que quedó
+// disponible (disponibleDesde). Mismo criterio que usa el backend para
+// decidir si manda recordatorio (server/src/lib/recordatorios.js).
+export function tareaVencida(tarea) {
+  return !!(tarea.esCliente && tarea.estado === 'pendiente' && tarea.disponibleDesde && tarea.plazoHoras
+    && (Date.now() - new Date(tarea.disponibleDesde).getTime()) > tarea.plazoHoras * 3600_000)
+}
+
+export function contarTareasVencidasCliente(proyecto) {
+  return proyecto.tareas.filter(tareaVencida).length
+}
+
 // true si el cliente hizo algo (completó una tarea, respondió) después de la
 // última vez que el admin abrió el detalle del proyecto.
 export function tieneRespuestaNueva(proyecto) {
@@ -531,4 +543,15 @@ export function formatFechaHora(isoString) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+// Texto tipo "hace 3 días" / "hace 5 horas" a partir de una fecha ISO.
+export function tiempoTranscurrido(isoString) {
+  if (!isoString) return ''
+  const ms = Date.now() - new Date(isoString).getTime()
+  const horas = Math.floor(ms / 3600_000)
+  if (horas < 1) return 'hace unos minutos'
+  if (horas < 24) return `hace ${horas} hora${horas === 1 ? '' : 's'}`
+  const dias = Math.floor(horas / 24)
+  return `hace ${dias} día${dias === 1 ? '' : 's'}`
 }

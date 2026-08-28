@@ -13,6 +13,7 @@ import eventosRouter from './routes/eventos.js'
 import oauthRouter from './routes/oauth.js'
 import wellKnownRouter from './routes/wellKnown.js'
 import prototiposRouter from './routes/prototipos.js'
+import { revisarRecordatoriosVencidos } from './lib/recordatorios.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -49,3 +50,10 @@ app.use((err, req, res, next) => {
 })
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+
+// Recordatorios de tareas de cliente vencidas: revisa cada hora y una vez al
+// arrancar. No debe tumbar el server si falla (Mailjet caído, etc).
+revisarRecordatoriosVencidos().catch((err) => console.error('Error revisando recordatorios:', err))
+setInterval(() => {
+  revisarRecordatoriosVencidos().catch((err) => console.error('Error revisando recordatorios:', err))
+}, 60 * 60 * 1000)

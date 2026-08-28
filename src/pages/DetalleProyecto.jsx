@@ -923,6 +923,7 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
     esRutaCritica: tarea.esRutaCritica,
     soloKarlaOAdmin: tarea.soloKarlaOAdmin,
     plazoHoras: tarea.plazoHoras || '',
+    avisosDesactivados: tarea.avisosDesactivados || false,
     dependencias: tarea.dependencias || [],
   })
   const opcionesDependencia = todasLasTareas.filter((t) => t.id !== tarea.id)
@@ -993,6 +994,15 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Plazo sugerido (horas)</label>
               <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
+              <label className="flex items-center gap-2 text-sm cursor-pointer mt-2.5">
+                <input
+                  type="checkbox"
+                  checked={!form.avisosDesactivados}
+                  onChange={(e) => setForm({ ...form, avisosDesactivados: !e.target.checked })}
+                  className="accent-brand-500"
+                />
+                Enviar recordatorios automáticos al cliente si se atrasa
+              </label>
             </div>
           )}
 

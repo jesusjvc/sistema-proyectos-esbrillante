@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getProyectoCliente, loginCliente, completarTareaCliente, crearSolicitudCliente } from '../../data/api'
-import { calcularAvance, getFaseActual, formatFecha } from '../../data/storage'
+import { calcularAvance, getFaseActual, formatFecha, tareaVencida, tiempoTranscurrido } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
@@ -639,21 +639,35 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
     }
   }
 
+  const vencida = tareaVencida(t)
+
   return (
-    <div className="bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-500/40 rounded-xl overflow-hidden shadow-lg shadow-amber-100 dark:shadow-none">
-      <div className="bg-amber-50 dark:bg-amber-500/10 px-5 py-3.5 flex items-center justify-between">
+    <div className={`bg-white dark:bg-slate-900 border-2 rounded-xl overflow-hidden shadow-lg dark:shadow-none ${vencida ? 'border-red-300 dark:border-red-500/40 shadow-red-100' : 'border-amber-300 dark:border-amber-500/40 shadow-amber-100'}`}>
+      <div className={`px-5 py-3.5 flex items-center justify-between ${vencida ? 'bg-red-50 dark:bg-red-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}`}>
         <div className="flex items-center gap-2 min-w-0">
-          <AlertCircle size={17} className="text-amber-500 shrink-0" />
-          <span className="font-semibold text-amber-800 dark:text-amber-300 text-base truncate">{t.titulo}</span>
+          <AlertCircle size={17} className={`shrink-0 ${vencida ? 'text-red-500' : 'text-amber-500'}`} />
+          <div className="min-w-0">
+            <span className={`font-semibold text-base truncate block ${vencida ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>{t.titulo}</span>
+            {t.disponibleDesde && (
+              <span className={`text-xs ${vencida ? 'text-red-500 dark:text-red-400' : 'text-amber-500/80 dark:text-amber-400/70'}`}>
+                Pendiente desde {tiempoTranscurrido(t.disponibleDesde)}
+              </span>
+            )}
+          </div>
         </div>
-        <button onClick={() => setExpandida(!expandida)} className="text-amber-400 shrink-0 ml-2">
+        <button onClick={() => setExpandida(!expandida)} className={`shrink-0 ml-2 ${vencida ? 'text-red-400' : 'text-amber-400'}`}>
           {expandida ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
       </div>
       {expandida && (
         <div className="px-5 py-4">
           <TextoEnriquecido html={t.instruccionesCliente} className="text-base text-slate-700 dark:text-slate-300 leading-relaxed mb-4" />
-          {t.plazoHoras && (
+          {vencida ? (
+            <div className="flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400 mb-4">
+              <AlertCircle size={12} />
+              Atrasada — el tiempo sugerido era {t.plazoHoras} horas
+            </div>
+          ) : t.plazoHoras && (
             <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
               <Clock size={12} />
               Tiempo sugerido: {t.plazoHoras} horas

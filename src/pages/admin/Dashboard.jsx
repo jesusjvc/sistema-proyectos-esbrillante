@@ -4,7 +4,7 @@ import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, getMiembros, confirmarAnticipo } from '../../data/api'
-import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../../data/storage'
+import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva, contarTareasVencidasCliente } from '../../data/storage'
 import { FASES } from '../../data/paquetes'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { miembrosDelEquipo } from '../../lib/permisos'
@@ -277,6 +277,7 @@ function ProyectoRow({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
   const pendientesCliente = contarPendientesCliente(p)
   const respuestaNueva = tieneRespuestaNueva(p)
   const equipoProyecto = miembrosDelEquipo(p.equipo, miembros)
+  const tareasVencidas = contarTareasVencidasCliente(p)
 
   const tareasDisponibles = p.tareas.filter((t) => {
     if (t.estado === 'completada' || t.estado === 'omitida') return false
@@ -288,7 +289,7 @@ function ProyectoRow({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
     <div
       onClick={() => navigate(`/admin/proyecto/${p.slug}`)}
       className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 flex flex-col gap-2.5 ${
-        respuestaNueva ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200 hover:border-slate-300'
+        tareasVencidas > 0 ? 'border-red-300 ring-1 ring-red-200' : respuestaNueva ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200 hover:border-slate-300'
       }`}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -305,6 +306,11 @@ function ProyectoRow({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
           {pendientesCliente > 0 && (
             <Chip className="bg-amber-100 text-amber-700">
               <MessageCircle size={11} /> {pendientesCliente} pendiente{pendientesCliente > 1 ? 's' : ''} del cliente
+            </Chip>
+          )}
+          {tareasVencidas > 0 && (
+            <Chip className="bg-red-100 text-red-700">
+              <AlertCircle size={11} /> {tareasVencidas} atrasada{tareasVencidas > 1 ? 's' : ''}
             </Chip>
           )}
         </div>

@@ -84,6 +84,11 @@ model Tarea {
   completadaEn  DateTime?
   asignadoA     String?
 
+  creadoEn             DateTime  @default(now())
+  disponibleDesde      DateTime?
+  avisosDesactivados   Boolean   @default(false)
+  ultimoRecordatorioEn DateTime?
+
   respuestaTexto       String?
   respuestaArchivoUrl  String?
   respuestaArchivoNombre String?

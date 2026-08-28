@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { tareaLeCorresponde } from '../lib/permisos.js'
-import { crearTareaCustom } from '../lib/tareaHelpers.js'
+import { crearTareaCustom, activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
@@ -73,6 +73,7 @@ router.post('/:tareaId/completar', requireAuth, async (req, res) => {
       data: { estado: 'completada', completadaPor: usuario, completadaEn: new Date() },
     })
     await logEntry(p.id, usuario, 'Tarea completada', tarea.titulo)
+    await activarTareasClienteDisponibles(p.id)
 
     emitirCambio(p.id)
     res.json({ ok: true })
@@ -180,6 +181,7 @@ router.post('/:tareaId/mover', requireAuth, async (req, res) => {
 
     const columnaLabel = { pendiente: 'Todo', en_proceso: 'Doing', revision: 'Revisión', completada: 'Done' }[estado]
     await logEntry(p.id, usuario, 'Tarjeta movida', `${tarea.titulo} → ${columnaLabel}`)
+    if (data.estado === 'completada') await activarTareasClienteDisponibles(p.id)
 
     emitirCambio(p.id)
     res.json({ ok: true })
@@ -195,7 +197,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
   const usuario = req.user.nombre
   const campos = ['titulo', 'descripcion', 'queHacer', 'necesitasAntes', 'plantillaMensaje',
     'queEntregas', 'responsable', 'instruccionesCliente', 'plazoHoras',
-    'esRutaCritica', 'soloKarlaOAdmin', 'esCliente', 'dependencias']
+    'esRutaCritica', 'soloKarlaOAdmin', 'esCliente', 'dependencias', 'avisosDesactivados']
 
   try {
     const p = await getProyecto(slug)
@@ -214,6 +216,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
 
     const tarea = await prisma.tarea.update({ where: { id: tareaId }, data })
     await logEntry(p.id, usuario, 'Tarea editada', tarea.titulo)
+    await activarTareasClienteDisponibles(p.id)
 
     emitirCambio(p.id)
     res.json(tarea)

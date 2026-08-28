@@ -112,6 +112,7 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
             completadaPor: null,
             completadaEn: null,
             asignadoA: null,
+            disponibleDesde: t.esCliente && !(t.dependencias || []).length ? new Date() : null,
           })),
         })
       }

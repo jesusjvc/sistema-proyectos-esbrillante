@@ -15,6 +15,7 @@ import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion } from '../lib/notificaciones.js'
+import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 
 const router = Router()
 
@@ -460,6 +461,7 @@ function buildServer(usuario) {
         },
       })
       await logEntry(p.id, usuario.nombre, marcarCompletada ? 'Tarea agregada y completada' : 'Tarea agregada', titulo)
+      if (marcarCompletada) await activarTareasClienteDisponibles(p.id)
       emitirCambio(p.id)
 
       const ubicacion = esContinuo ? `columna "${posicion.estadoFinal}"` : `fase ${posicion.faseFinal}`
@@ -509,6 +511,9 @@ function buildServer(usuario) {
         }
       }
 
+      const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+      const disponibleDeInicio = (dependeDeTareaIds || []).every((d) => completadasIds.has(d))
+
       await prisma.tarea.create({
         data: {
           id: randomUUID(),
@@ -524,6 +529,7 @@ function buildServer(usuario) {
           custom: true,
           estado: 'pendiente',
           driveFolderUrl,
+          disponibleDesde: disponibleDeInicio ? new Date() : null,
         },
       })
       await logEntry(p.id, usuario.nombre, 'Solicitud al cliente creada', titulo)
@@ -594,6 +600,7 @@ function buildServer(usuario) {
         data: { estado: 'completada', completadaPor: usuario.nombre, completadaEn: new Date() },
       })
       await logEntry(p.id, usuario.nombre, 'Tarea completada', respuesta ? `${tarea.titulo} — Respuesta: ${respuesta}` : tarea.titulo)
+      await activarTareasClienteDisponibles(p.id)
       emitirCambio(p.id)
 
       return ok(`Tarea "${tarea.titulo}" marcada como completada.${respuesta ? ' Respuesta registrada en el log.' : ''}`)
@@ -692,6 +699,7 @@ function buildServer(usuario) {
 
       await prisma.tarea.update({ where: { id: tareaId }, data })
       await logEntry(p.id, usuario.nombre, 'Tarea editada', tarea.titulo)
+      await activarTareasClienteDisponibles(p.id)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" actualizada.`)
