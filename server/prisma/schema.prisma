@@ -114,6 +114,49 @@ model Comentario {
   @@map("comentarios_tarea")
 }
 
+model Plantilla {
+  id          String   @id @default(cuid())
+  nombre      String
+  area        String   @default("General")
+  descripcion String   @default("")
+  fases       Json     @default("[]")
+
+  tareas TareaPlantilla[]
+
+  creadoEn DateTime @default(now())
+
+  @@map("plantillas")
+}
+
+model TareaPlantilla {
+  id          String    @id @default(cuid())
+  plantillaId String
+  plantilla   Plantilla @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+
+  fase             Int
+  orden            Float    @default(0)
+  titulo           String
+  responsable      String   @default("equipo")
+  dependencias     String[]
+  condicion        String?
+  descripcion      String   @default("")
+  queHacer         String   @default("")
+  necesitasAntes   String   @default("")
+  plantillaMensaje String   @default("")
+  queEntregas      String   @default("")
+  linkTipo         String?
+
+  esCliente             Boolean @default(false)
+  instruccionesCliente  String  @default("")
+  plazoHoras            Int?
+  esRutaCritica         Boolean @default(false)
+  soloAdmin             Boolean @default(false)
+  soloKarlaOAdmin       Boolean @default(false)
+  opcional              Boolean @default(false)
+
+  @@map("tareas_plantilla")
+}
+
 model Solicitud {
   id         String   @id @default(cuid())
   proyectoId String

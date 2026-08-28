@@ -7,12 +7,13 @@ import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { tareaLeCorresponde, tareaAsignadaDirectamente, RESPONSABLE_LABEL } from '../../lib/permisos'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
-import { CheckCircle2, ChevronRight, PlayCircle } from 'lucide-react'
+import { CheckCircle2, ChevronRight, PlayCircle, Lock, ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function MisTareas() {
   const { user } = useAuth()
   const [proyectos, setProyectos] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [mostrarBloqueadas, setMostrarBloqueadas] = useState(false)
 
   async function cargar() {
     try {
@@ -39,11 +40,13 @@ export default function MisTareas() {
   const base = esAdmin ? '/admin' : '/equipo'
 
   const tareasDisponibles = []
+  const tareasBloqueadas = []
   const tareasEnProceso = []
   proyectos
     .filter((p) => p.status === 'activo' || p.status === 'en_pausa')
     .forEach((p) => {
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+      const titulosPorId = new Map(p.tareas.map((t) => [t.id, t.titulo]))
       p.tareas.forEach((t) => {
         if (t.estado === 'completada' || t.estado === 'omitida' || t.esCliente) return
         if (t.soloKarlaOAdmin && !user?.esKarla && !esAdmin) return
@@ -56,7 +59,16 @@ export default function MisTareas() {
           if (t.asignadoA === user?.nombre) tareasEnProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
           return
         }
-        if (!t.dependencias.every((d) => completadasIds.has(d))) return
+        const pendientes = t.dependencias.filter((d) => !completadasIds.has(d))
+        if (pendientes.length) {
+          tareasBloqueadas.push({
+            ...t,
+            proyectoSlug: p.slug,
+            proyectoNombre: p.cliente.nombreComercial,
+            faltaPor: pendientes.map((d) => titulosPorId.get(d) || d),
+          })
+          return
+        }
         tareasDisponibles.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
       })
     })
@@ -155,6 +167,39 @@ export default function MisTareas() {
             </div>
           )}
         </section>
+
+        {!cargando && tareasBloqueadas.length > 0 && (
+          <section>
+            <button
+              onClick={() => setMostrarBloqueadas((v) => !v)}
+              className="flex items-center gap-2 text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
+            >
+              Próximamente ({tareasBloqueadas.length})
+              {mostrarBloqueadas ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+
+            {mostrarBloqueadas && (
+              <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+                {tareasBloqueadas.map((t) => (
+                  <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-slate-50/60">
+                    <Lock size={13} className="text-slate-400 mt-1 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-slate-600 text-sm">{t.titulo}</span>
+                        <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
+                      </div>
+                      <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
+                      <div className="text-xs text-slate-400 mt-1">Falta: {t.faltaPor.join(', ')}</div>
+                    </div>
+                    <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5 shrink-0">
+                      Ver <ChevronRight size={13} />
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {tareasRecientes.length > 0 && (
           <section>

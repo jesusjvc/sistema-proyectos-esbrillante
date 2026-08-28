@@ -26,7 +26,7 @@ export default function NuevoProyecto() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const base = user?.rol === 'admin' ? '/admin' : '/equipo'
-  const plantillas = getPlantillas()
+  const [plantillas, setPlantillas] = useState([])
 
   const [miembros, setMiembros] = useState([])
   const [paso, setPaso] = useState(1)
@@ -63,6 +63,7 @@ export default function NuevoProyecto() {
 
   useEffect(() => {
     getMiembros().then(setMiembros).catch(() => {})
+    getPlantillas().then(setPlantillas).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -107,8 +108,8 @@ export default function NuevoProyecto() {
     setCreando(true)
     try {
       const esContinuo = tipo === 'continuo'
-      const plantilla = getPlantilla(proyectoData.plantillaId)
-      const tareas = esContinuo ? [] : copiarTareasDesde(proyectoData.plantillaId, condiciones, proyectoData.extras)
+      const plantilla = esContinuo ? null : await getPlantilla(proyectoData.plantillaId)
+      const tareas = esContinuo ? [] : await copiarTareasDesde(proyectoData.plantillaId, condiciones, proyectoData.extras)
 
       const p = await crearProyecto({
         tipo,

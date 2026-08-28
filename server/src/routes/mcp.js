@@ -6,7 +6,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
 import { requireMcpAuth } from '../middleware/auth.js'
-import { tareaLeCorresponde } from '../lib/permisos.js'
+import { tareaLeCorresponde, validarYNormalizarEquipo } from '../lib/permisos.js'
+import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
@@ -148,7 +149,7 @@ function buildServer(usuario) {
     'crear_proyecto',
     {
       title: 'Crear proyecto',
-      description: 'Da de alta un proyecto nuevo en el Sistema de Seguimiento para poder empezar a reportarle avance. No confirma pagos ni cierra proyectos: anticipoConfirmado es solo informativo (si es false, el proyecto queda en status "pendiente_anticipo" hasta que se confirme desde el panel admin). La respuesta incluye el slug, la contraseña del portal del cliente y urlPortalCliente (la URL completa y lista para compartir, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. Soporta dos tipos de proyecto (parámetro tipo): "finito" (default, con fases y fecha de entrega) o "continuo" (servicio recurrente sin fecha de cierre, gestionado con un tablero Kanban de columnas Todo/Doing/Revisión/Done — en ese caso se ignoran fases y fechaEstimadaEntrega; usa registrar_actividad/solicitar_al_cliente con el parámetro columna, y mover_a_revision, para trabajar sobre el tablero).',
+      description: 'Da de alta un proyecto nuevo en el Sistema de Seguimiento para poder empezar a reportarle avance. No confirma pagos ni cierra proyectos: anticipoConfirmado es solo informativo (si es false, el proyecto queda en status "pendiente_anticipo" hasta que se confirme desde el panel admin). La respuesta incluye el slug, la contraseña del portal del cliente y urlPortalCliente (la URL completa y lista para compartir, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. Soporta dos tipos de proyecto (parámetro tipo): "finito" (default, con fases y fecha de entrega) o "continuo" (servicio recurrente sin fecha de cierre, gestionado con un tablero Kanban de columnas Todo/Doing/Revisión/Done — en ese caso se ignoran fases y fechaEstimadaEntrega; usa registrar_actividad/solicitar_al_cliente con el parámetro columna, y mover_a_revision, para trabajar sobre el tablero). Para un proyecto que corresponda a un paquete conocido (no un caso muy a medida), usa listar_plantillas primero y pasa plantillaId aquí — así el proyecto arranca con el checklist real de actividades core y sus dependencias correctas, en vez de tener que inventarlas una por una con registrar_actividad/solicitar_al_cliente después.',
       inputSchema: {
         clienteNombre: z.string().describe('Nombre comercial del cliente'),
         contactoNombre: z.string().optional().describe('Nombre del contacto principal del cliente'),
@@ -163,47 +164,84 @@ function buildServer(usuario) {
           requierePago: z.boolean().optional().describe('true si esta fase no arranca hasta confirmar un pago adicional (ej. Parte A de Fase 2)'),
           pagoConfirmado: z.boolean().optional().describe('true si ese pago ya se confirmó'),
         })).optional()
-          .describe('Fases del proyecto en orden, ej. [{"numero":1,"nombre":"Fase 1 — Auth","fechaEstimada":"2026-08-15"}]. Si se omite, usa un default genérico de 3 fases (Planeación/Desarrollo/Entrega). Solo aplica a tipo "finito"; se ignora en proyectos "continuo".'),
+          .describe('Fases del proyecto en orden, ej. [{"numero":1,"nombre":"Fase 1 — Auth","fechaEstimada":"2026-08-15"}]. Si se omite, usa un default genérico de 3 fases (Planeación/Desarrollo/Entrega) — o las fases de la plantilla si se pasó plantillaId. Solo aplica a tipo "finito"; se ignora en proyectos "continuo".'),
         fechaInicio: z.string().optional().describe('Fecha de inicio en formato YYYY-MM-DD. Default: hoy'),
         fechaEstimadaEntrega: z.string().optional().describe('Fecha estimada de entrega en formato YYYY-MM-DD. Solo aplica a tipo "finito".'),
         anticipoConfirmado: z.boolean().describe('true SOLO si consta que el anticipo/pago inicial ya fue confirmado y recibido. Si no estás seguro, usa false.'),
         passwordCliente: z.string().optional().describe('Contraseña de acceso al portal del cliente. Si se omite, se genera una automáticamente.'),
+        plantillaId: z.string().optional().describe('ID de una plantilla (ver listar_plantillas) para arrancar el proyecto con su checklist real de actividades y dependencias, en vez de vacío. Las tareas se filtran por condicionesTecnicas/extras igual que en el asistente de "Nuevo proyecto" del panel admin.'),
+        condicionesTecnicas: z.record(z.boolean()).optional().describe('Flags técnicos del proyecto (ej. requiereCloudflare, requiereCorreos, requiereAnalytics, requiereSearchConsole, requierePluginAdicional, requiereCapacitacion) — determinan qué tareas condicionales de la plantilla se incluyen. Solo aplica si se pasa plantillaId.'),
+        extras: z.array(z.string()).optional().describe('Nombres exactos de los extras contratados (ej. "Carga de productos (Ecommerce)", "Pasarela de pago (Stripe / MercadoPago / PayPal)", "Blog con entradas iniciales", "SEO avanzado") — también determinan qué tareas condicionales de la plantilla se incluyen. Solo aplica si se pasa plantillaId.'),
+        equipo: z.object({
+          copy: z.string().optional().describe('userId de quien hace copy/contenido en este proyecto'),
+          disenador: z.string().optional().describe('userId de quien diseña'),
+          programador: z.string().optional().describe('userId de quien programa, o "no_aplica" si el proyecto no lo requiere'),
+          adminProyecto: z.string().optional().describe('userId de quien administra el proyecto'),
+        }).optional().describe('Quiénes participan en el equipo de este proyecto, por rol (userId de un usuario real del sistema). Importante definirlo desde la creación: sin esto, las tareas de rol genérico (responsable=copy/disenador/programador) no le aparecen a nadie en "Mis tareas" hasta que se asigne después.'),
       },
     },
-    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente }) => {
+    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo }) => {
       const slug = generarSlug(clienteNombre)
       const tipoFinal = tipo === 'continuo' ? 'continuo' : 'finito'
-      const fasesFinal = tipoFinal === 'continuo' ? [] : (fases?.length ? fases : [
+      const password = passwordCliente || generarPasswordSimple()
+      const paqueteFinal = paquete || 'Personalizado'
+
+      let equipoFinal = {}
+      try {
+        equipoFinal = await validarYNormalizarEquipo(prisma, equipo)
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
+
+      let tareasFinal = []
+      if (tipoFinal === 'finito' && plantillaId) {
+        try {
+          tareasFinal = await materializarTareasDesdePlantilla(plantillaId, condicionesTecnicas, extras)
+        } catch (err) {
+          if (err.status) return fail(err.message)
+          throw err
+        }
+      }
+
+      const plantillaUsada = plantillaId ? await prisma.plantilla.findUnique({ where: { id: plantillaId }, select: { fases: true } }) : null
+      const fasesFinal = tipoFinal === 'continuo' ? [] : (fases?.length ? fases : plantillaUsada?.fases?.length ? plantillaUsada.fases : [
         { numero: 1, nombre: 'Planeación' },
         { numero: 2, nombre: 'Desarrollo' },
         { numero: 3, nombre: 'Entrega' },
       ])
-      const password = passwordCliente || generarPasswordSimple()
-      const paqueteFinal = paquete || 'Personalizado'
 
-      const p = await prisma.proyecto.create({
-        data: {
-          slug,
-          tipo: tipoFinal,
-          status: anticipoConfirmado ? 'activo' : 'pendiente_anticipo',
-          cliente: { nombreComercial: clienteNombre, contactoNombre: contactoNombre || '', correo: correo || '', whatsapp: '', participantes: [] },
-          proyecto: {
-            paquete: paqueteFinal,
-            descripcion: descripcion || '',
-            fases: fasesFinal,
-            extras: [],
-            fechaInicio: fechaInicio || new Date().toISOString().slice(0, 10),
-            fechaEstimadaEntrega: tipoFinal === 'continuo' ? null : (fechaEstimadaEntrega || null),
-            anticipoConfirmado,
+      const p = await prisma.$transaction(async (tx) => {
+        const proyecto = await tx.proyecto.create({
+          data: {
+            slug,
+            tipo: tipoFinal,
+            status: anticipoConfirmado ? 'activo' : 'pendiente_anticipo',
+            cliente: { nombreComercial: clienteNombre, contactoNombre: contactoNombre || '', correo: correo || '', whatsapp: '', participantes: [] },
+            proyecto: {
+              paquete: paqueteFinal,
+              descripcion: descripcion || '',
+              fases: fasesFinal,
+              extras: extras || [],
+              fechaInicio: fechaInicio || new Date().toISOString().slice(0, 10),
+              fechaEstimadaEntrega: tipoFinal === 'continuo' ? null : (fechaEstimadaEntrega || null),
+              anticipoConfirmado,
+            },
+            condicionesTecnicas: condicionesTecnicas || {},
+            equipo: equipoFinal,
+            passwordCliente: password,
+            linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
+            tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },
           },
-          condicionesTecnicas: {},
-          equipo: {},
-          passwordCliente: password,
-          linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
-          tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },
-        },
+        })
+
+        if (tareasFinal.length) {
+          await tx.tarea.createMany({ data: tareasFinal.map((t) => ({ ...t, proyectoId: proyecto.id })) })
+        }
+
+        return proyecto
       })
-      await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}`)
+      await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}${plantillaId ? ` — desde plantilla (${tareasFinal.length} tareas)` : ''}`)
 
       let avisoDrive = ''
       if (driveConfigurado()) {
@@ -219,7 +257,42 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       const avisoAnticipo = anticipoConfirmado ? '' : ' Status: "pendiente_anticipo" — confirma el anticipo desde el panel admin cuando corresponda.'
-      return ok(`Proyecto "${clienteNombre}" creado (tipo: ${tipoFinal}). slug: "${p.slug}". Contraseña del portal del cliente: "${password}". urlPortalCliente: "${urlPortalCliente(p.slug)}".${avisoAnticipo}${avisoDrive}`)
+      const resumenTareas = tareasFinal.length
+        ? `\nTareas creadas desde la plantilla (${tareasFinal.length}): ${JSON.stringify(tareasFinal.map((t) => ({ id: t.id, titulo: t.titulo, fase: t.fase, responsable: t.responsable })))}\nUsa editar_actividad con estos IDs si necesitas reasignar alguna a una persona específica.`
+        : ''
+      return ok(`Proyecto "${clienteNombre}" creado (tipo: ${tipoFinal}). slug: "${p.slug}". Contraseña del portal del cliente: "${password}". urlPortalCliente: "${urlPortalCliente(p.slug)}".${avisoAnticipo}${avisoDrive}${resumenTareas}`)
+    },
+  )
+
+  server.registerTool(
+    'listar_plantillas',
+    {
+      title: 'Listar plantillas de proyecto',
+      description: 'Lista las plantillas (checklists de actividades por tipo de paquete web) disponibles, con sus fases y tareas — incluyendo dependencias entre tareas, condicion (para qué se filtran con condicionesTecnicas/extras al crear el proyecto) y responsable. Úsala ANTES de crear_proyecto para elegir la plantilla que mejor corresponda al paquete contratado, en vez de inventar el checklist de actividades desde cero — así el proyecto arranca con las actividades core correctas y en el orden correcto.',
+      inputSchema: {},
+    },
+    async () => {
+      const plantillas = await prisma.plantilla.findMany({
+        include: { tareas: { orderBy: [{ fase: 'asc' }, { orden: 'asc' }] } },
+        orderBy: { creadoEn: 'asc' },
+      })
+      const resumen = plantillas.map((pl) => ({
+        id: pl.id,
+        nombre: pl.nombre,
+        area: pl.area,
+        descripcion: pl.descripcion || null,
+        fases: pl.fases,
+        tareas: pl.tareas.map((t) => ({
+          id: t.id,
+          fase: t.fase,
+          titulo: t.titulo,
+          responsable: t.responsable,
+          dependencias: t.dependencias,
+          condicion: t.condicion,
+          esCliente: t.esCliente,
+        })),
+      }))
+      return ok(JSON.stringify(resumen, null, 2))
     },
   )
 

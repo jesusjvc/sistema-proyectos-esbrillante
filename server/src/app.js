@@ -13,6 +13,7 @@ import eventosRouter from './routes/eventos.js'
 import oauthRouter from './routes/oauth.js'
 import wellKnownRouter from './routes/wellKnown.js'
 import prototiposRouter from './routes/prototipos.js'
+import plantillasRouter from './routes/plantillas.js'
 import { revisarRecordatoriosVencidos } from './lib/recordatorios.js'
 
 const app = express()
@@ -32,6 +33,7 @@ app.use(cookieParser())
 
 app.use('/api/auth', authRouter)
 app.use('/api/proyectos', proyectosRouter)
+app.use('/api/plantillas', plantillasRouter)
 app.use('/api/miembros', miembrosRouter)
 app.use('/api/prototipos', prototiposRouter)
 app.use('/api/cliente', clienteRouter)

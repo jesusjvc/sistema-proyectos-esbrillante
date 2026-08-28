@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin, requireAdminOrApiKey, requireAuthOrApiKey } 
 import { generarSlug } from '../lib/slug.js'
 import { generarPasswordSimple } from '../lib/passwords.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { EQUIPO_NO_APLICA, ROLES_EQUIPO } from '../lib/permisos.js'
+import { validarYNormalizarEquipo } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
@@ -238,22 +238,12 @@ router.put('/:slug/equipo', requireAuth, async (req, res) => {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const idsAValidar = ROLES_EQUIPO
-      .map((rol) => equipo[rol])
-      .filter((v) => v && v !== EQUIPO_NO_APLICA)
-
-    if (idsAValidar.length) {
-      const encontrados = await prisma.user.findMany({ where: { id: { in: idsAValidar } }, select: { id: true } })
-      if (encontrados.length !== new Set(idsAValidar).size) {
-        return res.status(400).json({ error: 'Uno o más miembros de equipo no son válidos' })
-      }
-    }
-
-    const nuevoEquipo = Object.fromEntries(ROLES_EQUIPO.map((rol) => [rol, equipo[rol] ?? null]))
+    const nuevoEquipo = await validarYNormalizarEquipo(prisma, equipo)
     await prisma.proyecto.update({ where: { id: p.id }, data: { equipo: nuevoEquipo } })
     emitirCambio(p.id)
     res.json({ ok: true, equipo: nuevoEquipo })
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
   }

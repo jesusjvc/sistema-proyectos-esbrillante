@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import {
   getPlantilla, actualizarPlantilla,
   agregarTareaPlantilla, editarTareaPlantilla, eliminarTareaPlantilla,
-  reordenarTareasPlantilla, agregarFasePlantilla, editarFasePlantilla,
+  moverTareaPlantilla, agregarFasePlantilla, editarFasePlantilla,
   CONDICION_LABELS,
 } from '../../data/plantillas'
 import {
@@ -12,6 +12,7 @@ import {
   ChevronUp as MoveUp, ChevronDown as MoveDown, GripVertical, Info, AlertCircle,
 } from 'lucide-react'
 import EditorEnriquecido from '../../components/EditorEnriquecido'
+import SelectorDependencias from '../../components/SelectorDependencias'
 
 const RESPONSABLES = [
   { valor: 'admin', label: 'Admin' },
@@ -26,18 +27,32 @@ const RESPONSABLES = [
 export default function EditarPaquete() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [plantilla, setPlantilla] = useState(() => getPlantilla(id))
+  const [plantilla, setPlantilla] = useState(null)
+  const [cargando, setCargando] = useState(true)
   const [editandoNombre, setEditandoNombre] = useState(false)
   const [metaForm, setMetaForm] = useState({})
-  const [fasesAbiertas, setFasesAbiertas] = useState(new Set([plantilla?.fases[0]?.numero]))
+  const [fasesAbiertas, setFasesAbiertas] = useState(new Set())
   const [modalTarea, setModalTarea] = useState(null) // { modo: 'nueva'|'editar', faseNum, tarea? }
   const [editandoFase, setEditandoFase] = useState(null)
   const [nuevaFaseNombre, setNuevaFaseNombre] = useState('')
   const [mostrarNuevaFase, setMostrarNuevaFase] = useState(false)
 
-  if (!plantilla) { navigate('/admin/paquetes'); return null }
+  async function refresh() {
+    try {
+      const p = await getPlantilla(id)
+      setPlantilla(p)
+      setFasesAbiertas((prev) => (prev.size ? prev : new Set([p.fases[0]?.numero])))
+    } catch {
+      navigate('/admin/paquetes')
+    } finally {
+      setCargando(false)
+    }
+  }
 
-  function refresh() { setPlantilla(getPlantilla(id)) }
+  useEffect(() => { refresh() }, [id])
+
+  if (cargando) return <Layout titulo="Cargando..."><div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div></Layout>
+  if (!plantilla) return null
 
   function toggleFase(num) {
     setFasesAbiertas((prev) => {
@@ -47,8 +62,8 @@ export default function EditarPaquete() {
     })
   }
 
-  function guardarMeta() {
-    actualizarPlantilla(id, metaForm)
+  async function guardarMeta() {
+    await actualizarPlantilla(id, metaForm)
     setEditandoNombre(false)
     refresh()
   }
@@ -58,37 +73,43 @@ export default function EditarPaquete() {
     setEditandoNombre(true)
   }
 
-  function handleGuardarTarea(datos) {
+  async function handleGuardarTarea(datos) {
     if (modalTarea.modo === 'nueva') {
-      agregarTareaPlantilla(id, { ...datos, fase: modalTarea.faseNum })
+      await agregarTareaPlantilla(id, { ...datos, fase: modalTarea.faseNum })
     } else {
-      editarTareaPlantilla(id, modalTarea.tarea.id, datos)
+      await editarTareaPlantilla(id, modalTarea.tarea.id, datos)
     }
     setModalTarea(null)
     refresh()
   }
 
-  function handleEliminarTarea(tareaId) {
-    eliminarTareaPlantilla(id, tareaId)
+  async function handleEliminarTarea(tareaId) {
+    await eliminarTareaPlantilla(id, tareaId)
     refresh()
   }
 
-  function handleMover(tareaId, dir) {
-    reordenarTareasPlantilla(id, tareaId, dir)
+  async function handleMover(tareaId, dir) {
+    const tarea = plantilla.tareas.find((t) => t.id === tareaId)
+    const mismaFase = plantilla.tareas.filter((t) => t.fase === tarea.fase)
+    const idxFase = mismaFase.findIndex((t) => t.id === tareaId)
+    if (dir === 'arriba' && idxFase === 0) return
+    if (dir === 'abajo' && idxFase === mismaFase.length - 1) return
+    const vecina = mismaFase[dir === 'arriba' ? idxFase - 1 : idxFase + 1]
+    await moverTareaPlantilla(id, tareaId, dir === 'arriba' ? { antesDeTareaId: vecina.id } : { despuesDeTareaId: vecina.id })
     refresh()
   }
 
-  function handleAgregarFase(e) {
+  async function handleAgregarFase(e) {
     e.preventDefault()
     if (!nuevaFaseNombre.trim()) return
-    agregarFasePlantilla(id, { nombre: nuevaFaseNombre.trim() })
+    await agregarFasePlantilla(id, { nombre: nuevaFaseNombre.trim() })
     setNuevaFaseNombre('')
     setMostrarNuevaFase(false)
     refresh()
   }
 
-  function handleEditarNombreFase(num, nombre) {
-    editarFasePlantilla(id, num, { nombre })
+  async function handleEditarNombreFase(num, nombre) {
+    await editarFasePlantilla(id, num, { nombre })
     setEditandoFase(null)
     refresh()
   }
@@ -250,6 +271,7 @@ export default function EditarPaquete() {
           modo={modalTarea.modo}
           faseNum={modalTarea.faseNum}
           tarea={modalTarea.tarea}
+          todasLasTareas={plantilla.tareas}
           onGuardar={handleGuardarTarea}
           onCerrar={() => setModalTarea(null)}
         />
@@ -311,7 +333,7 @@ function TareaFilaPlantilla({ tarea: t, idx, total, onEditar, onEliminar, onMove
   )
 }
 
-function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
+function ModalTareaPlantilla({ modo, faseNum, tarea, todasLasTareas = [], onGuardar, onCerrar }) {
   const [form, setForm] = useState({
     titulo: tarea?.titulo || '',
     descripcion: tarea?.esCliente ? '' : (tarea?.descripcion || ''),
@@ -328,7 +350,9 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
     opcional: tarea?.opcional || false,
     plazoHoras: tarea?.plazoHoras || '',
     condicion: tarea?.condicion || '',
+    dependencias: tarea?.dependencias || [],
   })
+  const opcionesDependencia = todasLasTareas.filter((t) => t.id !== tarea?.id)
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -411,6 +435,12 @@ function ModalTareaPlantilla({ modo, faseNum, tarea, onGuardar, onCerrar }) {
               </div>
             </>
           )}
+
+          <SelectorDependencias
+            opciones={opcionesDependencia}
+            seleccionadas={form.dependencias}
+            onChange={(dependencias) => setForm({ ...form, dependencias })}
+          />
 
           {/* Condición */}
           <div>

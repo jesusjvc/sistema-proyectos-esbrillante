@@ -12,6 +12,28 @@ export const ROLES_EQUIPO = ['copy', 'disenador', 'programador', 'adminProyecto'
 // persona específica del equipo, asignada directamente a la tarea.
 const ROLES_RESPONSABLE = ['equipo', 'copy', 'disenador', 'programador']
 
+// Valida que los userIds pasados en `equipo` (para cualquiera de ROLES_EQUIPO)
+// existan como User reales, y devuelve el objeto normalizado con las 4 claves
+// completas (null para las que no se pasaron). Lanza con err.status=400 si
+// algún id no es válido. Usado por PUT /api/proyectos/:slug/equipo y por el
+// tool MCP crear_proyecto.
+export async function validarYNormalizarEquipo(prisma, equipo) {
+  const idsAValidar = ROLES_EQUIPO
+    .map((rol) => equipo?.[rol])
+    .filter((v) => v && v !== EQUIPO_NO_APLICA)
+
+  if (idsAValidar.length) {
+    const encontrados = await prisma.user.findMany({ where: { id: { in: idsAValidar } }, select: { id: true } })
+    if (encontrados.length !== new Set(idsAValidar).size) {
+      const err = new Error('Uno o más miembros de equipo no son válidos')
+      err.status = 400
+      throw err
+    }
+  }
+
+  return Object.fromEntries(ROLES_EQUIPO.map((rol) => [rol, equipo?.[rol] ?? null]))
+}
+
 export function usuarioParticipaEnProyecto(equipo, userId) {
   if (!equipo || !userId) return false
   return [equipo.copy, equipo.disenador, equipo.programador, equipo.adminProyecto].includes(userId)

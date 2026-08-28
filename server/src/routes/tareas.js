@@ -24,6 +24,16 @@ async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
+// Defensa en profundidad: en la UI, "Mis tareas" ya no ofrece iniciar/completar
+// una tarea bloqueada, pero eso es solo convención de frontend — sin esto,
+// nada impide llamar estos endpoints directo sobre una tarea con dependencias
+// pendientes.
+function dependenciasResueltas(tarea, todasLasTareas) {
+  if (!tarea.dependencias.length) return true
+  const completadasIds = new Set(todasLasTareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+  return tarea.dependencias.every((d) => completadasIds.has(d))
+}
+
 // POST /api/proyectos/:slug/tareas/:tareaId/iniciar
 router.post('/:tareaId/iniciar', requireAuth, async (req, res) => {
   const { slug, tareaId } = req.params
@@ -37,6 +47,9 @@ router.post('/:tareaId/iniciar', requireAuth, async (req, res) => {
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
     if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
       return res.status(403).json({ error: 'No tienes permiso para operar esta tarea' })
+    }
+    if (!dependenciasResueltas(tarea, p.tareas)) {
+      return res.status(400).json({ error: 'Esta tarea depende de otras que aún no se completan.' })
     }
 
     await prisma.tarea.update({
@@ -66,6 +79,9 @@ router.post('/:tareaId/completar', requireAuth, async (req, res) => {
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
     if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
       return res.status(403).json({ error: 'No tienes permiso para operar esta tarea' })
+    }
+    if (!dependenciasResueltas(tarea, p.tareas)) {
+      return res.status(400).json({ error: 'Esta tarea depende de otras que aún no se completan.' })
     }
 
     await prisma.tarea.update({

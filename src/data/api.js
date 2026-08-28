@@ -62,6 +62,17 @@ export const crearPrototipo = (data) => req('POST', '/api/prototipos', data)
 export const actualizarPrototipo = (slug, data) => req('PATCH', `/api/prototipos/${slug}`, data)
 export const eliminarPrototipo = (slug) => req('DELETE', `/api/prototipos/${slug}`)
 
+// ─── Plantillas ────────────────────────────────────────────────────────────
+export const getPlantillasApi = () => req('GET', '/api/plantillas')
+export const getPlantillaApi = (id) => req('GET', `/api/plantillas/${id}`)
+export const crearPlantillaApi = (data) => req('POST', '/api/plantillas', data)
+export const actualizarPlantillaApi = (id, data) => req('PUT', `/api/plantillas/${id}`, data)
+export const eliminarPlantillaApi = (id) => req('DELETE', `/api/plantillas/${id}`)
+export const agregarTareaPlantillaApi = (plantillaId, data) => req('POST', `/api/plantillas/${plantillaId}/tareas`, data)
+export const editarTareaPlantillaApi = (plantillaId, tareaId, data) => req('PUT', `/api/plantillas/${plantillaId}/tareas/${tareaId}`, data)
+export const eliminarTareaPlantillaApi = (plantillaId, tareaId) => req('DELETE', `/api/plantillas/${plantillaId}/tareas/${tareaId}`)
+export const materializarPlantilla = (plantillaId, condicionesTecnicas, extras) => req('POST', `/api/plantillas/${plantillaId}/materializar`, { condicionesTecnicas, extras })
+
 // ─── Miembros ──────────────────────────────────────────────────────────────
 export const getMiembros = () => req('GET', '/api/miembros')
 export const crearMiembro = (data) => req('POST', '/api/miembros', data)

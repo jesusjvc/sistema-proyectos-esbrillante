@@ -1,54 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
-import { getPlantillas, crearPlantilla, eliminarPlantilla, FASES_WEB } from '../../data/plantillas'
+import { getPlantillas, crearPlantilla, eliminarPlantilla } from '../../data/plantillas'
 import { Plus, Pencil, Trash2, ChevronRight, ListChecks, X, Check } from 'lucide-react'
 
 const AREAS_SUGERIDAS = ['Web', 'Marketing', 'Branding', 'SEO', 'Redes Sociales', 'General']
 
 export default function Paquetes() {
-  const [plantillas, setPlantillas] = useState(getPlantillas)
+  const [plantillas, setPlantillas] = useState([])
+  const [cargando, setCargando] = useState(true)
   const [mostrarNuevo, setMostrarNuevo] = useState(false)
   const [borrandoId, setBorrandoId] = useState(null)
   const [nuevoForm, setNuevoForm] = useState({ nombre: '', area: 'Web', descripcion: '', copiarDe: '' })
 
-  function refresh() { setPlantillas(getPlantillas()) }
+  async function refresh() {
+    setPlantillas(await getPlantillas())
+    setCargando(false)
+  }
 
-  function handleCrear(e) {
+  useEffect(() => { refresh() }, [])
+
+  async function handleCrear(e) {
     e.preventDefault()
     if (!nuevoForm.nombre.trim()) return
 
-    let fases = FASES_WEB
-    let tareasBase = []
-
-    // Clonar desde otra plantilla si se eligió
-    if (nuevoForm.copiarDe) {
-      const origen = plantillas.find((p) => p.id === nuevoForm.copiarDe)
-      if (origen) {
-        fases = origen.fases
-        tareasBase = origen.tareas.map((t) => ({
-          ...t,
-          id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
-        }))
-      }
-    }
-
-    crearPlantilla({ nombre: nuevoForm.nombre.trim(), area: nuevoForm.area, descripcion: nuevoForm.descripcion, fases })
-    // Si clonamos, agregar tareas manualmente
-    if (tareasBase.length) {
-      const nuevas = getPlantillas()
-      const nueva = nuevas[nuevas.length - 1]
-      nueva.tareas = tareasBase
-      localStorage.setItem('esbrillante_plantillas', JSON.stringify(nuevas))
-    }
+    await crearPlantilla({
+      nombre: nuevoForm.nombre.trim(),
+      area: nuevoForm.area,
+      descripcion: nuevoForm.descripcion,
+      copiarDeId: nuevoForm.copiarDe || undefined,
+    })
 
     setNuevoForm({ nombre: '', area: 'Web', descripcion: '', copiarDe: '' })
     setMostrarNuevo(false)
     refresh()
   }
 
-  function handleEliminar(id) {
-    eliminarPlantilla(id)
+  async function handleEliminar(id) {
+    await eliminarPlantilla(id)
     setBorrandoId(null)
     refresh()
   }
@@ -67,7 +56,8 @@ export default function Paquetes() {
         </p>
 
         {/* Lista por área */}
-        {Object.entries(porArea).map(([area, paquetes]) => (
+        {cargando && <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>}
+        {!cargando && Object.entries(porArea).map(([area, paquetes]) => (
           <div key={area} className="mb-8">
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{area}</h2>
             <div className="space-y-2">
