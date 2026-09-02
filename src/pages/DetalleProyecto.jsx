@@ -25,6 +25,7 @@ import EditorEnriquecido from '../components/EditorEnriquecido'
 import TextoEnriquecido from '../components/TextoEnriquecido'
 import HiloComentarios from '../components/HiloComentarios'
 import SelectorDependencias from '../components/SelectorDependencias'
+import ModalDetalleTarea from '../components/ModalDetalleTarea'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -753,7 +754,7 @@ export default function DetalleProyecto() {
 }
 
 function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onComentar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
-  const [expandida, setExpandida] = useState(false)
+  const [modalAbierto, setModalAbierto] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
@@ -788,6 +789,15 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   const sinPersonaClara = mostrarAvatarPropio && !personaAsignada
   const numComentarios = t.comentarios?.length || 0
 
+  const badges = (
+    <>
+      {t.esRutaCritica && <Flag size={13} className="text-rose-500 shrink-0" title="Ruta crítica" />}
+      {t.esCliente && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>}
+      {t.soloKarlaOAdmin && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>}
+      {t.custom && <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Personalizada</span>}
+    </>
+  )
+
   return (
     <div className={`px-5 py-3.5 border-b border-slate-50 last:border-0 ${bgMap[estado]}`}>
       <div className="flex items-start gap-3">
@@ -808,16 +818,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             <span className={`text-sm font-medium ${estado === 'completada' ? 'line-through text-slate-400' : estado === 'omitida' ? 'text-slate-400' : 'text-slate-800'}`}>
               {t.titulo}
             </span>
-            {t.esRutaCritica && <Flag size={13} className="text-rose-500 shrink-0" title="Ruta crítica" />}
-            {t.esCliente && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Cliente</span>
-            )}
-            {t.soloKarlaOAdmin && (
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>
-            )}
-            {t.custom && (
-              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Personalizada</span>
-            )}
+            {badges}
           </div>
 
           {mostrarAvatarPropio && (
@@ -845,11 +846,11 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
           <div className="flex items-center gap-3 mt-1.5">
             <button
-              onClick={() => setExpandida(!expandida)}
+              onClick={() => setModalAbierto(true)}
               className="text-sm text-slate-400 hover:text-slate-600 flex items-center gap-1"
             >
               <Info size={13} />
-              {expandida ? 'Ocultar' : 'Ver detalles'}
+              Ver detalles
             </button>
             {numComentarios > 0 && (
               <span className="flex items-center gap-1 text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -857,52 +858,6 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
               </span>
             )}
           </div>
-
-          {expandida && (
-            <div className="mt-2 rounded-xl border border-brand-100 bg-brand-50 overflow-hidden">
-              {hayDetalle && (
-                <>
-                  {t.queHacer && (
-                    <DetalleSeccion titulo="¿Qué hay que hacer?">
-                      <TextoFormateado texto={t.queHacer} />
-                    </DetalleSeccion>
-                  )}
-                  {t.necesitasAntes && (
-                    <DetalleSeccion titulo="Antes de empezar">
-                      <TextoFormateado texto={t.necesitasAntes} />
-                    </DetalleSeccion>
-                  )}
-                  {t.plantillaMensaje && (
-                    <DetalleSeccion titulo="Plantilla de mensaje">
-                      <div className="relative">
-                        <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans bg-white border border-slate-200 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
-                        <button
-                          onClick={copiarPlantilla}
-                          className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 transition-colors"
-                          title="Copiar plantilla"
-                        >
-                          {copiadoPlantilla ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                        </button>
-                      </div>
-                    </DetalleSeccion>
-                  )}
-                  {t.queEntregas && (
-                    <DetalleSeccion titulo="Al completar esta tarea entrego">
-                      <TextoFormateado texto={t.queEntregas} />
-                    </DetalleSeccion>
-                  )}
-                  {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
-                    <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600" />
-                  )}
-                </>
-              )}
-              {onComentar && (
-                <div className="px-4 py-3">
-                  <HiloComentarios comentarios={t.comentarios} miembrosPorId={miembrosPorId} onEnviar={onComentar} />
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {esAdmin && (
@@ -958,6 +913,54 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
           </div>
         )}
       </div>
+
+      {modalAbierto && (
+        <ModalDetalleTarea titulo={t.titulo} badges={badges} onCerrar={() => setModalAbierto(false)}>
+          <div className="rounded-xl border border-brand-100 bg-brand-50 overflow-hidden">
+            {hayDetalle && (
+              <>
+                {t.queHacer && (
+                  <DetalleSeccion titulo="¿Qué hay que hacer?">
+                    <TextoFormateado texto={t.queHacer} />
+                  </DetalleSeccion>
+                )}
+                {t.necesitasAntes && (
+                  <DetalleSeccion titulo="Antes de empezar">
+                    <TextoFormateado texto={t.necesitasAntes} />
+                  </DetalleSeccion>
+                )}
+                {t.plantillaMensaje && (
+                  <DetalleSeccion titulo="Plantilla de mensaje">
+                    <div className="relative">
+                      <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans bg-white border border-slate-200 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
+                      <button
+                        onClick={copiarPlantilla}
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 hover:bg-brand-100 text-slate-500 hover:text-brand-700 transition-colors"
+                        title="Copiar plantilla"
+                      >
+                        {copiadoPlantilla ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                      </button>
+                    </div>
+                  </DetalleSeccion>
+                )}
+                {t.queEntregas && (
+                  <DetalleSeccion titulo="Al completar esta tarea entrego">
+                    <TextoFormateado texto={t.queEntregas} />
+                  </DetalleSeccion>
+                )}
+                {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
+                  <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600" />
+                )}
+              </>
+            )}
+            {onComentar && (
+              <div className="px-4 py-3">
+                <HiloComentarios comentarios={t.comentarios} miembrosPorId={miembrosPorId} onEnviar={onComentar} />
+              </div>
+            )}
+          </div>
+        </ModalDetalleTarea>
+      )}
     </div>
   )
 }
