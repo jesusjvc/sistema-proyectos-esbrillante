@@ -11,7 +11,7 @@ import TextoEnriquecido from './TextoEnriquecido'
 import HiloComentarios from './HiloComentarios'
 import ModalDetalleTarea from './ModalDetalleTarea'
 import {
-  CheckCircle2, PlayCircle, Eye, Circle, Info, Pencil, Trash2, GripVertical,
+  CheckCircle2, PlayCircle, Eye, Circle, Pencil, Trash2,
   Flag, UserX, MessageCircle,
 } from 'lucide-react'
 
@@ -104,7 +104,7 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="flex gap-4 overflow-x-auto pb-2">
         {KANBAN_COLUMNAS.map((c) => (
           <Columna
             key={c.columna}
@@ -137,7 +137,7 @@ function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, 
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col min-h-[120px]">
+    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col min-h-[120px] w-72 shrink-0">
       <div className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-semibold ${colorMap[columna.columna]}`}>
         {iconMap[columna.columna]}
         {columna.label}
@@ -199,15 +199,11 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
       <div
         ref={setNodeRef}
         style={style}
-        className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 ${overlay ? 'shadow-xl rotate-1' : 'shadow-sm'}`}
+        {...(!readOnly ? { ...attributes, ...listeners } : {})}
+        onClick={() => !isDragging && setModalAbierto(true)}
+        className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 select-none ${readOnly ? '' : 'cursor-pointer active:cursor-grabbing'} ${overlay ? 'shadow-xl rotate-1' : 'shadow-sm hover:border-brand-300 dark:hover:border-brand-500/50 transition-colors'}`}
       >
         <div className="flex items-start gap-2">
-          {!readOnly && (
-            <button {...attributes} {...listeners} className="mt-0.5 text-slate-300 dark:text-slate-600 hover:text-slate-500 cursor-grab active:cursor-grabbing shrink-0" title="Arrastrar">
-              <GripVertical size={14} />
-            </button>
-          )}
-
           {sinPersonaClara ? (
             <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
               <UserX size={13} className="text-amber-500" />
@@ -226,21 +222,19 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
               {lineaSecundaria}
             </div>
 
-            <div className="flex items-center gap-3 mt-1.5">
-              <button onClick={() => setModalAbierto(true)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1">
-                <Info size={13} />
-                Ver detalle
-              </button>
-              {numComentarios > 0 && (
-                <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
-                  <MessageCircle size={12} /> {numComentarios}
-                </span>
-              )}
-            </div>
+            {numComentarios > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full mt-1.5">
+                <MessageCircle size={12} /> {numComentarios}
+              </span>
+            )}
           </div>
 
           {!readOnly && (onEditar || onEliminar) && (
-            <div className="flex items-center gap-0.5 shrink-0">
+            <div
+              className="flex items-center gap-0.5 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               {onEditar && (
                 <button onClick={() => onEditar(t)} className="p-1 text-slate-300 hover:text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded transition-colors" title="Editar">
                   <Pencil size={12} />
