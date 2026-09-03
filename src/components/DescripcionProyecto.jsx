@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useRef } from 'react'
 import { Pencil, Check, X } from 'lucide-react'
 import EditorEnriquecido from './EditorEnriquecido'
 import TextoEnriquecido from './TextoEnriquecido'
@@ -12,6 +12,19 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
   const [editando, setEditando] = useState(false)
   const [valor, setValor] = useState(descripcion || '')
   const [guardando, setGuardando] = useState(false)
+  const [expandido, setExpandido] = useState(false)
+  const [truncado, setTruncado] = useState(false)
+  const contenidoRef = useRef(null)
+
+  // `contenidoRef` solo existe montado cuando !editando && hay descripción —
+  // `editando` debe estar en las dependencias para remedir justo al volver
+  // de editar (si no, con el ref recién montado en ese mismo render, el
+  // efecto no se dispara de nuevo y `truncado` se queda con el valor de la
+  // medición anterior).
+  useLayoutEffect(() => {
+    if (expandido || !contenidoRef.current) return
+    setTruncado(contenidoRef.current.scrollHeight > contenidoRef.current.clientHeight + 2)
+  }, [descripcion, expandido, editando])
 
   async function handleGuardar() {
     setGuardando(true)
@@ -68,7 +81,19 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
 
   return (
     <div className="mt-1.5 flex items-start gap-1.5 group">
-      <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 leading-relaxed flex-1" />
+      <div className="flex-1 min-w-0">
+        <div ref={contenidoRef} className={expandido ? '' : 'line-clamp-3'}>
+          <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 leading-relaxed" />
+        </div>
+        {(truncado || expandido) && (
+          <button
+            onClick={() => setExpandido((v) => !v)}
+            className="text-xs font-medium text-brand-700 hover:text-brand-800 mt-1"
+          >
+            {expandido ? 'Ver menos' : 'Ver más'}
+          </button>
+        )}
+      </div>
       <button
         onClick={() => setEditando(true)}
         className="text-slate-300 hover:text-brand-700 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
