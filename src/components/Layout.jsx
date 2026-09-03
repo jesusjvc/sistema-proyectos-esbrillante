@@ -3,7 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, ChevronRight, Users, Package, Sun, Moon, LayoutTemplate, Terminal } from 'lucide-react'
-import logo from '../assets/logo-esbrillante.svg'
+import logo from '../assets/logo-foco-dark.svg'
+import icono from '../assets/icon-foco.svg'
 import AvatarUploader from './AvatarUploader'
 
 const SIDEBAR_COLAPSADO_KEY = 'sidebarColapsado'
@@ -36,13 +37,11 @@ export default function Layout({ children, titulo, volver }) {
       <aside className={`${colapsado ? 'w-16' : 'w-60'} bg-slate-950 text-white flex flex-col shrink-0 transition-[width] duration-150`}>
         <div className={`${colapsado ? 'px-0 py-5 flex justify-center' : 'px-5 py-5'} border-b border-slate-800 shrink-0`}>
           {colapsado ? (
-            <div className="h-7 w-7 rounded-md bg-brand-500 text-slate-900 text-xs font-bold flex items-center justify-center" title="EsBrillante">
-              eB
-            </div>
+            <img src={icono} alt="Foco" className="h-7 w-7" title="Foco" />
           ) : (
             <>
-              <img src={logo} alt="EsBrillante" className="h-7 w-auto" />
-              <div className="text-xs text-slate-400 mt-1.5">Sistema de Proyectos</div>
+              <img src={logo} alt="Foco" className="h-7 w-auto" />
+              <div className="text-xs text-slate-400 mt-1.5">by EsBrillante</div>
             </>
           )}
         </div>

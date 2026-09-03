@@ -7,7 +7,7 @@ import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle, Eye } from 'lucide-react'
-import logo from '../../assets/logo-esbrillante.svg'
+import logo from '../../assets/logo-foco-dark.svg'
 
 export default function VistaCliente() {
   const { id } = useParams()
@@ -74,7 +74,7 @@ export default function VistaCliente() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-800 flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-6">
-            <img src={logo} alt="EsBrillante" className="h-8 w-auto mx-auto mb-3" />
+            <img src={logo} alt="Foco" className="h-8 w-auto mx-auto mb-3" />
             <p className="text-brand-300 text-sm mt-1">Seguimiento de tu proyecto</p>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-2xl">
@@ -154,10 +154,10 @@ export default function VistaCliente() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <header className="bg-slate-950 border-b border-brand-500/25 px-4 py-4 shadow-lg shadow-black/5">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <img src={logo} alt="EsBrillante" className="h-8 w-auto shrink-0" />
+          <img src={logo} alt="Foco" className="h-8 w-auto shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-white text-lg truncate">{proyecto.cliente.nombreComercial}</div>
-            <div className="text-sm text-slate-400">Seguimiento de proyecto · EsBrillante</div>
+            <div className="text-sm text-slate-400">Seguimiento de proyecto · by EsBrillante</div>
           </div>
           {enPausa && <span className="text-sm bg-amber-400/15 text-amber-300 px-2 py-1 rounded-full shrink-0">En pausa</span>}
           {completado && <span className="text-sm bg-emerald-400/15 text-emerald-300 px-2 py-1 rounded-full shrink-0">Completado</span>}

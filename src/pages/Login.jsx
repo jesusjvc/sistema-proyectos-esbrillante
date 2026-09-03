@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login } from '../data/api'
 import { useAuth } from '../context/AuthContext'
-import logo from '../assets/logo-esbrillante.svg'
+import logo from '../assets/logo-foco-dark.svg'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -35,8 +35,8 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src={logo} alt="EsBrillante" className="h-9 w-auto mx-auto mb-4" />
-          <p className="text-slate-400 text-sm mt-1">Sistema de Seguimiento de Proyectos</p>
+          <img src={logo} alt="Foco" className="h-9 w-auto mx-auto mb-4" />
+          <p className="text-slate-400 text-sm mt-1">by EsBrillante</p>
         </div>
 
         <div className="bg-slate-800 rounded-2xl p-6">
