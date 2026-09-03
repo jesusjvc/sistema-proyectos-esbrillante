@@ -172,6 +172,24 @@ export default function VistaCliente() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        {tareasPendientesCliente.length > 0 && (
+          <section>
+            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3 flex items-center gap-2">
+              <AlertCircle size={20} className="text-amber-500" />
+              Necesitamos tu respuesta
+              <span className="text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
+            </h2>
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+              Te pedimos apoyarnos respondiendo esto a la brevedad — mientras más tardemos en tener esta información, más se puede alargar el tiempo del proyecto. No hace falta que nos mandes todo junto: puedes ir compartiendo la información poco a poco y nosotros vamos avanzando de este lado con lo que ya tengamos.
+            </div>
+            <div className="space-y-3">
+              {tareasPendientesCliente.map((t) => (
+                <TareaClienteCard key={t.id} tarea={t} onCompletar={(respuesta) => handleCompletar(t.id, respuesta)} />
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -267,24 +285,6 @@ export default function VistaCliente() {
         )}
 
         <RecursosProyecto links={proyecto.linksCliente || {}} />
-
-        {tareasPendientesCliente.length > 0 && (
-          <section>
-            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3 flex items-center gap-2">
-              <AlertCircle size={20} className="text-amber-500" />
-              Necesitamos tu respuesta
-              <span className="text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
-            </h2>
-            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-4 py-3 mb-3 text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
-              Te pedimos apoyarnos respondiendo esto a la brevedad — mientras más tardemos en tener esta información, más se puede alargar el tiempo del proyecto. No hace falta que nos mandes todo junto: puedes ir compartiendo la información poco a poco y nosotros vamos avanzando de este lado con lo que ya tengamos.
-            </div>
-            <div className="space-y-3">
-              {tareasPendientesCliente.map((t) => (
-                <TareaClienteCard key={t.id} tarea={t} onCompletar={(respuesta) => handleCompletar(t.id, respuesta)} />
-              ))}
-            </div>
-          </section>
-        )}
 
         {tareasPendientesCliente.length === 0 && !completado && (
           <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-xl p-4 text-base text-emerald-700 dark:text-emerald-300 flex items-center gap-2">

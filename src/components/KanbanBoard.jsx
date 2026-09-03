@@ -10,6 +10,7 @@ import Avatar from './Avatar'
 import TextoEnriquecido from './TextoEnriquecido'
 import HiloComentarios from './HiloComentarios'
 import ModalDetalleTarea from './ModalDetalleTarea'
+import SelectorResponsableRapido from './SelectorResponsableRapido'
 import {
   CheckCircle2, PlayCircle, Eye, Circle, Pencil, Trash2,
   Flag, UserX, MessageCircle,
@@ -28,7 +29,7 @@ function agrupar(tareas) {
 // portal del cliente, para proyectos de tipo "continuo". El estado local
 // `columnas` se mantiene optimista durante el drag (patrón multi-container
 // de dnd-kit) y se resincroniza desde `tareas` cuando no hay drag activo.
-export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onComentar, readOnly = false, avatares = {}, equipo, miembrosPorId = {} }) {
+export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onComentar, onAsignar, readOnly = false, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [columnas, setColumnas] = useState(() => agrupar(tareas))
   const [activeId, setActiveId] = useState(null)
 
@@ -114,9 +115,11 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
             onEditar={onEditar}
             onEliminar={onEliminar}
             onComentar={onComentar}
+            onAsignar={onAsignar}
             avatares={avatares}
             equipo={equipo}
             miembrosPorId={miembrosPorId}
+            miembros={miembros}
           />
         ))}
       </div>
@@ -127,7 +130,7 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
   )
 }
 
-function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, avatares, equipo, miembrosPorId }) {
+function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, onAsignar, avatares, equipo, miembrosPorId, miembros }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
     todo: 'text-slate-500 dark:text-slate-400',
@@ -146,7 +149,7 @@ function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, 
       <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
           {tareas.map((t) => (
-            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} onComentar={onComentar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} />
+            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} onComentar={onComentar} onAsignar={onAsignar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} miembros={miembros} />
           ))}
         </DroppableArea>
       </SortableContext>
@@ -164,7 +167,7 @@ function DroppableArea({ id, children }) {
   return <div ref={setNodeRef} className="flex-1 px-2.5 pb-2.5 space-y-2 min-h-[60px]">{children}</div>
 }
 
-function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overlay, avatares = {}, equipo, miembrosPorId = {} }) {
+function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsignar, overlay, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [modalAbierto, setModalAbierto] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
@@ -205,9 +208,15 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
       >
         <div className="flex items-start gap-2">
           {sinPersonaClara ? (
-            <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
-              <UserX size={13} className="text-amber-500" />
-            </div>
+            onAsignar ? (
+              <div className="mt-0.5">
+                <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={28} iconSize={13} />
+              </div>
+            ) : (
+              <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
+                <UserX size={13} className="text-amber-500" />
+              </div>
+            )
           ) : (
             <div className="mt-0.5"><Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={28} /></div>
           )}
@@ -254,9 +263,13 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
         <ModalDetalleTarea titulo={t.titulo} badges={badges} onCerrar={() => setModalAbierto(false)}>
           <div className="flex items-center gap-2.5">
             {sinPersonaClara ? (
-              <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0">
-                <UserX size={14} className="text-amber-500" />
-              </div>
+              onAsignar ? (
+                <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={30} iconSize={14} />
+              ) : (
+                <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0">
+                  <UserX size={14} className="text-amber-500" />
+                </div>
+              )
             ) : (
               <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
             )}

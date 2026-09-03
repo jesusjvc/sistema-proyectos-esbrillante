@@ -26,6 +26,7 @@ import TextoEnriquecido from '../components/TextoEnriquecido'
 import HiloComentarios from '../components/HiloComentarios'
 import SelectorDependencias from '../components/SelectorDependencias'
 import ModalDetalleTarea from '../components/ModalDetalleTarea'
+import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -146,6 +147,11 @@ export default function DetalleProyecto() {
     await refresh()
   }
 
+  async function asignarResponsable(tareaId, personaId) {
+    await editarTarea(proyecto.slug, tareaId, { responsable: personaId })
+    await refresh()
+  }
+
   async function handleAgregarTarea(datos) {
     await agregarTarea(proyecto.slug, datos)
     setModalNueva(null)
@@ -235,6 +241,8 @@ export default function DetalleProyecto() {
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
   const miembrosProyecto = miembrosDelEquipo(proyecto.equipo, miembros)
   const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
+  const tareasCliente = proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden)
+  const preguntasPendientes = tareasCliente.filter((t) => t.estado !== 'completada' && t.estado !== 'omitida').length
 
   return (
     <Layout titulo={proyecto.cliente.nombreComercial} volver={base}>
@@ -422,7 +430,7 @@ export default function DetalleProyecto() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {[['tareas', 'Tareas'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
+        {[['tareas', 'Tareas'], ['preguntas', 'Preguntas'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -431,12 +439,79 @@ export default function DetalleProyecto() {
             }`}
           >
             {l}
+            {t === 'preguntas' && preguntasPendientes > 0 && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{preguntasPendientes}</span>
+            )}
             {t === 'solicitudes' && solicitudesPendientes > 0 && (
               <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{solicitudesPendientes}</span>
             )}
           </button>
         ))}
       </div>
+
+      {/* ─── Tab: Preguntas (tareas asignadas al cliente, con sus respuestas) ─── */}
+      {tab === 'preguntas' && (
+        <div className="space-y-3">
+          {tareasCliente.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-sm text-slate-400">
+              Este proyecto no tiene preguntas o tareas asignadas al cliente.
+            </div>
+          ) : esContinuo ? (
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              {tareasCliente.map((t) => (
+                <TareaRow
+                  key={t.id}
+                  tarea={t}
+                  estado={estadoCalculado(t)}
+                  avatares={avatares}
+                  equipo={proyecto.equipo}
+                  miembrosPorId={miembrosPorId}
+                  miembros={miembros}
+                  onCompletar={() => marcarCompleta(t.id)}
+                  onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
+                  onReabrir={() => reabrir(t.id)}
+                  onOmitir={() => omitir(t.id)}
+                  onEditar={() => setModalEditar(t)}
+                  onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
+                  onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
+                  esAdmin={true}
+                />
+              ))}
+            </div>
+          ) : (
+            fases.map((fase) => {
+              const tareasF = tareasCliente.filter((t) => t.fase === fase.numero)
+              if (tareasF.length === 0) return null
+              return (
+                <div key={fase.numero} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+                    <span className="font-medium text-slate-700 text-sm">Fase {fase.numero} — {fase.nombre}</span>
+                  </div>
+                  {tareasF.map((t) => (
+                    <TareaRow
+                      key={t.id}
+                      tarea={t}
+                      estado={estadoCalculado(t)}
+                      avatares={avatares}
+                      equipo={proyecto.equipo}
+                      miembrosPorId={miembrosPorId}
+                      miembros={miembros}
+                      onCompletar={() => marcarCompleta(t.id)}
+                      onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
+                      onReabrir={() => reabrir(t.id)}
+                      onOmitir={() => omitir(t.id)}
+                      onEditar={() => setModalEditar(t)}
+                      onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
+                      onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
+                      esAdmin={true}
+                    />
+                  ))}
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
 
       {/* ─── Tab: Solicitudes ─── */}
       {tab === 'solicitudes' && (
@@ -466,10 +541,12 @@ export default function DetalleProyecto() {
             avatares={avatares}
             equipo={proyecto.equipo}
             miembrosPorId={miembrosPorId}
+            miembros={miembros}
             onMover={handleMoverTarea}
             onEditar={(t) => setModalEditar(t)}
             onEliminar={(t) => handleEliminarTarea(t.id)}
             onComentar={comentar}
+            onAsignar={asignarResponsable}
           />
         </div>
       )}
@@ -538,12 +615,14 @@ export default function DetalleProyecto() {
                           avatares={avatares}
                           equipo={proyecto.equipo}
                           miembrosPorId={miembrosPorId}
+                          miembros={miembros}
                           onCompletar={() => marcarCompleta(t.id)}
                           onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                           onReabrir={() => reabrir(t.id)}
                           onOmitir={() => omitir(t.id)}
                           onEditar={() => setModalEditar(t)}
                           onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
+                          onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                           esAdmin={true}
                         />
                       )
@@ -576,7 +655,7 @@ export default function DetalleProyecto() {
       {modalEditar && (
         <ModalEditarTarea
           tarea={modalEditar}
-          miembrosProyecto={miembrosProyecto}
+          miembrosProyecto={miembros}
           todasLasTareas={proyecto.tareas}
           onGuardar={(cambios) => handleGuardarEdicion(modalEditar.id, cambios)}
           onCerrar={() => setModalEditar(null)}
@@ -587,7 +666,7 @@ export default function DetalleProyecto() {
       {modalNueva !== null && (
         <ModalNuevaTarea
           contexto={modalNueva}
-          miembrosProyecto={miembrosProyecto}
+          miembrosProyecto={miembros}
           todasLasTareas={proyecto.tareas}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
@@ -753,7 +832,7 @@ export default function DetalleProyecto() {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, onCompletar, onComentar, onReabrir, onOmitir, onEditar, onEliminar, esAdmin }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], onCompletar, onComentar, onReabrir, onOmitir, onEditar, onEliminar, onAsignarResponsable, esAdmin }) {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
@@ -805,9 +884,13 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
         {mostrarAvatarPropio && (
           sinPersonaClara ? (
-            <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="Sin responsable claro — le aparece a todo el equipo del proyecto en Mis tareas">
-              <UserX size={14} className="text-amber-500" />
-            </div>
+            onAsignarResponsable ? (
+              <SelectorResponsableRapido miembros={miembros} onAsignar={onAsignarResponsable} size={30} iconSize={14} />
+            ) : (
+              <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="Sin responsable claro — le aparece a todo el equipo del proyecto en Mis tareas">
+                <UserX size={14} className="text-amber-500" />
+              </div>
+            )
           ) : (
             <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
           )
@@ -971,7 +1054,7 @@ const RESPONSABLES = [
   { valor: 'copy', label: 'Copy' },
   { valor: 'disenador', label: 'Diseñador' },
   { valor: 'programador', label: 'Programador' },
-  { valor: 'karla', label: 'Karla' },
+  { valor: 'karla', label: 'Karla (QA)' },
   { valor: 'cliente', label: 'Cliente' },
 ]
 

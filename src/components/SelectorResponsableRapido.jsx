@@ -1,0 +1,56 @@
+import { useState, useRef, useEffect } from 'react'
+import { UserX } from 'lucide-react'
+
+// Popover que se abre al hacer clic en el ícono de "sin responsable" (el
+// círculo punteado ámbar) para asignar una persona directamente sin tener
+// que abrir el modal completo de "Editar tarea".
+export default function SelectorResponsableRapido({ miembros = [], onAsignar, size = 30, iconSize = 14 }) {
+  const [abierto, setAbierto] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    function alHacerClicFuera(e) {
+      if (ref.current && !ref.current.contains(e.target)) setAbierto(false)
+    }
+    document.addEventListener('mousedown', alHacerClicFuera)
+    return () => document.removeEventListener('mousedown', alHacerClicFuera)
+  }, [abierto])
+
+  return (
+    <div
+      ref={ref}
+      className="relative shrink-0"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        style={{ width: size, height: size }}
+        className="rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
+        title="Sin responsable — clic para asignar a alguien"
+      >
+        <UserX size={iconSize} className="text-amber-500" />
+      </button>
+
+      {abierto && (
+        <div className="absolute z-20 top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1 max-h-64 overflow-y-auto">
+          {miembros.length === 0 && (
+            <div className="px-3 py-2 text-sm text-slate-400">No hay usuarios</div>
+          )}
+          {miembros.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => { onAsignar(m.id); setAbierto(false) }}
+              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+            >
+              {m.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

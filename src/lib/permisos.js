@@ -64,7 +64,7 @@ export function infoResponsable(tarea, equipo, miembrosPorId = {}) {
   // nombre (p. ej. en el portal del cliente, que no recibe miembrosPorId) no
   // mostramos el id crudo — degradamos a la etiqueta genérica de "Equipo".
   const nombre = miembrosPorId[responsable]
-  return { label: nombre || 'Equipo', nombre: null }
+  return { label: nombre || 'Equipo', nombre: nombre || null }
 }
 
 // Miembros del sistema que están asignados al equipo de este proyecto
