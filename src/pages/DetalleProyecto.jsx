@@ -27,6 +27,7 @@ import HiloComentarios from '../components/HiloComentarios'
 import SelectorDependencias from '../components/SelectorDependencias'
 import ModalDetalleTarea from '../components/ModalDetalleTarea'
 import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
+import IconGoogleDrive from '../components/IconGoogleDrive'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
@@ -40,7 +41,6 @@ export default function DetalleProyecto() {
   const { user } = useAuth()
   const [proyecto, setProyecto] = useState(null)
   const [faseAbierta, setFaseAbierta] = useState(null)
-  const [headerExpandido, setHeaderExpandido] = useState(false)
   const [faseOcultarCompletadas, setFaseOcultarCompletadas] = useState({})
   const [tab, setTab] = useState('tareas')
   const [copiado, setCopiado] = useState(false)
@@ -246,38 +246,11 @@ export default function DetalleProyecto() {
 
   return (
     <Layout titulo={proyecto.cliente.nombreComercial} volver={base}>
-      {/* Header del proyecto */}
-      <div className="bg-white rounded-xl border border-slate-200 mb-5 overflow-hidden">
-        <button
-          onClick={() => setHeaderExpandido((v) => !v)}
-          className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
-        >
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusBadge(proyecto.status)}`}>
-            {statusLabel(proyecto.status)}
-          </span>
+      {/* Header del proyecto — siempre visible: estado, descripción y métricas de avance */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex-1 min-w-0">
-            <span className="font-bold text-slate-800">{proyecto.cliente.nombreComercial}</span>
-            <span className="text-sm text-slate-500 ml-2 truncate">
-              {esContinuo ? 'Servicio continuo' : `Fase ${faseActual} — ${fases.find((f) => f.numero === faseActual)?.nombre}`}
-              {!esContinuo && ` · ${avance}%`} · Entrega {esContinuo ? 'continua' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}
-            </span>
-          </div>
-          {!esContinuo && (
-            <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden shrink-0 hidden sm:block">
-              <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
-            </div>
-          )}
-          <span className="flex items-center gap-1 text-sm text-slate-500 shrink-0">
-            Detalles {headerExpandido ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </span>
-        </button>
-
-        {headerExpandido && (
-        <div className="border-t border-slate-100 p-5">
-        <div className="flex flex-col lg:flex-row items-start gap-6">
-          {/* Columna izquierda: identidad + progreso + métricas */}
-          <div className="flex-1 min-w-0 w-full">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge(proyecto.status)}`}>
                 {statusLabel(proyecto.status)}
               </span>
@@ -292,145 +265,89 @@ export default function DetalleProyecto() {
             </div>
             <h2 className="text-xl font-bold text-slate-800">{proyecto.cliente.nombreComercial}</h2>
             <p className="text-sm text-slate-500 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
-            <DescripcionProyecto
-              descripcion={proyecto.proyecto?.descripcion}
-              onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
-            />
-
-            {esContinuo ? (
-              <div className="mt-4 flex items-center gap-3 flex-wrap">
-                {KANBAN_COLUMNAS.map((c) => (
-                  <div key={c.columna} className="text-sm text-slate-500">
-                    <span className="font-bold text-slate-800">{columnasCount[c.columna]}</span> {c.label}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* Barra de progreso */
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-sm mb-1.5">
-                  <span className="text-slate-600 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
-                  <span className="font-bold text-slate-800">{avance}%</span>
-                </div>
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
-                </div>
-              </div>
-            )}
-
-            {/* Métricas de tiempo */}
-            <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Tiempo activo</div>
-                <div className="font-semibold text-slate-800 mt-0.5">{tiempos.activoHoras}h</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">En pausa</div>
-                <div className="font-semibold text-amber-600 mt-0.5">{tiempos.pausaHoras}h</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
-                <div className="font-semibold text-slate-800 mt-0.5">{esContinuo ? 'Continuo' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
-              </div>
-            </div>
           </div>
 
-          {/* Columna derecha: acciones + acceso del cliente */}
-          <div className="w-full lg:w-72 shrink-0 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              {proyecto.status === 'pendiente_anticipo' && esAdminRol && (
-                <button
-                  onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
-                  className="flex-1 text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Confirmar anticipo
-                </button>
-              )}
-              {proyecto.status === 'activo' && (
-                <button onClick={togglePausa} className="flex-1 flex items-center justify-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg transition-colors">
-                  <Pause size={14} /> Marcar pausa
-                </button>
-              )}
-              {proyecto.status === 'en_pausa' && (
-                <button onClick={togglePausa} className="flex-1 flex items-center justify-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
-                  <Play size={14} /> Reanudar
-                </button>
-              )}
-              {proyecto.status !== 'completado' && (
-                <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
-                  <XCircle size={16} />
-                </button>
-              )}
-              {esAdminRol && (
-                <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Acceso del cliente</div>
-              <div className="flex items-stretch gap-1.5">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}`)
-                    setCopiado('link')
-                    setTimeout(() => setCopiado(false), 2000)
-                  }}
-                  className="flex-1 flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
-                  title="Copiar link"
-                >
-                  <code className="text-xs text-slate-700 truncate">/cliente/{proyecto.slug}</code>
-                  {copiado === 'link' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
-                </button>
-                <a
-                  href={`/cliente/${proyecto.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
-                  title="Ver como cliente (sin contraseña, con tu sesión)"
-                >
-                  <ExternalLink size={13} className="text-slate-400" />
-                </a>
-              </div>
-              <div className="flex items-stretch gap-1.5">
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(proyecto.passwordCliente)
-                    setCopiado('pass')
-                    setTimeout(() => setCopiado(false), 2000)
-                  }}
-                  className="flex-1 flex items-center justify-between gap-2 bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
-                  title="Copiar contraseña"
-                >
-                  <code className="text-xs text-slate-700 truncate">{proyecto.passwordCliente}</code>
-                  {copiado === 'pass' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
-                </button>
-                <button
-                  onClick={handleRegenerarPassword}
-                  className="flex items-center justify-center bg-white border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
-                  title="Generar nueva contraseña"
-                >
-                  <RefreshCw size={13} className="text-slate-400" />
-                </button>
-              </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {proyecto.status === 'pendiente_anticipo' && esAdminRol && (
               <button
-                onClick={copiarMensaje}
-                className="w-full flex items-center justify-center gap-1.5 text-xs font-medium bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-md transition-colors"
+                onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
+                className="text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
-                {copiado === true ? <Check size={13} /> : <MessageCircle size={13} />}
-                {copiado === true ? 'Copiado' : 'Copiar mensaje WhatsApp'}
+                Confirmar anticipo
               </button>
-            </div>
+            )}
+            {proyecto.status === 'activo' && (
+              <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg transition-colors">
+                <Pause size={14} /> Pausa
+              </button>
+            )}
+            {proyecto.status === 'en_pausa' && (
+              <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg transition-colors">
+                <Play size={14} /> Reanudar
+              </button>
+            )}
+            {proyecto.status !== 'completado' && (
+              <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
+                <XCircle size={16} />
+              </button>
+            )}
+            {esAdminRol && (
+              <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
         </div>
-        </div>
+
+        <DescripcionProyecto
+          descripcion={proyecto.proyecto?.descripcion}
+          onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
+        />
+
+        {esContinuo ? (
+          <div className="mt-4 flex items-center gap-3 flex-wrap">
+            {KANBAN_COLUMNAS.map((c) => (
+              <div key={c.columna} className="text-sm text-slate-500">
+                <span className="font-bold text-slate-800">{columnasCount[c.columna]}</span> {c.label}
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Barra de progreso */
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-1.5">
+              <span className="text-slate-600 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
+              <span className="font-bold text-slate-800">{avance}%</span>
+            </div>
+            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
+            </div>
+          </div>
         )}
+
+        {/* Métricas de tiempo */}
+        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">Tiempo activo</div>
+            <div className="font-semibold text-slate-800 mt-0.5">{tiempos.activoHoras}h</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">En pausa</div>
+            <div className="font-semibold text-amber-600 mt-0.5">{tiempos.pausaHoras}h</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
+            <div className="font-semibold text-slate-800 mt-0.5">{esContinuo ? 'Continuo' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
+          </div>
+        </div>
       </div>
+
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+      <div className="flex-1 min-w-0 w-full">
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {[['tareas', 'Tareas'], ['preguntas', 'Preguntas'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
+        {[['tareas', 'Tareas'], ['preguntas', 'Preguntas al Cliente'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -697,69 +614,6 @@ export default function DetalleProyecto() {
       {/* ─── Tab: Info ─── */}
       {tab === 'info' && (
         <div className="grid grid-cols-2 gap-5">
-          <InfoCard titulo="Links del cliente" icono={<Link2 size={14} />} fullWidth>
-            <LinksClienteEditor
-              links={proyecto.linksCliente || {}}
-              onGuardar={async (cambios) => { await actualizarLinks(proyecto.slug, cambios); await refresh() }}
-            />
-          </InfoCard>
-
-          <InfoCard titulo="Carpeta de Drive" icono={<FolderOpen size={14} />}>
-            {proyecto.driveRespuestasId ? (
-              <>
-                <div className="text-sm text-emerald-700 flex items-center gap-1.5 mb-2">
-                  <Check size={13} /> Carpeta creada
-                </div>
-                <a
-                  href={`https://drive.google.com/drive/folders/${proyecto.driveRespuestasId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-brand-700 hover:text-brand-800 underline decoration-dotted flex items-center gap-1 w-fit"
-                >
-                  Abrir en Drive <ExternalLink size={11} />
-                </a>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-slate-400 mb-2">Este proyecto todavía no tiene carpeta de Drive.</p>
-                <button
-                  onClick={handleCrearDrive}
-                  disabled={driveEstado === 'cargando'}
-                  className="text-xs bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                >
-                  {driveEstado === 'cargando'
-                    ? <><Loader2 size={12} className="animate-spin" /> Generando...</>
-                    : <><FolderOpen size={12} /> Generar carpeta de Drive</>
-                  }
-                </button>
-                {driveEstado === 'error' && (
-                  <div className="text-xs text-red-500 mt-1.5">{driveError}</div>
-                )}
-              </>
-            )}
-          </InfoCard>
-
-          <InfoCard titulo="Equipo asignado" icono={<Users size={14} />}>
-            {editandoEquipo ? (
-              <EquipoEditor
-                equipo={proyecto.equipo}
-                miembros={miembros}
-                onGuardar={handleGuardarEquipo}
-                onCancelar={() => setEditandoEquipo(false)}
-              />
-            ) : (
-              <>
-                <InfoRow label="Copy" valor={nombreEquipo(proyecto.equipo.copy, miembrosPorId)} />
-                <InfoRow label="Diseñador" valor={nombreEquipo(proyecto.equipo.disenador, miembrosPorId)} />
-                <InfoRow label="Programador" valor={nombreEquipo(proyecto.equipo.programador, miembrosPorId)} />
-                <InfoRow label="Coordinador" valor={nombreEquipo(proyecto.equipo.adminProyecto, miembrosPorId)} />
-                <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 hover:text-brand-800 font-medium mt-1">
-                  Editar equipo
-                </button>
-              </>
-            )}
-          </InfoCard>
-
           <InfoCard titulo="Configuración técnica" icono={<Settings2 size={14} />}>
             <InfoBool label="Ya tiene dominio" valor={proyecto.condicionesTecnicas.tieneDominio} />
             <InfoBool label="Ya tiene hosting" valor={proyecto.condicionesTecnicas.tieneHosting} />
@@ -774,7 +628,7 @@ export default function DetalleProyecto() {
           </InfoCard>
 
           <InfoCard titulo="Extras contratados" icono={<Sparkles size={14} />}>
-            {proyecto.proyecto.extras.length === 0
+            {!proyecto.proyecto.extras?.length
               ? <p className="text-sm text-slate-400">Sin extras</p>
               : proyecto.proyecto.extras.map((e) => (
                 <div key={e} className="text-sm text-slate-700 flex items-center gap-2">
@@ -794,6 +648,27 @@ export default function DetalleProyecto() {
                 </div>
               ))
             }
+          </InfoCard>
+
+          <InfoCard titulo="Equipo asignado" icono={<Users size={14} />} fullWidth>
+            {editandoEquipo ? (
+              <EquipoEditor
+                equipo={proyecto.equipo}
+                miembros={miembros}
+                onGuardar={handleGuardarEquipo}
+                onCancelar={() => setEditandoEquipo(false)}
+              />
+            ) : (
+              <>
+                <InfoRow label="Copy" valor={nombreEquipo(proyecto.equipo.copy, miembrosPorId)} />
+                <InfoRow label="Diseñador" valor={nombreEquipo(proyecto.equipo.disenador, miembrosPorId)} />
+                <InfoRow label="Programador" valor={nombreEquipo(proyecto.equipo.programador, miembrosPorId)} />
+                <InfoRow label="Coordinador" valor={nombreEquipo(proyecto.equipo.adminProyecto, miembrosPorId)} />
+                <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 hover:text-brand-800 font-medium mt-1">
+                  Editar equipo
+                </button>
+              </>
+            )}
           </InfoCard>
         </div>
       )}
@@ -828,6 +703,100 @@ export default function DetalleProyecto() {
           </div>
         </div>
       )}
+      </div>
+
+      {/* Columna derecha: recursos a la mano */}
+      <aside className="w-full lg:w-80 shrink-0 space-y-4 lg:sticky lg:top-6">
+        <InfoCard titulo="Acceso del cliente" icono={<Link2 size={14} />}>
+          <div className="flex items-stretch gap-1.5">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}`)
+                setCopiado('link')
+                setTimeout(() => setCopiado(false), 2000)
+              }}
+              className="flex-1 flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
+              title="Copiar link"
+            >
+              <code className="text-xs text-slate-700 truncate">/cliente/{proyecto.slug}</code>
+              {copiado === 'link' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
+            </button>
+            <a
+              href={`/cliente/${proyecto.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center bg-slate-50 border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
+              title="Ver como cliente (sin contraseña, con tu sesión)"
+            >
+              <ExternalLink size={13} className="text-slate-400" />
+            </a>
+          </div>
+          <div className="flex items-stretch gap-1.5">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(proyecto.passwordCliente)
+                setCopiado('pass')
+                setTimeout(() => setCopiado(false), 2000)
+              }}
+              className="flex-1 flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
+              title="Copiar contraseña"
+            >
+              <code className="text-xs text-slate-700 truncate">{proyecto.passwordCliente}</code>
+              {copiado === 'pass' ? <Check size={13} className="text-emerald-600 shrink-0" /> : <Copy size={13} className="text-slate-400 shrink-0" />}
+            </button>
+            <button
+              onClick={handleRegenerarPassword}
+              className="flex items-center justify-center bg-slate-50 border border-slate-200 hover:border-brand-300 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
+              title="Generar nueva contraseña"
+            >
+              <RefreshCw size={13} className="text-slate-400" />
+            </button>
+          </div>
+          <button
+            onClick={copiarMensaje}
+            className="w-full flex items-center justify-center gap-1.5 text-xs font-medium bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-md transition-colors"
+          >
+            {copiado === true ? <Check size={13} /> : <MessageCircle size={13} />}
+            {copiado === true ? 'Copiado' : 'Copiar mensaje WhatsApp'}
+          </button>
+        </InfoCard>
+
+        <InfoCard titulo="Carpeta de Drive" icono={<IconGoogleDrive size={15} />}>
+          {proyecto.driveRespuestasId ? (
+            <>
+              <div className="text-sm text-emerald-700 flex items-center gap-1.5 mb-2">
+                <Check size={13} /> Carpeta creada
+              </div>
+              <a
+                href={`https://drive.google.com/drive/folders/${proyecto.driveRespuestasId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-brand-700 hover:text-brand-800 underline decoration-dotted flex items-center gap-1 w-fit"
+              >
+                Abrir en Drive <ExternalLink size={11} />
+              </a>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-400 mb-2">Este proyecto todavía no tiene carpeta de Drive.</p>
+              <button
+                onClick={handleCrearDrive}
+                disabled={driveEstado === 'cargando'}
+                className="text-xs bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {driveEstado === 'cargando'
+                  ? <><Loader2 size={12} className="animate-spin" /> Generando...</>
+                  : <><FolderOpen size={12} /> Generar carpeta de Drive</>
+                }
+              </button>
+              {driveEstado === 'error' && (
+                <div className="text-xs text-red-500 mt-1.5">{driveError}</div>
+              )}
+            </>
+          )}
+        </InfoCard>
+      </aside>
+      </div>
     </Layout>
   )
 }
@@ -867,6 +836,10 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   const mostrarAvatarPropio = !t.esCliente
   const sinPersonaClara = mostrarAvatarPropio && !personaAsignada
   const numComentarios = t.comentarios?.length || 0
+  // Reasignar solo tiene sentido mientras el avatar refleja el campo
+  // `responsable` — en completada/en_proceso el avatar es info histórica
+  // (quién completó / quién la tomó), no el responsable editable.
+  const puedeReasignar = !!onAsignarResponsable && estado !== 'completada' && estado !== 'en_proceso'
 
   const badges = (
     <>
@@ -884,13 +857,17 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
         {mostrarAvatarPropio && (
           sinPersonaClara ? (
-            onAsignarResponsable ? (
+            puedeReasignar ? (
               <SelectorResponsableRapido miembros={miembros} onAsignar={onAsignarResponsable} size={30} iconSize={14} />
             ) : (
               <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="Sin responsable claro — le aparece a todo el equipo del proyecto en Mis tareas">
                 <UserX size={14} className="text-amber-500" />
               </div>
             )
+          ) : puedeReasignar ? (
+            <SelectorResponsableRapido miembros={miembros} onAsignar={onAsignarResponsable} size={30} iconSize={14}>
+              <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
+            </SelectorResponsableRapido>
           ) : (
             <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
           )

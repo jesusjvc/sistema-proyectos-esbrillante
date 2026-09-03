@@ -2,9 +2,11 @@ import { useState, useRef, useEffect } from 'react'
 import { UserX } from 'lucide-react'
 
 // Popover que se abre al hacer clic en el ícono de "sin responsable" (el
-// círculo punteado ámbar) para asignar una persona directamente sin tener
-// que abrir el modal completo de "Editar tarea".
-export default function SelectorResponsableRapido({ miembros = [], onAsignar, size = 30, iconSize = 14 }) {
+// círculo punteado ámbar) o en el avatar de quien ya está asignado, para
+// asignar o reasignar a una persona sin tener que abrir el modal completo
+// de "Editar tarea". Si se pasa `children` (p. ej. un <Avatar>), ese es el
+// disparador; si no, se usa el círculo punteado por defecto.
+export default function SelectorResponsableRapido({ miembros = [], onAsignar, size = 30, iconSize = 14, children }) {
   const [abierto, setAbierto] = useState(false)
   const ref = useRef(null)
 
@@ -27,11 +29,15 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        style={{ width: size, height: size }}
-        className="rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
-        title="Sin responsable — clic para asignar a alguien"
+        style={children ? undefined : { width: size, height: size }}
+        className={
+          children
+            ? 'rounded-full ring-offset-2 dark:ring-offset-slate-800 hover:ring-2 hover:ring-brand-300 transition-all'
+            : 'rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors'
+        }
+        title={children ? 'Cambiar responsable' : 'Sin responsable — clic para asignar a alguien'}
       >
-        <UserX size={iconSize} className="text-amber-500" />
+        {children || <UserX size={iconSize} className="text-amber-500" />}
       </button>
 
       {abierto && (

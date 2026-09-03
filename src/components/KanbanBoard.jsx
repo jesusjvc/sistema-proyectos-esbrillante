@@ -181,6 +181,10 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
   const personaAsignada = t.estado === 'completada' ? t.completadaPor : t.estado === 'en_proceso' ? t.asignadoA : responsableInfo.nombre
   const sinPersonaClara = !personaAsignada
   const numComentarios = t.comentarios?.length || 0
+  // Reasignar solo tiene sentido mientras el avatar refleja el campo
+  // `responsable` — en completada/en_proceso el avatar es info histórica
+  // (quién completó / quién la tomó), no el responsable editable.
+  const puedeReasignar = !!onAsignar && t.estado !== 'completada' && t.estado !== 'en_proceso'
 
   const badges = (
     <>
@@ -208,7 +212,7 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
       >
         <div className="flex items-start gap-2">
           {sinPersonaClara ? (
-            onAsignar ? (
+            puedeReasignar ? (
               <div className="mt-0.5">
                 <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={28} iconSize={13} />
               </div>
@@ -217,6 +221,12 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
                 <UserX size={13} className="text-amber-500" />
               </div>
             )
+          ) : puedeReasignar ? (
+            <div className="mt-0.5">
+              <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={28} iconSize={13}>
+                <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={28} />
+              </SelectorResponsableRapido>
+            </div>
           ) : (
             <div className="mt-0.5"><Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={28} /></div>
           )}
@@ -263,13 +273,17 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
         <ModalDetalleTarea titulo={t.titulo} badges={badges} onCerrar={() => setModalAbierto(false)}>
           <div className="flex items-center gap-2.5">
             {sinPersonaClara ? (
-              onAsignar ? (
+              puedeReasignar ? (
                 <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={30} iconSize={14} />
               ) : (
                 <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0">
                   <UserX size={14} className="text-amber-500" />
                 </div>
               )
+            ) : puedeReasignar ? (
+              <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={30} iconSize={14}>
+                <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
+              </SelectorResponsableRapido>
             ) : (
               <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
             )}
