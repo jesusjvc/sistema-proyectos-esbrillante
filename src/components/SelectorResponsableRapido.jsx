@@ -32,7 +32,7 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
         style={children ? undefined : { width: size, height: size }}
         className={
           children
-            ? 'rounded-full ring-offset-2 dark:ring-offset-slate-800 hover:ring-2 hover:ring-brand-300 transition-all'
+            ? 'rounded-full ring-offset-2 dark:ring-offset-ink-800 hover:ring-2 hover:ring-brand-300 transition-all'
             : 'rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors'
         }
         title={children ? 'Cambiar responsable' : 'Sin responsable — clic para asignar a alguien'}
@@ -41,7 +41,7 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
       </button>
 
       {abierto && (
-        <div className="absolute z-20 top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1 max-h-64 overflow-y-auto">
+        <div className="absolute z-20 top-full left-0 mt-1 w-48 bg-white dark:bg-ink-700 border border-slate-200 dark:border-ink-500 rounded-lg shadow-lg py-1 max-h-64 overflow-y-auto">
           {miembros.length === 0 && (
             <div className="px-3 py-2 text-sm text-slate-400">No hay usuarios</div>
           )}
@@ -50,7 +50,7 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
               key={m.id}
               type="button"
               onClick={() => { onAsignar(m.id); setAbierto(false) }}
-              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-ink-100 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
             >
               {m.nombre}
             </button>

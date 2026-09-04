@@ -63,7 +63,7 @@ export default function VistaCliente() {
 
   if (estado === 'cargando') {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-ink-950 flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -151,7 +151,7 @@ export default function VistaCliente() {
   const completado = proyecto.status === 'completado'
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-ink-950">
       <header className="bg-slate-950 border-b border-brand-500/25 px-4 py-4 shadow-lg shadow-black/5">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <img src={logo} alt="Foco" className="h-8 w-auto shrink-0" />
@@ -174,7 +174,7 @@ export default function VistaCliente() {
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
         {tareasPendientesCliente.length > 0 && (
           <section>
-            <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg mb-3 flex items-center gap-2">
+            <h2 className="font-bold text-slate-800 dark:text-ink-100 text-lg mb-3 flex items-center gap-2">
               <AlertCircle size={20} className="text-amber-500" />
               Necesitamos tu respuesta
               <span className="text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">{tareasPendientesCliente.length}</span>
@@ -190,11 +190,11 @@ export default function VistaCliente() {
           </section>
         )}
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+        <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <div className="font-semibold text-slate-800 dark:text-slate-100 text-base">{proyecto.proyecto.paquete}</div>
-              <div className="text-base text-slate-500 dark:text-slate-400 mt-0.5">
+              <div className="font-semibold text-slate-800 dark:text-ink-100 text-base">{proyecto.proyecto.paquete}</div>
+              <div className="text-base text-slate-500 dark:text-ink-300 mt-0.5">
                 {esContinuo ? 'Servicio continuo' : completado ? 'Proyecto entregado' : `Etapa ${faseActual} de ${fases.length} — ${faseActualNombre}`}
               </div>
             </div>
@@ -202,7 +202,7 @@ export default function VistaCliente() {
           </div>
           {!esContinuo && (
             <>
-              <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-3">
+              <div className="h-2.5 bg-slate-100 dark:bg-ink-700 rounded-full overflow-hidden mb-3">
                 <div className="h-full bg-gradient-to-r from-brand-400 to-brand-500 rounded-full transition-all duration-700" style={{ width: `${avance}%` }} />
               </div>
               <div className="flex gap-1 mb-3">
@@ -210,7 +210,7 @@ export default function VistaCliente() {
                   const tareasF = proyecto.tareas.filter((t) => t.fase === f.numero && t.estado !== 'omitida')
                   const completa = tareasF.length > 0 && tareasF.filter((t) => t.estado === 'completada').length === tareasF.length
                   const enCurso = f.numero === faseActual && !completado
-                  return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100 dark:bg-slate-800'}`} />
+                  return <div key={f.numero} title={f.nombre} className={`flex-1 h-1.5 rounded-full transition-colors ${completa ? 'bg-brand-500' : enCurso ? 'bg-brand-300' : 'bg-slate-100 dark:bg-ink-700'}`} />
                 })}
               </div>
             </>
@@ -222,7 +222,7 @@ export default function VistaCliente() {
             </div>
           )}
           {!esContinuo && (
-            <div className="flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+            <div className="flex items-start gap-2 text-sm text-slate-400 dark:text-ink-400 bg-slate-50 dark:bg-ink-900/60 rounded-lg px-3 py-2.5">
               <Info size={13} className="shrink-0 mt-0.5" />
               <span>El % es un estimado y puede ajustarse — si surgen nuevas actividades durante el proyecto, es normal que baje un poco antes de volver a subir. No significa que se haya retrocedido.</span>
             </div>
@@ -233,18 +233,18 @@ export default function VistaCliente() {
           tieneFechasPorFase ? (
             <FasesConFechas fases={fases} faseActual={faseActual} completado={completado} fechaCierre={proyecto.tiempos.cierre} />
           ) : (
-            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+            <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-brand-50 dark:bg-brand-500/10 rounded-xl flex items-center justify-center shrink-0">
                   <Calendar size={18} className="text-brand-600 dark:text-brand-400" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
-                  <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
+                  <div className="text-sm font-medium text-slate-500 dark:text-ink-300 uppercase tracking-wide mb-0.5">Fecha estimada de entrega</div>
+                  <div className="text-xl font-bold text-slate-800 dark:text-ink-100">{proyecto.proyecto.fechaEstimadaEntrega ? formatFecha(proyecto.proyecto.fechaEstimadaEntrega) : 'Por definir'}</div>
                   {completado && proyecto.tiempos.cierre && <div className="text-base text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">✓ Entregado el {formatFecha(proyecto.tiempos.cierre)}</div>}
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+              <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-ink-400 bg-slate-50 dark:bg-ink-900/60 rounded-lg px-3 py-2.5">
                 <Info size={13} className="shrink-0 mt-0.5" />
                 <span>Esta fecha es un estimado. Te avisaremos con anticipación si hay algún cambio.</span>
               </div>
@@ -253,14 +253,14 @@ export default function VistaCliente() {
         )}
 
         {esContinuo && !completado && (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
             <div className="px-5 py-4">
-              <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg">¿En qué estamos trabajando?</h2>
+              <h2 className="font-bold text-slate-800 dark:text-ink-100 text-lg">¿En qué estamos trabajando?</h2>
             </div>
             {tareasContinuoEquipo.length === 0 ? (
-              <div className="px-5 pb-4 text-base text-slate-500 dark:text-slate-400">Aún no hay actividades registradas.</div>
+              <div className="px-5 pb-4 text-base text-slate-500 dark:text-ink-300">Aún no hay actividades registradas.</div>
             ) : (
-              <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800">
+              <div className="border-t border-slate-100 dark:border-ink-500 divide-y divide-slate-50 dark:divide-ink-500">
                 {continuoEnProceso.length > 0 && <GrupoActividad titulo="En proceso ahora" tareas={continuoEnProceso} estado="en_proceso" />}
                 {continuoEnRevision.length > 0 && <GrupoActividad titulo="En revisión" tareas={continuoEnRevision} estado="revision" />}
                 {continuoPendientes.length > 0 && <GrupoActividad titulo="Próximamente" tareas={continuoPendientes} estado="pendiente" />}
@@ -276,8 +276,8 @@ export default function VistaCliente() {
                     )}
                   </GrupoActividad>
                 )}
-                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/60">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
+                <div className="px-5 py-3 bg-slate-50 dark:bg-ink-900/60">
+                  <p className="text-sm text-slate-500 dark:text-ink-300">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
                 </div>
               </div>
             )}
@@ -301,21 +301,21 @@ export default function VistaCliente() {
         )}
 
         {!esContinuo && tareasEquipoVisibles.length > 0 && !completado && (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <button onClick={() => setSeccionAbierta(seccionAbierta === 'equipo' ? null : 'equipo')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+          <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
+            <button onClick={() => setSeccionAbierta(seccionAbierta === 'equipo' ? null : 'equipo')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-ink-600/60 transition-colors">
               <div className="flex items-center gap-2">
-                <Users size={16} className="text-slate-500 dark:text-slate-400" />
-                <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">¿Qué está haciendo el equipo?</span>
+                <Users size={16} className="text-slate-500 dark:text-ink-300" />
+                <span className="font-semibold text-slate-800 dark:text-ink-100 text-base">¿Qué está haciendo el equipo?</span>
               </div>
               {seccionAbierta === 'equipo' ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
             </button>
             {seccionAbierta === 'equipo' && (
-              <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-50 dark:divide-slate-800">
+              <div className="border-t border-slate-100 dark:border-ink-500 divide-y divide-slate-50 dark:divide-ink-500">
                 {equipoEnProceso.length > 0 && <GrupoActividad titulo="En proceso ahora" tareas={equipoEnProceso} estado="en_proceso" />}
                 {equipoPendientes.length > 0 && <GrupoActividad titulo="Próximamente" tareas={equipoPendientes} estado="pendiente" />}
                 {equipoCompletadas.length > 0 && <GrupoActividad titulo="Completadas" tareas={equipoCompletadas} estado="completada" />}
-                <div className="px-5 py-3 bg-slate-50 dark:bg-slate-800/60">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
+                <div className="px-5 py-3 bg-slate-50 dark:bg-ink-900/60">
+                  <p className="text-sm text-slate-500 dark:text-ink-300">El responsable aparece como <strong>Equipo EsBrillante</strong> para proteger la organización interna.</p>
                 </div>
               </div>
             )}
@@ -323,20 +323,20 @@ export default function VistaCliente() {
         )}
 
         {tareasPorFaseCliente.length > 0 && (
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <button onClick={() => setSeccionAbierta(seccionAbierta === 'participacion' ? null : 'participacion')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+          <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
+            <button onClick={() => setSeccionAbierta(seccionAbierta === 'participacion' ? null : 'participacion')} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-ink-600/60 transition-colors">
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={16} className="text-slate-500 dark:text-slate-400" />
-                <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">Tu participación en el proyecto</span>
+                <CheckCircle2 size={16} className="text-slate-500 dark:text-ink-300" />
+                <span className="font-semibold text-slate-800 dark:text-ink-100 text-base">Tu participación en el proyecto</span>
               </div>
               {seccionAbierta === 'participacion' ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
             </button>
             {seccionAbierta === 'participacion' && (
-              <div className="border-t border-slate-100 dark:border-slate-800">
+              <div className="border-t border-slate-100 dark:border-ink-500">
                 {tareasPorFaseCliente.map((fase) => (
-                  <div key={fase.numero} className="border-b border-slate-50 dark:border-slate-800 last:border-0">
+                  <div key={fase.numero} className="border-b border-slate-50 dark:border-ink-500 last:border-0">
                     {fase.nombre && (
-                      <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-800/60"><span className="text-sm font-semibold text-slate-600 dark:text-slate-300">{fase.nombre}</span></div>
+                      <div className="px-5 py-2.5 bg-slate-50 dark:bg-ink-900/60"><span className="text-sm font-semibold text-slate-600 dark:text-ink-300">{fase.nombre}</span></div>
                     )}
                     {fase.tareasCliente.map((t) => {
                       const desbloqueada = t.dependencias.every((d) => completadasIds.has(d))
@@ -345,8 +345,8 @@ export default function VistaCliente() {
                         <div key={t.id} className="px-5 py-3 flex items-center gap-3">
                           {est === 'completada' && <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />}
                           {est === 'pendiente_tuya' && <AlertCircle size={15} className="text-amber-400 shrink-0" />}
-                          {est === 'por_venir' && <Clock size={15} className="text-slate-300 dark:text-slate-600 shrink-0" />}
-                          <span className={`text-base ${est === 'completada' ? 'line-through text-slate-500 dark:text-slate-500' : est === 'pendiente_tuya' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-500 dark:text-slate-500'}`}>{t.titulo}</span>
+                          {est === 'por_venir' && <Clock size={15} className="text-slate-300 dark:text-ink-400 shrink-0" />}
+                          <span className={`text-base ${est === 'completada' ? 'line-through text-slate-500 dark:text-ink-400' : est === 'pendiente_tuya' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-500 dark:text-ink-400'}`}>{t.titulo}</span>
                           {est === 'completada' && <span className="ml-auto text-sm text-emerald-500">Listo ✓</span>}
                           {est === 'pendiente_tuya' && <span className="ml-auto text-sm text-amber-500">Te toca</span>}
                         </div>
@@ -366,9 +366,9 @@ export default function VistaCliente() {
           onNueva={() => setModalSolicitud(true)}
         />
 
-        <div className="text-center text-sm text-slate-400 dark:text-slate-500 pb-6 space-y-1">
+        <div className="text-center text-sm text-slate-400 dark:text-ink-400 pb-6 space-y-1">
           <p>¿Tienes preguntas? Contáctanos directamente por WhatsApp.</p>
-          <p className="font-semibold text-slate-500 dark:text-slate-400">Equipo EsBrillante</p>
+          <p className="font-semibold text-slate-500 dark:text-ink-300">Equipo EsBrillante</p>
         </div>
       </main>
 
@@ -387,17 +387,17 @@ function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+    <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-ink-600/60 transition-colors">
         <div className="flex items-center gap-2">
-          <MessageSquarePlus size={16} className="text-slate-500 dark:text-slate-400" />
-          <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">¿Necesitas algo más?</span>
+          <MessageSquarePlus size={16} className="text-slate-500 dark:text-ink-300" />
+          <span className="font-semibold text-slate-800 dark:text-ink-100 text-base">¿Necesitas algo más?</span>
         </div>
         {abierta ? <ChevronUp size={15} className="text-slate-400" /> : <ChevronDown size={15} className="text-slate-400" />}
       </button>
       {abierta && (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-4 space-y-4">
-          <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+        <div className="border-t border-slate-100 dark:border-ink-500 px-5 py-4 space-y-4">
+          <p className="text-base text-slate-600 dark:text-ink-300 leading-relaxed">
             Si necesitas un cambio específico en tu proyecto, cuéntanos aquí. Cada solicitud se analiza para confirmar que entra dentro del alcance de tu paquete antes de agregarse a las actividades.
           </p>
           <button
@@ -412,16 +412,16 @@ function SeccionSolicitudes({ solicitudes, abierta, onToggle, onNueva }) {
               {solicitudes.map((s) => {
                 const info = ESTADO_INFO[s.estado]
                 return (
-                  <div key={s.id} className="border border-slate-100 dark:border-slate-800 rounded-lg px-3.5 py-3">
+                  <div key={s.id} className="border border-slate-100 dark:border-ink-500 rounded-lg px-3.5 py-3">
                     <div className="flex items-start gap-2">
                       <span className="mt-0.5 shrink-0">{info.icono}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-base font-medium text-slate-800 dark:text-slate-100">{s.titulo}</span>
+                          <span className="text-base font-medium text-slate-800 dark:text-ink-100">{s.titulo}</span>
                           <span className={`text-sm px-2 py-0.5 rounded-full shrink-0 ${info.badge}`}>{info.label}</span>
                         </div>
                         {s.estado === 'rechazada' && s.motivoRechazo && (
-                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{s.motivoRechazo}</p>
+                          <p className="text-sm text-slate-500 dark:text-ink-300 mt-1">{s.motivoRechazo}</p>
                         )}
                         {s.archivoUrl && (
                           <a
@@ -469,40 +469,40 @@ function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Solicitar un cambio</h3>
-          <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"><X size={18} /></button>
+      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
+          <h3 className="font-semibold text-slate-800 dark:text-ink-100">Solicitar un cambio</h3>
+          <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700 dark:hover:text-ink-100"><X size={18} /></button>
         </div>
         <form onSubmit={enviar} className="p-6 space-y-4">
           <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg px-3.5 py-2.5 text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
             Revisaremos tu solicitud para confirmar que entra dentro del alcance de tu proyecto antes de agregarla a las actividades.
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">¿Qué necesitas? *</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">¿Qué necesitas? *</label>
             <input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Ej. Cambiar el color del botón principal"
-              className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="w-full text-base bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-500 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-ink-400"
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Cuéntanos más (opcional)</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Cuéntanos más (opcional)</label>
             <textarea
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
               rows={4}
               placeholder="Entre más detalle nos des, más rápido podemos revisarlo..."
-              className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
+              className="w-full text-base bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-500 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-ink-400 resize-none"
             />
           </div>
           <div>
             {archivo ? (
-              <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2">
                 <Paperclip size={12} className="text-slate-400 shrink-0" />
-                <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{archivo.name}</span>
+                <span className="flex-1 truncate text-slate-600 dark:text-ink-300">{archivo.name}</span>
                 <button type="button" onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
                   <X size={13} />
                 </button>
@@ -532,8 +532,8 @@ function ModalNuevaSolicitud({ onGuardar, onCerrar }) {
 
 function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
-      <div className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Fechas estimadas por fase</div>
+    <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5">
+      <div className="text-sm font-medium text-slate-500 dark:text-ink-300 uppercase tracking-wide mb-3">Fechas estimadas por fase</div>
       <div className="space-y-3">
         {fases.map((f) => {
           const bloqueadaPorPago = !!f.requierePago && !f.pagoConfirmado
@@ -541,10 +541,10 @@ function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
           const yaPaso = f.numero < faseActual || completado
           return (
             <div key={f.numero} className="flex items-start gap-3">
-              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${yaPaso ? 'bg-emerald-500' : esActual ? 'bg-brand-500' : 'bg-slate-200 dark:bg-ink-700'}`} />
               <div className="flex-1 min-w-0">
-                <div className={`text-base font-medium ${esActual ? 'text-slate-800 dark:text-slate-100' : yaPaso ? 'text-slate-600 dark:text-slate-300' : 'text-slate-500 dark:text-slate-500'}`}>{f.nombre}</div>
-                {f.fechaEstimada && <div className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">Estimado: {formatFecha(f.fechaEstimada)}</div>}
+                <div className={`text-base font-medium ${esActual ? 'text-slate-800 dark:text-ink-100' : yaPaso ? 'text-slate-600 dark:text-ink-300' : 'text-slate-500 dark:text-ink-400'}`}>{f.nombre}</div>
+                {f.fechaEstimada && <div className="text-sm text-slate-400 dark:text-ink-400 mt-0.5">Estimado: {formatFecha(f.fechaEstimada)}</div>}
               </div>
               {bloqueadaPorPago && (
                 <span className="flex items-center gap-1 text-sm bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full shrink-0">
@@ -558,7 +558,7 @@ function FasesConFechas({ fases, faseActual, completado, fechaCierre }) {
       {completado && fechaCierre && (
         <div className="mt-3 text-base text-emerald-600 dark:text-emerald-400 font-medium">✓ Entregado el {formatFecha(fechaCierre)}</div>
       )}
-      <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/60 rounded-lg px-3 py-2.5">
+      <div className="mt-3 flex items-start gap-2 text-sm text-slate-400 dark:text-ink-400 bg-slate-50 dark:bg-ink-900/60 rounded-lg px-3 py-2.5">
         <Info size={13} className="shrink-0 mt-0.5" />
         <span>Estas fechas son un estimado y pueden ajustarse. Te avisaremos si hay algún cambio.</span>
       </div>
@@ -577,17 +577,17 @@ function RecursosProyecto({ links }) {
   const disponibles = RECURSOS_CONFIG.filter((r) => links[r.tipo])
   if (disponibles.length === 0) return null
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+    <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 dark:border-ink-500 flex items-center gap-2">
         <FolderOpen size={16} className="text-brand-600 dark:text-brand-400" />
-        <span className="font-semibold text-slate-800 dark:text-slate-100 text-base">Recursos de tu proyecto</span>
+        <span className="font-semibold text-slate-800 dark:text-ink-100 text-base">Recursos de tu proyecto</span>
       </div>
-      <div className="divide-y divide-slate-50 dark:divide-slate-800">
+      <div className="divide-y divide-slate-50 dark:divide-ink-500">
         {disponibles.map((r) => (
           <div key={r.tipo} className="px-5 py-3.5 flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <div className="text-base font-medium text-slate-800 dark:text-slate-100">{r.label}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{r.descripcion}</div>
+              <div className="text-base font-medium text-slate-800 dark:text-ink-100">{r.label}</div>
+              <div className="text-sm text-slate-500 dark:text-ink-300 mt-0.5">{r.descripcion}</div>
             </div>
             <a href={links[r.tipo]} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm bg-brand-500 hover:bg-brand-600 text-slate-900 px-3 py-1.5 rounded-lg transition-colors shrink-0">
               Abrir <ExternalLink size={11} />
@@ -602,16 +602,16 @@ function RecursosProyecto({ links }) {
 function GrupoActividad({ titulo, tareas, estado, children }) {
   return (
     <div className="px-5 py-3">
-      <div className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{titulo}</div>
+      <div className="text-sm font-semibold text-slate-500 dark:text-ink-300 uppercase tracking-wide mb-2">{titulo}</div>
       <div className="space-y-2">
         {tareas.map((t) => (
           <div key={t.id} className="flex items-center gap-2.5">
             {estado === 'completada' && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
             {estado === 'en_proceso' && <div className="w-3.5 h-3.5 rounded-full border-2 border-brand-500 border-t-transparent animate-spin shrink-0" />}
             {estado === 'revision' && <Eye size={14} className="text-amber-500 shrink-0" />}
-            {estado === 'pendiente' && <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 dark:border-slate-600 shrink-0" />}
-            <span className={`text-base ${estado === 'completada' ? 'text-slate-500 dark:text-slate-500 line-through' : estado === 'en_proceso' ? 'text-slate-800 dark:text-slate-100 font-medium' : estado === 'revision' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-600 dark:text-slate-300'}`}>{t.titulo}</span>
-            <span className="ml-auto text-sm text-slate-400 dark:text-slate-500 shrink-0">Equipo EsBrillante</span>
+            {estado === 'pendiente' && <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 dark:border-ink-400 shrink-0" />}
+            <span className={`text-base ${estado === 'completada' ? 'text-slate-500 dark:text-ink-400 line-through' : estado === 'en_proceso' ? 'text-slate-800 dark:text-ink-100 font-medium' : estado === 'revision' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-600 dark:text-ink-300'}`}>{t.titulo}</span>
+            <span className="ml-auto text-sm text-slate-400 dark:text-ink-400 shrink-0">Equipo EsBrillante</span>
           </div>
         ))}
       </div>
@@ -642,7 +642,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
   const vencida = tareaVencida(t)
 
   return (
-    <div className={`bg-white dark:bg-slate-900 border-2 rounded-xl overflow-hidden shadow-lg dark:shadow-none ${vencida ? 'border-red-300 dark:border-red-500/40 shadow-red-100' : 'border-amber-300 dark:border-amber-500/40 shadow-amber-100'}`}>
+    <div className={`bg-white dark:bg-ink-800 border-2 rounded-xl overflow-hidden shadow-lg dark:shadow-none ${vencida ? 'border-red-300 dark:border-red-500/40 shadow-red-100' : 'border-amber-300 dark:border-amber-500/40 shadow-amber-100'}`}>
       <div className={`px-5 py-3.5 flex items-center justify-between ${vencida ? 'bg-red-50 dark:bg-red-500/10' : 'bg-amber-50 dark:bg-amber-500/10'}`}>
         <div className="flex items-center gap-2 min-w-0">
           <AlertCircle size={17} className={`shrink-0 ${vencida ? 'text-red-500' : 'text-amber-500'}`} />
@@ -661,14 +661,14 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
       </div>
       {expandida && (
         <div className="px-5 py-4">
-          <TextoEnriquecido html={t.instruccionesCliente} className="text-base text-slate-700 dark:text-slate-300 leading-relaxed mb-4" />
+          <TextoEnriquecido html={t.instruccionesCliente} className="text-base text-slate-700 dark:text-ink-300 leading-relaxed mb-4" />
           {vencida ? (
             <div className="flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400 mb-4">
               <AlertCircle size={12} />
               Atrasada — el tiempo sugerido era {t.plazoHoras} horas
             </div>
           ) : t.plazoHoras && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 mb-4">
+            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-ink-300 mb-4">
               <Clock size={12} />
               Tiempo sugerido: {t.plazoHoras} horas
             </div>
@@ -692,13 +692,13 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Escribe tu respuesta aquí (opcional si solo vas a adjuntar un archivo)..."
             rows={3}
-            className="w-full text-base bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
+            className="w-full text-base bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-500 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-ink-400 resize-none"
           />
 
           {archivo ? (
-            <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 mb-3">
+            <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2 mb-3">
               <Paperclip size={12} className="text-slate-400 shrink-0" />
-              <span className="flex-1 truncate text-slate-600 dark:text-slate-300">{archivo.name}</span>
+              <span className="flex-1 truncate text-slate-600 dark:text-ink-300">{archivo.name}</span>
               <button onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
                 <X size={13} />
               </button>
@@ -721,7 +721,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             ✓ Enviar respuesta
           </button>
-          <p className="text-sm text-slate-400 dark:text-slate-500 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>
+          <p className="text-sm text-slate-400 dark:text-ink-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>
         </div>
       )}
     </div>

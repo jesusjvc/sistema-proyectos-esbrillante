@@ -39,7 +39,7 @@ export default function Login() {
       <button
         onClick={toggleTema}
         title={tema === 'dark' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
-        className="absolute top-5 right-5 lg:top-6 lg:right-8 z-10 p-2 rounded-lg text-slate-400 dark:text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+        className="absolute top-5 right-5 lg:top-6 lg:right-8 z-10 p-2 rounded-lg text-slate-400 dark:text-ink-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
       >
         {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
@@ -87,7 +87,7 @@ export default function Login() {
                 placeholder="tu@esbrillante.mx"
                 required
                 autoFocus
-                className="w-full h-10 border border-[#788291] dark:border-[#8793A5] dark:bg-[#242832] rounded-lg px-3 outline-none text-sm text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-[#1D4ED8] dark:focus:ring-[#93C5FD] focus:border-transparent transition-shadow"
+                className="w-full h-10 border border-[#788291] dark:border-[#8793A5] dark:bg-[#242832] rounded-lg px-3 outline-none text-sm text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-ink-400 focus:ring-2 focus:ring-[#1D4ED8] dark:focus:ring-[#93C5FD] focus:border-transparent transition-shadow"
               />
             </div>
             <div>
@@ -98,7 +98,7 @@ export default function Login() {
                 onChange={(e) => { setPassword(e.target.value); setError('') }}
                 placeholder="••••••••"
                 required
-                className="w-full h-10 border border-[#788291] dark:border-[#8793A5] dark:bg-[#242832] rounded-lg px-3 outline-none text-sm text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-[#1D4ED8] dark:focus:ring-[#93C5FD] focus:border-transparent transition-shadow"
+                className="w-full h-10 border border-[#788291] dark:border-[#8793A5] dark:bg-[#242832] rounded-lg px-3 outline-none text-sm text-slate-800 dark:text-white placeholder:text-slate-400 dark:placeholder:text-ink-400 focus:ring-2 focus:ring-[#1D4ED8] dark:focus:ring-[#93C5FD] focus:border-transparent transition-shadow"
               />
             </div>
 

@@ -133,18 +133,18 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
 function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, onAsignar, avatares, equipo, miembrosPorId, miembros }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
-    todo: 'text-slate-500 dark:text-slate-400',
+    todo: 'text-slate-500 dark:text-ink-300',
     doing: 'text-brand-600 dark:text-brand-400',
     revision: 'text-amber-600 dark:text-amber-400',
     done: 'text-emerald-600 dark:text-emerald-400',
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col min-h-[120px] w-72 shrink-0">
+    <div className="bg-slate-50 dark:bg-ink-900/60 border border-slate-200 dark:border-ink-500 rounded-xl flex flex-col min-h-[120px] w-72 shrink-0">
       <div className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-semibold ${colorMap[columna.columna]}`}>
         {iconMap[columna.columna]}
         {columna.label}
-        <span className="ml-auto text-xs font-normal text-slate-400 dark:text-slate-500">{tareas.length}</span>
+        <span className="ml-auto text-xs font-normal text-slate-400 dark:text-ink-400">{tareas.length}</span>
       </div>
       <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
@@ -189,7 +189,7 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
   const badges = (
     <>
       {t.esRutaCritica && <Flag size={13} className="text-rose-500 shrink-0" title="Ruta crítica" />}
-      {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">Personalizada</span>}
+      {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300 px-1.5 py-0.5 rounded-full">Personalizada</span>}
     </>
   )
 
@@ -208,7 +208,7 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
         style={style}
         {...(!readOnly ? { ...attributes, ...listeners } : {})}
         onClick={() => !isDragging && setModalAbierto(true)}
-        className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 select-none ${readOnly ? '' : 'cursor-pointer active:cursor-grabbing'} ${overlay ? 'shadow-xl rotate-1' : 'shadow-sm hover:border-brand-300 dark:hover:border-brand-500/50 transition-colors'}`}
+        className={`bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2.5 select-none ${readOnly ? '' : 'cursor-pointer active:cursor-grabbing'} ${overlay ? 'shadow-xl rotate-1' : 'shadow-sm hover:border-brand-300 dark:hover:border-brand-500/50 transition-colors'}`}
       >
         <div className="flex items-start gap-2">
           {sinPersonaClara ? (
@@ -233,16 +233,16 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{t.titulo}</span>
+              <span className="text-sm font-medium text-slate-800 dark:text-ink-100">{t.titulo}</span>
               {badges}
             </div>
 
-            <div className={`text-sm mt-0.5 ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+            <div className={`text-sm mt-0.5 ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-ink-300'}`}>
               {lineaSecundaria}
             </div>
 
             {numComentarios > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full mt-1.5">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-ink-300 bg-slate-100 dark:bg-ink-700 px-2 py-0.5 rounded-full mt-1.5">
                 <MessageCircle size={12} /> {numComentarios}
               </span>
             )}
@@ -287,12 +287,12 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
             ) : (
               <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
             )}
-            <div className={`text-sm ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+            <div className={`text-sm ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-ink-300'}`}>
               {lineaSecundaria}
             </div>
           </div>
 
-          {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-slate-300" />}
+          {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-ink-300" />}
 
           {onComentar && (
             <HiloComentarios

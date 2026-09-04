@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Bold, Italic, List, ListOrdered } from 'lucide-react'
 
-const inputCls = 'w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-sm text-slate-800 dark:text-slate-100 focus-within:ring-2 focus-within:ring-brand-400 dark:focus-within:ring-brand-500/40 focus-within:border-transparent overflow-hidden'
+const inputCls = 'w-full border border-slate-200 dark:border-ink-500 bg-white dark:bg-ink-900 rounded-lg text-sm text-slate-800 dark:text-ink-100 focus-within:ring-2 focus-within:ring-brand-400 dark:focus-within:ring-brand-500/40 focus-within:border-transparent overflow-hidden'
 
 function BotonToolbar({ activo, onClick, title, children }) {
   return (
@@ -13,7 +13,7 @@ function BotonToolbar({ activo, onClick, title, children }) {
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       title={title}
-      className={`p-1.5 rounded-md transition-colors ${activo ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-700 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+      className={`p-1.5 rounded-md transition-colors ${activo ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-700 dark:text-brand-400' : 'text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-100 hover:bg-slate-100 dark:hover:bg-ink-600'}`}
     >
       {children}
     </button>
@@ -46,7 +46,7 @@ export default function EditorEnriquecido({ value, onChange, placeholder, minHei
 
   return (
     <div className={inputCls}>
-      <div className="flex items-center gap-0.5 px-2 py-1 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+      <div className="flex items-center gap-0.5 px-2 py-1 border-b border-slate-100 dark:border-ink-500 bg-slate-50 dark:bg-ink-800">
         <BotonToolbar activo={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Negrita">
           <Bold size={14} />
         </BotonToolbar>

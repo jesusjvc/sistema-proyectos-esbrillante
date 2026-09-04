@@ -272,7 +272,7 @@ export default function DetalleProyecto() {
             </button>
           )}
           {proyecto.status === 'activo' && (
-            <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-2 rounded-lg transition-colors">
+            <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm border border-slate-200 dark:border-ink-500 hover:bg-slate-50 dark:hover:bg-ink-600 text-slate-700 dark:text-ink-300 px-3 py-2 rounded-lg transition-colors">
               <Pause size={14} /> Pausa
             </button>
           )}
@@ -282,12 +282,12 @@ export default function DetalleProyecto() {
             </button>
           )}
           {proyecto.status !== 'completado' && (
-            <button onClick={handleCerrar} className="text-sm text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
+            <button onClick={handleCerrar} className="text-sm text-slate-400 dark:text-ink-400 hover:text-red-600 dark:hover:text-red-400 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
               <XCircle size={16} />
             </button>
           )}
           {esAdminRol && (
-            <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
+            <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 dark:text-ink-400 hover:text-red-600 dark:hover:text-red-400 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
               <Trash2 size={16} />
             </button>
           )}
@@ -295,18 +295,18 @@ export default function DetalleProyecto() {
       }
     >
       {/* Header del proyecto — siempre visible: descripción y métricas de avance */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 mb-5">
+      <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5 mb-5">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-400 dark:text-slate-500">{proyecto.proyecto.paquete}</span>
+          <span className="text-xs text-slate-400 dark:text-ink-400">{proyecto.proyecto.paquete}</span>
           <button
             onClick={handleCambiarTipo}
-            className="text-xs text-slate-400 dark:text-slate-500 hover:text-brand-700 dark:hover:text-brand-400 underline decoration-dotted transition-colors"
+            className="text-xs text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 underline decoration-dotted transition-colors"
             title={esContinuo ? 'Convertir a proyecto finito (con fases)' : 'Convertir a proyecto continuo (tablero Kanban)'}
           >
             Cambiar a {esContinuo ? 'finito' : 'continuo'}
           </button>
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
+        <p className="text-sm text-slate-500 dark:text-ink-300 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
 
         <DescripcionProyecto
           descripcion={proyecto.proyecto?.descripcion}
@@ -316,8 +316,8 @@ export default function DetalleProyecto() {
         {esContinuo ? (
           <div className="mt-4 flex items-center gap-3 flex-wrap">
             {KANBAN_COLUMNAS.map((c) => (
-              <div key={c.columna} className="text-sm text-slate-500 dark:text-slate-400">
-                <span className="font-bold text-slate-800 dark:text-slate-100">{columnasCount[c.columna]}</span> {c.label}
+              <div key={c.columna} className="text-sm text-slate-500 dark:text-ink-300">
+                <span className="font-bold text-slate-800 dark:text-ink-100">{columnasCount[c.columna]}</span> {c.label}
               </div>
             ))}
           </div>
@@ -325,28 +325,28 @@ export default function DetalleProyecto() {
           /* Barra de progreso */
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm mb-1.5">
-              <span className="text-slate-600 dark:text-slate-300 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
-              <span className="font-bold text-slate-800 dark:text-slate-100">{avance}%</span>
+              <span className="text-slate-600 dark:text-ink-300 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
+              <span className="font-bold text-slate-800 dark:text-ink-100">{avance}%</span>
             </div>
-            <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-2.5 bg-slate-100 dark:bg-ink-700 rounded-full overflow-hidden">
               <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
             </div>
           </div>
         )}
 
         {/* Métricas de tiempo */}
-        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-ink-500">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 font-medium">Tiempo activo</div>
-            <div className="font-semibold text-slate-800 dark:text-slate-100 mt-0.5">{tiempos.activoHoras}h</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">Tiempo activo</div>
+            <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5">{tiempos.activoHoras}h</div>
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 font-medium">En pausa</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">En pausa</div>
             <div className="font-semibold text-amber-600 dark:text-amber-400 mt-0.5">{tiempos.pausaHoras}h</div>
           </div>
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
-            <div className="font-semibold text-slate-800 dark:text-slate-100 mt-0.5">{esContinuo ? 'Continuo' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
+            <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5">{esContinuo ? 'Continuo' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
           </div>
         </div>
       </div>
@@ -355,13 +355,13 @@ export default function DetalleProyecto() {
       <div className="flex-1 min-w-0 w-full">
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-700 mb-5">
+      <div className="flex border-b border-slate-200 dark:border-ink-500 mb-5">
         {[['tareas', 'Tareas'], ['preguntas', 'Preguntas al Cliente'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t ? 'border-brand-600 dark:border-brand-500 text-brand-800 dark:text-brand-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              tab === t ? 'border-brand-600 dark:border-brand-500 text-brand-800 dark:text-brand-400' : 'border-transparent text-slate-500 dark:text-ink-300 hover:text-slate-700 dark:hover:text-ink-100'
             }`}
           >
             {l}
@@ -379,11 +379,11 @@ export default function DetalleProyecto() {
       {tab === 'preguntas' && (
         <div className="space-y-3">
           {tareasCliente.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-8 text-center text-sm text-slate-400 dark:text-slate-500">
+            <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-8 text-center text-sm text-slate-400 dark:text-ink-400">
               Este proyecto no tiene preguntas o tareas asignadas al cliente.
             </div>
           ) : esContinuo ? (
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
               {tareasCliente.map((t) => (
                 <TareaRow
                   key={t.id}
@@ -409,9 +409,9 @@ export default function DetalleProyecto() {
               const tareasF = tareasCliente.filter((t) => t.fase === fase.numero)
               if (tareasF.length === 0) return null
               return (
-                <div key={fase.numero} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  <div className="px-5 py-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700">
-                    <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">Fase {fase.numero} — {fase.nombre}</span>
+                <div key={fase.numero} className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 dark:bg-ink-900 border-b border-slate-100 dark:border-ink-500">
+                    <span className="font-medium text-slate-700 dark:text-ink-300 text-sm">Fase {fase.numero} — {fase.nombre}</span>
                   </div>
                   {tareasF.map((t) => (
                     <TareaRow
@@ -489,24 +489,24 @@ export default function DetalleProyecto() {
               : fase.tareas
 
             return (
-              <div key={fase.numero} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div key={fase.numero} className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
                 <div
                   role="button"
                   tabIndex={0}
                   onClick={() => setFaseAbierta(abierta ? null : fase.numero)}
                   onKeyDown={(e) => e.key === 'Enter' && setFaseAbierta(abierta ? null : fase.numero)}
-                  className={`w-full flex items-center justify-between px-5 py-4 cursor-pointer transition-colors ${abierta ? 'bg-slate-50 dark:bg-slate-900' : 'hover:bg-slate-50 dark:hover:bg-slate-900'}`}
+                  className={`w-full flex items-center justify-between px-5 py-4 cursor-pointer transition-colors ${abierta ? 'bg-slate-50 dark:bg-ink-900' : 'hover:bg-slate-50 dark:hover:bg-ink-900'}`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-wrap">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
                       completadas === total && total > 0 ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
-                      fase.numero === faseActual ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                      fase.numero === faseActual ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300' : 'bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300'
                     }`}>
                       {completadas === total && total > 0 ? <Check size={14} /> : fase.numero}
                     </div>
-                    <span className="font-medium text-slate-800 dark:text-slate-100">Fase {fase.numero} — {fase.nombre}</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500">{completadas}/{total}</span>
-                    {fase.fechaEstimada && <span className="text-xs text-slate-400 dark:text-slate-500">· est. {formatFecha(fase.fechaEstimada)}</span>}
+                    <span className="font-medium text-slate-800 dark:text-ink-100">Fase {fase.numero} — {fase.nombre}</span>
+                    <span className="text-xs text-slate-400 dark:text-ink-400">{completadas}/{total}</span>
+                    {fase.fechaEstimada && <span className="text-xs text-slate-400 dark:text-ink-400">· est. {formatFecha(fase.fechaEstimada)}</span>}
                     {fase.requierePago && !fase.pagoConfirmado && (
                       <span className="flex items-center gap-1 text-xs bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-medium">
                         <Lock size={10} /> Esperando pago
@@ -518,19 +518,19 @@ export default function DetalleProyecto() {
                       <button
                         onClick={(e) => { e.stopPropagation(); setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: !ocultarCompletadas })) }}
                         className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
-                          ocultarCompletadas ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                          ocultarCompletadas ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300' : 'bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300'
                         }`}
                         title={ocultarCompletadas ? 'Mostrar tareas completadas' : 'Ocultar tareas completadas'}
                       >
                         Ocultar completadas
                       </button>
                     )}
-                    {abierta ? <ChevronUp size={16} className="text-slate-400 dark:text-slate-500" /> : <ChevronDown size={16} className="text-slate-400 dark:text-slate-500" />}
+                    {abierta ? <ChevronUp size={16} className="text-slate-400 dark:text-ink-400" /> : <ChevronDown size={16} className="text-slate-400 dark:text-ink-400" />}
                   </div>
                 </div>
 
                 {abierta && (
-                  <div className="border-t border-slate-100 dark:border-slate-700">
+                  <div className="border-t border-slate-100 dark:border-ink-500">
                     {tareasVisibles.map((t) => {
                       const est = estadoCalculado(t)
                       return (
@@ -556,12 +556,12 @@ export default function DetalleProyecto() {
                     {ocultarCompletadas && completadas > 0 && (
                       <button
                         onClick={() => setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: false }))}
-                        className="w-full flex items-center justify-center gap-1.5 text-sm text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 py-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 text-sm text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-300 py-3 border-t border-slate-50 dark:border-ink-500 transition-colors"
                       >
                         <ChevronDown size={13} /> {completadas} tarea{completadas > 1 ? 's' : ''} completada{completadas > 1 ? 's' : ''} — Mostrar
                       </button>
                     )}
-                    <div className="px-5 py-2.5 border-t border-slate-50 dark:border-slate-700">
+                    <div className="px-5 py-2.5 border-t border-slate-50 dark:border-ink-500">
                       <button
                         onClick={() => setModalNueva(fase.numero)}
                         className="flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
@@ -629,11 +629,11 @@ export default function DetalleProyecto() {
             ) : (
               <>
                 {!proyecto.areas?.length ? (
-                  <p className="text-sm text-slate-400 dark:text-slate-500">Sin área asignada — visible en cualquier filtro de área.</p>
+                  <p className="text-sm text-slate-400 dark:text-ink-400">Sin área asignada — visible en cualquier filtro de área.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {proyecto.areas.map((a) => (
-                      <span key={a} className={`text-xs px-2 py-0.5 rounded-full font-medium ${AREA_COLOR[a] || 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                      <span key={a} className={`text-xs px-2 py-0.5 rounded-full font-medium ${AREA_COLOR[a] || 'bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300'}`}>
                         {AREA_LABEL[a] || a}
                       </span>
                     ))}
@@ -661,9 +661,9 @@ export default function DetalleProyecto() {
 
           <InfoCard titulo="Extras contratados" icono={<Sparkles size={14} />}>
             {!proyecto.proyecto.extras?.length
-              ? <p className="text-sm text-slate-400 dark:text-slate-500">Sin extras</p>
+              ? <p className="text-sm text-slate-400 dark:text-ink-400">Sin extras</p>
               : proyecto.proyecto.extras.map((e) => (
-                <div key={e} className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <div key={e} className="text-sm text-slate-700 dark:text-ink-300 flex items-center gap-2">
                   <Check size={13} className="text-brand-600 dark:text-brand-400 shrink-0" /> {e}
                 </div>
               ))
@@ -672,11 +672,11 @@ export default function DetalleProyecto() {
 
           <InfoCard titulo="Participantes del cliente" icono={<UserCircle2 size={14} />}>
             {!proyecto.cliente.participantes?.length
-              ? <p className="text-sm text-slate-400 dark:text-slate-500">Solo el contacto principal</p>
+              ? <p className="text-sm text-slate-400 dark:text-ink-400">Solo el contacto principal</p>
               : proyecto.cliente.participantes.map((p, i) => (
                 <div key={i} className="text-sm">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">{p.nombre}</span>
-                  <span className="text-slate-400 dark:text-slate-500"> · {p.rol}</span>
+                  <span className="font-medium text-slate-700 dark:text-ink-300">{p.nombre}</span>
+                  <span className="text-slate-400 dark:text-ink-400"> · {p.rol}</span>
                 </div>
               ))
             }
@@ -712,23 +712,23 @@ export default function DetalleProyecto() {
 
       {/* ─── Tab: Log ─── */}
       {tab === 'log' && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">
-            <Clock3 size={14} className="text-slate-400 dark:text-slate-500" /> Registro de actividad
+        <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-ink-100 mb-4">
+            <Clock3 size={14} className="text-slate-400 dark:text-ink-400" /> Registro de actividad
           </h3>
           <div className="relative">
-            <div className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200 dark:bg-slate-700" />
+            <div className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200 dark:bg-ink-500" />
             <div className="space-y-5">
               {[...proyecto.log].reverse().map((entry) => (
                 <div key={entry.id} className="relative pl-6">
-                  <div className="absolute left-0 top-1 w-2.5 h-2.5 rounded-full bg-brand-400 ring-4 ring-white dark:ring-slate-800" />
+                  <div className="absolute left-0 top-1 w-2.5 h-2.5 rounded-full bg-brand-400 ring-4 ring-white dark:ring-ink-800" />
                   <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                    <div className="text-sm text-slate-800 dark:text-slate-100">
+                    <div className="text-sm text-slate-800 dark:text-ink-100">
                       <span className="font-semibold">{entry.usuario}</span> — {entry.accion}
                     </div>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 shrink-0">{formatFechaHora(entry.fecha)}</div>
+                    <div className="text-xs text-slate-400 dark:text-ink-400 shrink-0">{formatFechaHora(entry.fecha)}</div>
                   </div>
-                  {entry.detalle && <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{entry.detalle}</div>}
+                  {entry.detalle && <div className="text-xs text-slate-500 dark:text-ink-300 mt-0.5">{entry.detalle}</div>}
                 </div>
               ))}
             </div>
@@ -747,20 +747,20 @@ export default function DetalleProyecto() {
                 setCopiado('link')
                 setTimeout(() => setCopiado(false), 2000)
               }}
-              className="flex-1 flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
+              className="flex-1 flex items-center justify-between gap-2 bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
               title="Copiar link"
             >
-              <code className="text-xs text-slate-700 dark:text-slate-300 truncate">/cliente/{proyecto.slug}</code>
-              {copiado === 'link' ? <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Copy size={13} className="text-slate-400 dark:text-slate-500 shrink-0" />}
+              <code className="text-xs text-slate-700 dark:text-ink-300 truncate">/cliente/{proyecto.slug}</code>
+              {copiado === 'link' ? <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Copy size={13} className="text-slate-400 dark:text-ink-400 shrink-0" />}
             </button>
             <a
               href={`/cliente/${proyecto.slug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
+              className="flex items-center justify-center bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
               title="Ver como cliente (sin contraseña, con tu sesión)"
             >
-              <ExternalLink size={13} className="text-slate-400 dark:text-slate-500" />
+              <ExternalLink size={13} className="text-slate-400 dark:text-ink-400" />
             </a>
           </div>
           <div className="flex items-stretch gap-1.5">
@@ -770,18 +770,18 @@ export default function DetalleProyecto() {
                 setCopiado('pass')
                 setTimeout(() => setCopiado(false), 2000)
               }}
-              className="flex-1 flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
+              className="flex-1 flex items-center justify-between gap-2 bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors text-left min-w-0"
               title="Copiar contraseña"
             >
-              <code className="text-xs text-slate-700 dark:text-slate-300 truncate">{proyecto.passwordCliente}</code>
-              {copiado === 'pass' ? <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Copy size={13} className="text-slate-400 dark:text-slate-500 shrink-0" />}
+              <code className="text-xs text-slate-700 dark:text-ink-300 truncate">{proyecto.passwordCliente}</code>
+              {copiado === 'pass' ? <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Copy size={13} className="text-slate-400 dark:text-ink-400 shrink-0" />}
             </button>
             <button
               onClick={handleRegenerarPassword}
-              className="flex items-center justify-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
+              className="flex items-center justify-center bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 hover:border-brand-300 dark:hover:border-brand-600 px-2.5 py-1.5 rounded-md transition-colors shrink-0"
               title="Generar nueva contraseña"
             >
-              <RefreshCw size={13} className="text-slate-400 dark:text-slate-500" />
+              <RefreshCw size={13} className="text-slate-400 dark:text-ink-400" />
             </button>
           </div>
           <button
@@ -810,7 +810,7 @@ export default function DetalleProyecto() {
             </>
           ) : (
             <>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mb-2">Este proyecto todavía no tiene carpeta de Drive.</p>
+              <p className="text-sm text-slate-400 dark:text-ink-400 mb-2">Este proyecto todavía no tiene carpeta de Drive.</p>
               <button
                 onClick={handleCrearDrive}
                 disabled={driveEstado === 'cargando'}
@@ -849,19 +849,19 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   const iconMap = {
     completada: <CheckCircle2 size={18} className="text-emerald-500 dark:text-emerald-400 shrink-0" />,
     en_proceso: <PlayCircle size={18} className="text-brand-600 dark:text-brand-400 shrink-0" />,
-    disponible: <Circle size={18} className="text-slate-300 dark:text-slate-600 shrink-0" />,
-    bloqueada_dependencia: <Lock size={18} className="text-slate-300 dark:text-slate-600 shrink-0" />,
+    disponible: <Circle size={18} className="text-slate-300 dark:text-ink-400 shrink-0" />,
+    bloqueada_dependencia: <Lock size={18} className="text-slate-300 dark:text-ink-400 shrink-0" />,
     bloqueada_cliente: <AlertCircle size={18} className="text-amber-400 dark:text-amber-500 shrink-0" />,
-    omitida: <XCircle size={18} className="text-slate-300 dark:text-slate-600 shrink-0" />,
+    omitida: <XCircle size={18} className="text-slate-300 dark:text-ink-400 shrink-0" />,
   }
 
   const bgMap = {
     completada: 'bg-emerald-50 dark:bg-emerald-500/10',
     en_proceso: 'bg-brand-50 dark:bg-brand-500/10',
-    disponible: 'bg-white dark:bg-slate-800',
-    bloqueada_dependencia: 'bg-slate-50 dark:bg-slate-900',
+    disponible: 'bg-white dark:bg-ink-800',
+    bloqueada_dependencia: 'bg-slate-50 dark:bg-ink-900',
     bloqueada_cliente: 'bg-amber-50 dark:bg-amber-500/10',
-    omitida: 'bg-slate-50 dark:bg-slate-900 opacity-50',
+    omitida: 'bg-slate-50 dark:bg-ink-900 opacity-50',
   }
 
   const personaAsignada = estado === 'completada' ? t.completadaPor : estado === 'en_proceso' ? t.asignadoA : responsableInfo.nombre
@@ -878,12 +878,12 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
       {t.esRutaCritica && <Flag size={13} className="text-rose-500 dark:text-rose-400 shrink-0" title="Ruta crítica" />}
       {t.esCliente && <span className="text-xs bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">Cliente</span>}
       {t.soloKarlaOAdmin && <span className="text-xs bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>}
-      {t.custom && <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full">Personalizada</span>}
+      {t.custom && <span className="text-xs bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300 px-2 py-0.5 rounded-full">Personalizada</span>}
     </>
   )
 
   return (
-    <div className={`px-5 py-3.5 border-b border-slate-50 dark:border-slate-700 last:border-0 ${bgMap[estado]}`}>
+    <div className={`px-5 py-3.5 border-b border-slate-50 dark:border-ink-500 last:border-0 ${bgMap[estado]}`}>
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{iconMap[estado]}</div>
 
@@ -907,14 +907,14 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-sm font-medium ${estado === 'completada' ? 'line-through text-slate-400 dark:text-slate-500' : estado === 'omitida' ? 'text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
+            <span className={`text-sm font-medium ${estado === 'completada' ? 'line-through text-slate-400 dark:text-ink-400' : estado === 'omitida' ? 'text-slate-400 dark:text-ink-400' : 'text-slate-800 dark:text-ink-100'}`}>
               {t.titulo}
             </span>
             {badges}
           </div>
 
           {mostrarAvatarPropio && (
-            <div className={`text-sm mt-0.5 ${estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+            <div className={`text-sm mt-0.5 ${estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-ink-300'}`}>
               {estado === 'completada'
                 ? `Completada por ${t.completadaPor} · ${formatFechaHora(t.completadaEn)}`
                 : estado === 'en_proceso'
@@ -927,7 +927,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
           {estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl) && (
             <div className="mt-1.5 text-sm bg-brand-50 dark:bg-brand-500/10 border border-brand-100 dark:border-brand-500/20 rounded-lg px-2.5 py-2 space-y-1">
-              {t.respuestaTexto && <p className="text-slate-700 dark:text-slate-300">{t.respuestaTexto}</p>}
+              {t.respuestaTexto && <p className="text-slate-700 dark:text-ink-300">{t.respuestaTexto}</p>}
               {t.respuestaArchivoUrl && (
                 <a href={t.respuestaArchivoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium">
                   <ExternalLink size={13} /> {t.respuestaArchivoNombre || 'Archivo adjunto'}
@@ -939,13 +939,13 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
           <div className="flex items-center gap-3 mt-1.5">
             <button
               onClick={() => setModalAbierto(true)}
-              className="text-sm text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1"
+              className="text-sm text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-300 flex items-center gap-1"
             >
               <Info size={13} />
               Ver detalles
             </button>
             {numComentarios > 0 && (
-              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-ink-300 bg-slate-100 dark:bg-ink-700 px-2 py-0.5 rounded-full">
                 <MessageCircle size={12} /> {numComentarios}
               </span>
             )}
@@ -965,7 +965,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
               </button>
             )}
             {estado === 'completada' && (
-              <button onClick={onReabrir} className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-2 py-1">
+              <button onClick={onReabrir} className="text-xs text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300 px-2 py-1">
                 Reabrir
               </button>
             )}
@@ -973,7 +973,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             {estado !== 'omitida' && (
               <button
                 onClick={onEditar}
-                className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
+                className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
                 title="Editar tarea"
               >
                 <Pencil size={13} />
@@ -984,13 +984,13 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
               onEliminar ? (
                 <button
                   onClick={() => setConfirmarEliminar(true)}
-                  className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                   title="Eliminar tarea"
                 >
                   <Trash2 size={13} />
                 </button>
               ) : (
-                <button onClick={onOmitir} className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Omitir tarea">
+                <button onClick={onOmitir} className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-slate-500 dark:hover:text-ink-300 hover:bg-slate-100 dark:hover:bg-ink-600 rounded-lg transition-colors" title="Omitir tarea">
                   <X size={13} />
                 </button>
               )
@@ -999,7 +999,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             {confirmarEliminar && (
               <div className="flex items-center gap-1">
                 <button onClick={onEliminar} className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg">Eliminar</button>
-                <button onClick={() => setConfirmarEliminar(false)} className="text-xs text-slate-400 dark:text-slate-500 px-1">No</button>
+                <button onClick={() => setConfirmarEliminar(false)} className="text-xs text-slate-400 dark:text-ink-400 px-1">No</button>
               </div>
             )}
           </div>
@@ -1024,10 +1024,10 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                 {t.plantillaMensaje && (
                   <DetalleSeccion titulo="Plantilla de mensaje">
                     <div className="relative">
-                      <pre className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-sans bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
+                      <pre className="text-xs text-slate-700 dark:text-ink-300 whitespace-pre-wrap font-sans bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
                       <button
                         onClick={copiarPlantilla}
-                        className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 dark:bg-slate-700 hover:bg-brand-100 dark:hover:bg-brand-500/20 text-slate-500 dark:text-slate-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 dark:bg-ink-700 hover:bg-brand-100 dark:hover:bg-brand-500/20 text-slate-500 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
                         title="Copiar plantilla"
                       >
                         {copiadoPlantilla ? <Check size={13} className="text-emerald-500 dark:text-emerald-400" /> : <Copy size={13} />}
@@ -1041,7 +1041,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                   </DetalleSeccion>
                 )}
                 {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
-                  <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300" />
+                  <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600 dark:text-ink-300" />
                 )}
               </>
             )}
@@ -1090,19 +1090,19 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Editar tarea</h3>
-          <button onClick={onCerrar} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"><X size={18} /></button>
+      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
+          <h3 className="font-semibold text-slate-800 dark:text-ink-100">Editar tarea</h3>
+          <button onClick={onCerrar} className="text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Título *</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Título *</label>
             <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} autoFocus />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Responsable</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
               <optgroup label="Rol">
                 {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
@@ -1117,28 +1117,28 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
 
           {!form.esCliente && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Descripción interna</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción interna</label>
               <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
             </div>
           )}
 
           {form.esCliente && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Instrucciones para el cliente</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente</label>
               <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente..." minHeight="6rem" />
             </div>
           )}
 
           <div className="flex gap-4 flex-wrap">
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
               <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
               Tarea del cliente
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
               <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-brand-500" />
               Ruta crítica
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
               <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-brand-500" />
               Solo Karla/Admin
             </label>
@@ -1146,9 +1146,9 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
 
           {form.esCliente && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Plazo sugerido (horas)</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
               <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer mt-2.5">
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer mt-2.5">
                 <input
                   type="checkbox"
                   checked={!form.avisosDesactivados}
@@ -1170,7 +1170,7 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
             <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Guardar cambios
             </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>
@@ -1213,27 +1213,27 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{esContinuo ? 'Nueva tarjeta' : `Nueva tarea — Fase ${contexto}`}</h3>
-          <button onClick={onCerrar} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"><X size={18} /></button>
+      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
+          <h3 className="font-semibold text-slate-800 dark:text-ink-100">{esContinuo ? 'Nueva tarjeta' : `Nueva tarea — Fase ${contexto}`}</h3>
+          <button onClick={onCerrar} className="text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Título *</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Título *</label>
             <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} placeholder="Nombre de la tarea..." autoFocus />
           </div>
 
           {esContinuo && !form.esCliente && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Columna</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Columna</label>
               <select value={form.columna} onChange={(e) => setForm({ ...form, columna: e.target.value })} className={inputCls}>
                 {KANBAN_COLUMNAS.map((c) => <option key={c.columna} value={c.columna}>{c.label}</option>)}
               </select>
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
             <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
             Es una tarea del cliente
           </label>
@@ -1241,7 +1241,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
           {!form.esCliente && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Responsable</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
                 <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
                   <optgroup label="Rol">
                     {RESPONSABLES.filter(r => r.valor !== 'cliente').map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
@@ -1254,7 +1254,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Descripción interna</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción interna</label>
                 <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="¿Qué hay que hacer exactamente?" />
               </div>
             </>
@@ -1263,11 +1263,11 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
           {form.esCliente && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Instrucciones para el cliente</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente</label>
                 <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente en su portal..." minHeight="6rem" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Plazo sugerido (horas)</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
                 <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
               </div>
             </>
@@ -1283,7 +1283,7 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
             <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Agregar tarea
             </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>
@@ -1293,13 +1293,13 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
   )
 }
 
-const inputCls = 'w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500'
+const inputCls = 'w-full border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2.5 text-sm text-slate-800 dark:text-ink-100 bg-white dark:bg-ink-900 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-ink-400'
 
 function InfoCard({ titulo, icono, children, fullWidth }) {
   return (
-    <div className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 ${fullWidth ? 'col-span-2' : ''}`}>
-      <h3 className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100 mb-3 text-sm">
-        {icono && <span className="text-slate-400 dark:text-slate-500">{icono}</span>}
+    <div className={`bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5 ${fullWidth ? 'col-span-2' : ''}`}>
+      <h3 className="flex items-center gap-2 font-semibold text-slate-800 dark:text-ink-100 mb-3 text-sm">
+        {icono && <span className="text-slate-400 dark:text-ink-400">{icono}</span>}
         {titulo}
       </h3>
       <div className="space-y-2">{children}</div>
@@ -1343,7 +1343,7 @@ function EditorAreas({ areasIniciales, onGuardar, onCancelar }) {
     <div className="space-y-2.5">
       <div className="flex flex-col gap-1.5">
         {AREAS.map((a) => (
-          <label key={a.valor} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+          <label key={a.valor} className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
             <input type="checkbox" checked={areas.includes(a.valor)} onChange={() => toggle(a.valor)} className="accent-brand-500" />
             {a.label}
           </label>
@@ -1357,7 +1357,7 @@ function EditorAreas({ areasIniciales, onGuardar, onCancelar }) {
         >
           <Check size={12} /> Guardar
         </button>
-        <button onClick={onCancelar} className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-2.5 py-1.5 rounded-md transition-colors">
+        <button onClick={onCancelar} className="flex items-center gap-1 text-xs text-slate-500 dark:text-ink-300 hover:text-slate-700 dark:hover:text-ink-100 px-2.5 py-1.5 rounded-md transition-colors">
           <X size={12} /> Cancelar
         </button>
       </div>
@@ -1393,11 +1393,11 @@ function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
     <form onSubmit={handleGuardar} className="space-y-2">
       {ROLES_EQUIPO_FORM.map(([key, label]) => (
         <div key={key} className="flex items-center gap-2">
-          <label className="text-xs text-slate-500 dark:text-slate-400 w-24 shrink-0">{label}</label>
+          <label className="text-xs text-slate-500 dark:text-ink-300 w-24 shrink-0">{label}</label>
           <select
             value={form[key]}
             onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-            className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40"
+            className="flex-1 border border-slate-200 dark:border-ink-500 bg-white dark:bg-ink-900 text-slate-800 dark:text-ink-100 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40"
           >
             <option value="">Por asignar</option>
             {key === 'programador' && <option value={EQUIPO_NO_APLICA}>No aplica</option>}
@@ -1411,7 +1411,7 @@ function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
         <button type="submit" disabled={guardando} className="text-xs bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
           {guardando ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Guardar
         </button>
-        <button type="button" onClick={onCancelar} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-2">Cancelar</button>
+        <button type="button" onClick={onCancelar} className="text-xs text-slate-500 dark:text-ink-300 hover:text-slate-700 dark:hover:text-ink-100 px-2">Cancelar</button>
       </div>
     </form>
   )
@@ -1443,15 +1443,15 @@ function LinksClienteEditor({ links, onGuardar }) {
     <form onSubmit={handleGuardar} className="space-y-3">
       {Object.entries(LINK_LABELS).map(([tipo, { label, placeholder }]) => (
         <div key={tipo} className="flex items-center gap-2">
-          <label className="text-xs text-slate-500 dark:text-slate-400 w-36 shrink-0">{label}</label>
+          <label className="text-xs text-slate-500 dark:text-ink-300 w-36 shrink-0">{label}</label>
           <input
             value={form[tipo]}
             onChange={(e) => setForm({ ...form, [tipo]: e.target.value })}
             placeholder={placeholder}
-            className="flex-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+            className="flex-1 border border-slate-200 dark:border-ink-500 bg-white dark:bg-ink-900 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 placeholder:text-slate-300 dark:placeholder:text-ink-400"
           />
           {form[tipo] && (
-            <a href={form[tipo]} target="_blank" rel="noopener noreferrer" className="text-slate-300 dark:text-slate-600 hover:text-brand-700 dark:hover:text-brand-400 shrink-0">
+            <a href={form[tipo]} target="_blank" rel="noopener noreferrer" className="text-slate-300 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 shrink-0">
               <ExternalLink size={13} />
             </a>
           )}
@@ -1485,23 +1485,23 @@ function ModalEliminarProyecto({ nombre, onConfirmar, onCerrar }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
           <h3 className="flex items-center gap-2 font-semibold text-red-600 dark:text-red-400"><AlertTriangle size={17} /> Eliminar proyecto</h3>
-          <button onClick={onCerrar} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"><X size={18} /></button>
+          <button onClick={onCerrar} className="text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-slate-600 dark:text-ink-300">
             Esta acción es <span className="font-semibold text-red-600 dark:text-red-400">permanente</span> y elimina el proyecto, sus tareas y su historial. No se puede deshacer.
           </p>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">
               Escribe <span className="font-semibold">{nombre}</span> para confirmar
             </label>
             <input
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
-              className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-500/40 focus:border-transparent"
+              className="w-full border border-slate-200 dark:border-ink-500 bg-white dark:bg-ink-900 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-500/40 focus:border-transparent"
               autoFocus
             />
           </div>
@@ -1513,7 +1513,7 @@ function ModalEliminarProyecto({ nombre, onConfirmar, onCerrar }) {
             >
               {eliminando ? 'Eliminando...' : 'Eliminar proyecto'}
             </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>
@@ -1535,25 +1535,25 @@ function ModalLink({ tareaId, linkTipo, titulo, valorActual, onCompletar, onCerr
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Completar tarea</h3>
-          <button onClick={onCerrar} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"><X size={18} /></button>
+      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
+          <h3 className="font-semibold text-slate-800 dark:text-ink-100">Completar tarea</h3>
+          <button onClick={onCerrar} className="text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <div className="text-sm text-slate-600 dark:text-slate-300 mb-1">Tarea: <span className="font-medium text-slate-800 dark:text-slate-100">{titulo}</span></div>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Para completar esta tarea es necesario pegar el link generado. Este link quedará visible en el panel del cliente.</p>
+            <div className="text-sm text-slate-600 dark:text-ink-300 mb-1">Tarea: <span className="font-medium text-slate-800 dark:text-ink-100">{titulo}</span></div>
+            <p className="text-xs text-slate-400 dark:text-ink-400">Para completar esta tarea es necesario pegar el link generado. Este link quedará visible en el panel del cliente.</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{info.label} *</label>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={info.placeholder} className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 placeholder:text-slate-400 dark:placeholder:text-slate-500" autoFocus />
+            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">{info.label} *</label>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={info.placeholder} className="w-full border border-slate-200 dark:border-ink-500 bg-white dark:bg-ink-900 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 placeholder:text-slate-400 dark:placeholder:text-ink-400" autoFocus />
           </div>
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={!url.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Completar y guardar link
             </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>
@@ -1566,8 +1566,8 @@ function ModalLink({ tareaId, linkTipo, titulo, valorActual, onCompletar, onCerr
 function InfoRow({ label, valor }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="text-slate-800 dark:text-slate-100 font-medium">{valor || '—'}</span>
+      <span className="text-slate-500 dark:text-ink-300">{label}</span>
+      <span className="text-slate-800 dark:text-ink-100 font-medium">{valor || '—'}</span>
     </div>
   )
 }
@@ -1575,8 +1575,8 @@ function InfoRow({ label, valor }) {
 function InfoBool({ label, valor }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className={valor ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}>{valor ? '✓ Sí' : '✗ No'}</span>
+      <span className="text-slate-500 dark:text-ink-300">{label}</span>
+      <span className={valor ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-ink-400'}>{valor ? '✓ Sí' : '✗ No'}</span>
     </div>
   )
 }
@@ -1586,8 +1586,8 @@ function statusBadge(status) {
     activo: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
     en_pausa: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
     pendiente_anticipo: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-    completado: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-    cancelado: 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
+    completado: 'bg-slate-100 text-slate-600 dark:bg-ink-700 dark:text-ink-300',
+    cancelado: 'bg-slate-100 text-slate-500 dark:bg-ink-700 dark:text-ink-300',
   }
   return m[status] || m.activo
 }
@@ -1608,7 +1608,7 @@ function DetalleSeccion({ titulo, children }) {
 
 function TextoFormateado({ texto }) {
   return (
-    <div className="text-xs text-slate-700 dark:text-slate-300 space-y-0.5">
+    <div className="text-xs text-slate-700 dark:text-ink-300 space-y-0.5">
       {texto.split('\n').map((linea, i) => (
         <div key={i} className={linea === '' ? 'h-1' : ''}>
           {linea}

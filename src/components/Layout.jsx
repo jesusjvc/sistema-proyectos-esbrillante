@@ -33,7 +33,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
   const esEquipo = user?.rol === 'equipo'
 
   return (
-    <div className="h-screen flex bg-slate-50 dark:bg-slate-950 overflow-hidden">
+    <div className="h-screen flex bg-slate-50 dark:bg-ink-950 overflow-hidden">
       <aside className={`${colapsado ? 'w-16' : 'w-60'} bg-slate-950 text-white flex flex-col shrink-0 transition-[width] duration-150`}>
         <div className={`${colapsado ? 'px-0 py-5 flex justify-center' : 'px-5 py-5'} border-b border-slate-800 shrink-0`}>
           {colapsado ? (
@@ -108,18 +108,18 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center gap-3 shrink-0">
+        <header className="bg-white dark:bg-ink-800 border-b border-slate-200 dark:border-ink-500 px-6 py-4 flex items-center gap-3 shrink-0">
           {volver && (
             <button
               onClick={() => navigate(volver)}
-              className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm transition-colors shrink-0"
+              className="flex items-center gap-1 text-slate-500 dark:text-ink-300 hover:text-slate-800 dark:hover:text-white text-sm transition-colors shrink-0"
             >
               <ChevronLeft size={16} />
             </button>
           )}
           <div className="flex items-center gap-2 min-w-0">
             {badge}
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100 truncate">{titulo}</h1>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-ink-100 truncate">{titulo}</h1>
           </div>
           {acciones && <div className="flex items-center gap-2 shrink-0 ml-auto">{acciones}</div>}
         </header>
