@@ -20,7 +20,7 @@ const STATUS_CONFIG = {
   cancelado: { label: 'Cancelado', color: 'bg-slate-100 text-slate-500', icon: null },
 }
 
-const KANBAN_SEGMENT_COLOR = { todo: 'bg-slate-300', doing: 'bg-brand-500', revision: 'bg-violet-500', done: 'bg-emerald-500' }
+const KANBAN_COUNT_COLOR = { todo: 'text-slate-700', doing: 'text-blue-700', revision: 'text-amber-700', done: 'text-emerald-700' }
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -173,9 +173,9 @@ export default function AdminDashboard() {
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {filtrados.map((p) => (
-            <ProyectoRow key={p.id} proyecto={p} miembros={miembros} avatares={avatares} onConfirmarAnticipo={handleConfirmarAnticipo} />
+            <ProyectoCard key={p.id} proyecto={p} miembros={miembros} avatares={avatares} onConfirmarAnticipo={handleConfirmarAnticipo} />
           ))}
         </div>
       )}
@@ -274,10 +274,10 @@ function AvatarStack({ miembros, avatares }) {
 
 function ProgressBar({ avance, faseActual, faseNombre }) {
   return (
-    <div className="w-56 shrink-0">
-      <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-        <span>Fase {faseActual} — {faseNombre}</span>
-        <span className="font-semibold text-slate-700">{avance}%</span>
+    <div className="w-full">
+      <div className="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+        <span className="truncate">Fase {faseActual} — {faseNombre}</span>
+        <span className="font-semibold text-slate-700 shrink-0 ml-2">{avance}%</span>
       </div>
       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
@@ -286,25 +286,20 @@ function ProgressBar({ avance, faseActual, faseNombre }) {
   )
 }
 
-function KanbanBar({ counts }) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1
+function KanbanMini({ counts }) {
   return (
-    <div className="w-56 shrink-0">
-      <div className="h-1.5 rounded-full overflow-hidden flex gap-0.5 bg-slate-100">
-        {KANBAN_COLUMNAS.map((c) => counts[c.columna] > 0 && (
-          <div key={c.columna} className={`h-full ${KANBAN_SEGMENT_COLOR[c.columna]}`} style={{ width: `${(counts[c.columna] / total) * 100}%` }} />
-        ))}
-      </div>
-      <div className="flex items-center gap-2.5 mt-1 text-[11px] text-slate-500">
-        {KANBAN_COLUMNAS.map((c) => (
-          <span key={c.columna}><span className="font-semibold text-slate-600">{counts[c.columna]}</span> {c.label}</span>
-        ))}
-      </div>
+    <div className="grid grid-cols-4 gap-2">
+      {KANBAN_COLUMNAS.map((c) => (
+        <div key={c.columna} className="bg-slate-50 rounded-lg py-2 flex flex-col items-center gap-0.5">
+          <span className={`text-base font-bold ${KANBAN_COUNT_COLOR[c.columna]}`}>{counts[c.columna]}</span>
+          <span className="text-[10px] font-medium text-slate-400">{c.label}</span>
+        </div>
+      ))}
     </div>
   )
 }
 
-function ProyectoRow({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
+function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
   const navigate = useNavigate()
   const esContinuo = p.tipo === 'continuo'
   const avance = calcularAvance(p)
@@ -323,78 +318,87 @@ function ProyectoRow({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
     return !t.esCliente && t.dependencias.every((d) => completadasIds.has(d))
   }).length
 
+  const etiquetas = [
+    respuestaNueva && (
+      <Chip key="respuesta" className="bg-brand-100 text-brand-800">
+        <Bell size={11} /> Respuesta nueva
+      </Chip>
+    ),
+    pendientesCliente > 0 && (
+      <Chip key="pendientes" className="bg-amber-100 text-amber-700">
+        <MessageCircle size={11} /> {pendientesCliente} pendiente{pendientesCliente > 1 ? 's' : ''}
+      </Chip>
+    ),
+    tareasVencidas > 0 && (
+      <Chip key="vencidas" className="bg-red-100 text-red-700">
+        <AlertCircle size={11} /> {tareasVencidas} atrasada{tareasVencidas > 1 ? 's' : ''}
+      </Chip>
+    ),
+    ...(p.areas?.map((a) => (
+      <Chip key={a} className={AREA_COLOR[a] || 'bg-slate-100 text-slate-500'}>{AREA_LABEL[a] || a}</Chip>
+    )) || []),
+  ].filter(Boolean)
+
   return (
     <div
       onClick={() => navigate(`/admin/proyecto/${p.slug}`)}
-      className={`bg-white rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 flex flex-col gap-2.5 ${
+      className={`bg-white rounded-xl border p-5 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 flex flex-col gap-3.5 ${
         tareasVencidas > 0 ? 'border-red-300 ring-1 ring-red-200' : respuestaNueva ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200 hover:border-slate-300'
       }`}
     >
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <h3 className="font-semibold text-slate-800 truncate">{p.cliente.nombreComercial}</h3>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${cfg.color}`}>
-            {cfg.icon}{cfg.label}
-          </span>
-          {respuestaNueva && (
-            <Chip className="bg-brand-100 text-brand-800">
-              <Bell size={11} /> Respuesta nueva
-            </Chip>
-          )}
-          {pendientesCliente > 0 && (
-            <Chip className="bg-amber-100 text-amber-700">
-              <MessageCircle size={11} /> {pendientesCliente} pendiente{pendientesCliente > 1 ? 's' : ''} del cliente
-            </Chip>
-          )}
-          {tareasVencidas > 0 && (
-            <Chip className="bg-red-100 text-red-700">
-              <AlertCircle size={11} /> {tareasVencidas} atrasada{tareasVencidas > 1 ? 's' : ''}
-            </Chip>
-          )}
-          {p.areas?.map((a) => (
-            <Chip key={a} className={AREA_COLOR[a] || 'bg-slate-100 text-slate-500'}>{AREA_LABEL[a] || a}</Chip>
-          ))}
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${cfg.color}`}>
+          {cfg.icon}{cfg.label}
+        </span>
         <BadgeEntrega proyecto={p} />
       </div>
 
-      <div className="text-sm text-slate-500">
-        {p.proyecto.paquete}
-        {p.proyecto.extras?.length > 0 && ` · ${p.proyecto.extras.length} extra${p.proyecto.extras.length > 1 ? 's' : ''}`}
+      <div className="min-w-0">
+        <h3 className="font-semibold text-slate-800 text-[17px] truncate">{p.cliente.nombreComercial}</h3>
+        <p className="text-sm text-slate-500 truncate">
+          {p.proyecto.paquete}
+          {p.proyecto.extras?.length > 0 && ` · ${p.proyecto.extras.length} extra${p.proyecto.extras.length > 1 ? 's' : ''}`}
+        </p>
       </div>
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        {p.status === 'pendiente_anticipo' ? (
-          <>
-            <span className="text-sm text-slate-400 flex items-center gap-2">
-              <Clock size={12} />
-              {equipoProyecto.length > 0 ? `Equipo: ${equipoProyecto.map((m) => m.nombre).join(', ')}` : 'Sin equipo asignado aún'}
+      {etiquetas.length > 0 && <div className="flex flex-wrap gap-1.5">{etiquetas}</div>}
+
+      {p.status === 'pendiente_anticipo' ? (
+        <div className="mt-auto pt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
+          <span className="text-xs text-slate-400 flex items-center gap-1.5 min-w-0 truncate">
+            <Clock size={12} className="shrink-0" />
+            {equipoProyecto.length > 0 ? `Equipo: ${equipoProyecto.map((m) => m.nombre).join(', ')}` : 'Sin equipo asignado'}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onConfirmarAnticipo(p.slug)
+            }}
+            className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            Confirmar anticipo
+          </button>
+        </div>
+      ) : (
+        <>
+          {esContinuo ? <KanbanMini counts={columnasCount} /> : <ProgressBar avance={avance} faseActual={faseActual} faseNombre={faseNombre} />}
+
+          <div className="mt-auto pt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1 text-sm font-semibold text-slate-800 shrink-0">
+              Ver proyecto
+              <ChevronRight size={14} />
             </span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onConfirmarAnticipo(p.slug)
-              }}
-              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0"
-            >
-              Confirmar anticipo
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-4 min-w-0 flex-wrap">
-              {esContinuo ? <KanbanBar counts={columnasCount} /> : <ProgressBar avance={avance} faseActual={faseActual} faseNombre={faseNombre} />}
+            <div className="flex items-center gap-2 min-w-0">
+              {tareasDisponibles > 0 && (
+                <span className="text-xs font-semibold bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full shrink-0">
+                  {tareasDisponibles} disp.
+                </span>
+              )}
               <AvatarStack miembros={equipoProyecto} avatares={avatares} />
             </div>
-            {tareasDisponibles > 0 && (
-              <span className="flex items-center gap-1 text-xs font-semibold bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full shrink-0">
-                {tareasDisponibles} disponible{tareasDisponibles > 1 ? 's' : ''}
-                <ChevronRight size={12} />
-              </span>
-            )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
