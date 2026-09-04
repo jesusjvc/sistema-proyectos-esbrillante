@@ -39,6 +39,7 @@ export const cambiarTipoProyecto = (slug, tipo) => req('PUT', `/api/proyectos/${
 export const actualizarEquipoProyecto = (slug, equipo) => req('PUT', `/api/proyectos/${slug}/equipo`, { equipo })
 export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-visto`)
 export const regenerarPasswordCliente = (slug) => req('POST', `/api/proyectos/${slug}/regenerar-password`)
+export const actualizarAreasProyecto = (slug, areas) => req('PUT', `/api/proyectos/${slug}/areas`, { areas })
 
 // ─── Tareas ────────────────────────────────────────────────────────────────
 export const iniciarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/iniciar`)
@@ -47,6 +48,7 @@ export const reabrirTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slu
 export const omitirTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/omitir`)
 export const editarTarea = (slug, tareaId, data) => req('PUT', `/api/proyectos/${slug}/tareas/${tareaId}`, data)
 export const moverTarea = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/mover`, data)
+export const reordenarTarea = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/reordenar`, data)
 export const agregarTarea = (slug, data) => req('POST', `/api/proyectos/${slug}/tareas`, data)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
 export const listarComentarios = (slug, tareaId) => req('GET', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`)

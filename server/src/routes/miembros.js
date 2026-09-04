@@ -5,11 +5,13 @@ import { requireAdmin, requireAuth } from '../middleware/auth.js'
 
 const router = Router()
 
+const AREAS_VALIDAS = ['web', 'diseno_grafico', 'redes_sociales']
+
 // GET /api/miembros
 router.get('/', requireAuth, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true, avatarUrl: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true },
       orderBy: { nombre: 'asc' },
     })
     res.json(users)
@@ -21,14 +23,15 @@ router.get('/', requireAuth, async (req, res) => {
 
 // POST /api/miembros
 router.post('/', requireAdmin, async (req, res) => {
-  const { email, password, nombre, rol, esKarla } = req.body
+  const { email, password, nombre, rol, esKarla, area } = req.body
   if (!email || !password || !nombre) return res.status(400).json({ error: 'email, password y nombre son requeridos' })
+  if (area && !AREAS_VALIDAS.includes(area)) return res.status(400).json({ error: `area inválida — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
 
   try {
     const hash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
-      data: { email: email.toLowerCase().trim(), password: hash, nombre, rol: rol || 'EQUIPO', esKarla: esKarla || false },
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true, avatarUrl: true },
+      data: { email: email.toLowerCase().trim(), password: hash, nombre, rol: rol || 'EQUIPO', esKarla: esKarla || false, area: area || null },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true },
     })
     res.status(201).json(user)
   } catch (err) {
@@ -40,20 +43,22 @@ router.post('/', requireAdmin, async (req, res) => {
 
 // PUT /api/miembros/:id
 router.put('/:id', requireAdmin, async (req, res) => {
-  const { nombre, email, rol, esKarla, activo, password } = req.body
+  const { nombre, email, rol, esKarla, area, activo, password } = req.body
+  if (area && !AREAS_VALIDAS.includes(area)) return res.status(400).json({ error: `area inválida — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
   try {
     const data = {}
     if (nombre !== undefined) data.nombre = nombre
     if (email !== undefined) data.email = email.toLowerCase().trim()
     if (rol !== undefined) data.rol = rol
     if (esKarla !== undefined) data.esKarla = esKarla
+    if (area !== undefined) data.area = area || null
     if (activo !== undefined) data.activo = activo
     if (password) data.password = await bcrypt.hash(password, 12)
 
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, activo: true, avatarUrl: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true },
     })
     res.json(user)
   } catch (err) {

@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import { getMiembros, crearMiembro, editarMiembro, eliminarMiembro } from '../../data/api'
+import { AREAS, AREA_LABEL } from '../../lib/areas'
 import { Plus, Pencil, Trash2, Check, X, Shield, Star } from 'lucide-react'
 
-const FORM_VACIO = { nombre: '', email: '', password: '', rol: 'EQUIPO', esKarla: false }
+const FORM_VACIO = { nombre: '', email: '', password: '', rol: 'EQUIPO', esKarla: false, area: '' }
 
 export default function Equipo() {
   const [miembros, setMiembros] = useState([])
@@ -28,12 +29,12 @@ export default function Equipo() {
 
   function iniciarEdicion(m) {
     setEditandoId(m.id)
-    setEditForm({ nombre: m.nombre, email: m.email, rol: m.rol, esKarla: m.esKarla, password: '' })
+    setEditForm({ nombre: m.nombre, email: m.email, rol: m.rol, esKarla: m.esKarla, area: m.area || '', password: '' })
   }
 
   async function guardarEdicion(id) {
     if (!editForm.nombre.trim()) return
-    const data = { nombre: editForm.nombre, email: editForm.email, rol: editForm.rol, esKarla: editForm.esKarla }
+    const data = { nombre: editForm.nombre, email: editForm.email, rol: editForm.rol, esKarla: editForm.esKarla, area: editForm.area || null }
     if (editForm.password) data.password = editForm.password
     await editarMiembro(id, data)
     setEditandoId(null)
@@ -53,7 +54,7 @@ export default function Equipo() {
       return
     }
     try {
-      await crearMiembro({ nombre: nuevoForm.nombre, email: nuevoForm.email, password: nuevoForm.password, rol: nuevoForm.rol, esKarla: nuevoForm.esKarla })
+      await crearMiembro({ nombre: nuevoForm.nombre, email: nuevoForm.email, password: nuevoForm.password, rol: nuevoForm.rol, esKarla: nuevoForm.esKarla, area: nuevoForm.area || null })
       setNuevoForm(FORM_VACIO)
       setMostrarNuevo(false)
       cargar()
@@ -108,6 +109,14 @@ export default function Equipo() {
                         <input type="checkbox" checked={editForm.esKarla} onChange={(e) => setEditForm({ ...editForm, esKarla: e.target.checked })} className="accent-brand-500" />
                         Rol QA (Karla)
                       </label>
+                      <select
+                        value={editForm.area}
+                        onChange={(e) => setEditForm({ ...editForm, area: e.target.value })}
+                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-400"
+                      >
+                        <option value="">Sin área</option>
+                        {AREAS.map((a) => <option key={a.valor} value={a.valor}>{a.label}</option>)}
+                      </select>
                       <div className="flex gap-1 ml-auto">
                         <button onClick={() => guardarEdicion(m.id)} className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
                           <Check size={13} /> Guardar
@@ -136,6 +145,7 @@ export default function Equipo() {
                         {m.rol === 'ADMIN' && <span className="text-xs text-brand-700 flex items-center gap-0.5"><Shield size={11} /> Admin</span>}
                         {m.esKarla && <span className="text-xs text-amber-600 flex items-center gap-0.5"><Star size={11} /> QA</span>}
                         {m.rol !== 'ADMIN' && !m.esKarla && <span className="text-xs text-slate-400">Equipo</span>}
+                        {m.area && <span className="text-xs text-slate-500">· {AREA_LABEL[m.area]}</span>}
                         {!m.activo && <span className="text-xs text-red-400">Inactivo</span>}
                       </div>
                     </div>
@@ -165,6 +175,14 @@ export default function Equipo() {
                       <input type="checkbox" checked={nuevoForm.esKarla} onChange={(e) => setNuevoForm({ ...nuevoForm, esKarla: e.target.checked })} className="accent-brand-500" />
                       Rol QA (Karla)
                     </label>
+                    <select
+                      value={nuevoForm.area}
+                      onChange={(e) => setNuevoForm({ ...nuevoForm, area: e.target.value })}
+                      className="border border-slate-200 rounded-lg px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-brand-400"
+                    >
+                      <option value="">Sin área</option>
+                      {AREAS.map((a) => <option key={a.valor} value={a.valor}>{a.label}</option>)}
+                    </select>
                     <div className="flex gap-1 ml-auto">
                       <button onClick={handleAgregar} className="flex items-center gap-1 bg-brand-500 hover:bg-brand-600 text-slate-900 text-xs px-3 py-1.5 rounded-lg transition-colors">
                         <Check size={13} /> Agregar

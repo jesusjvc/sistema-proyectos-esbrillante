@@ -21,6 +21,9 @@ model User {
   esKarla   Boolean @default(false)
   activo    Boolean @default(true)
   avatarUrl String?
+  // Área a la que pertenece (web | diseno_grafico | redes_sociales) — determina
+  // qué proyectos ve por defecto en el dashboard. null = ve todos (sin filtrar).
+  area      String?
 
   creadoEn DateTime @default(now())
 
@@ -42,6 +45,9 @@ model Proyecto {
   vistoAdminEn        DateTime?
   tiempos             Json     @default("{}")
   passwordCliente     String
+  // Una o varias áreas (web | diseno_grafico | redes_sociales) — un proyecto
+  // integral tiene varias. Vacío = visible en cualquier filtro de área.
+  areas               String[] @default([])
 
   tareas      Tarea[]
   log         LogEntry[]

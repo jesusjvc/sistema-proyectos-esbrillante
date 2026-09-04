@@ -11,6 +11,13 @@ import solicitudesRouter from './solicitudes.js'
 
 const router = Router()
 
+// Lista fija por ahora — duplicada (no importada) de src/lib/areas.js porque
+// frontend y backend se despliegan como apps separadas en Coolify.
+const AREAS_VALIDAS = ['web', 'diseno_grafico', 'redes_sociales']
+function areasValidas(areas) {
+  return Array.isArray(areas) && areas.every((a) => AREAS_VALIDAS.includes(a))
+}
+
 router.use('/:slug/tareas', tareasRouter)
 router.use('/:slug/solicitudes', solicitudesRouter)
 
@@ -59,7 +66,8 @@ router.get('/:slug', requireAuth, async (req, res) => {
 
 // POST /api/proyectos
 router.post('/', requireAuthOrApiKey, async (req, res) => {
-  const { tipo, cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor } = req.body
+  const { tipo, cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor, areas } = req.body
+  if (areas !== undefined && !areasValidas(areas)) return res.status(400).json({ error: `areas inválido — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
   const slug = generarSlug(cliente.nombreComercial)
 
   try {
@@ -73,6 +81,7 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
           proyecto,
           condicionesTecnicas,
           equipo,
+          areas: areas || [],
           passwordCliente: passwordCliente || generarPasswordSimple(),
           linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
           tiempos: {
@@ -244,6 +253,24 @@ router.put('/:slug/equipo', requireAuth, async (req, res) => {
     res.json({ ok: true, equipo: nuevoEquipo })
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// PUT /api/proyectos/:slug/areas
+router.put('/:slug/areas', requireAuth, async (req, res) => {
+  const { areas } = req.body
+  if (!areasValidas(areas)) return res.status(400).json({ error: `areas inválido — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    await prisma.proyecto.update({ where: { id: p.id }, data: { areas } })
+    emitirCambio(p.id)
+    res.json({ ok: true, areas })
+  } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
   }

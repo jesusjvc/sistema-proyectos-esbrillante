@@ -13,6 +13,19 @@
   --color-brand-700: #b08200;
   --color-brand-800: #8a6600;
   --color-brand-900: #715400;
+
+  /* Escala neutra oscura de docs/brand/DESIGN.md (sección 4) — reemplaza
+     el gris azulado de Tailwind `slate` en dark mode por los tonos casi
+     negros reales de la marca Foco. */
+  --color-ink-100: #f5f6f8; /* --text */
+  --color-ink-300: #b5bdca; /* --text-muted */
+  --color-ink-400: #8793a5; /* --control-border */
+  --color-ink-500: #3d4554; /* --border */
+  --color-ink-600: #2d3340; /* --surface-hover */
+  --color-ink-700: #242832; /* --surface-raised (menús, diálogos) */
+  --color-ink-800: #1b1e25; /* --surface (tarjetas, nav) */
+  --color-ink-900: #15181f; /* --surface-muted */
+  --color-ink-950: #111318; /* --bg */
 }
 
 * {

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useRef } from 'react'
 import { Pencil, Check, X } from 'lucide-react'
 import EditorEnriquecido from './EditorEnriquecido'
 import TextoEnriquecido from './TextoEnriquecido'
+import ModalDetalleTarea from './ModalDetalleTarea'
 
 /**
  * Descripción libre del proyecto — contexto de qué trata y qué se busca
@@ -12,6 +13,19 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
   const [editando, setEditando] = useState(false)
   const [valor, setValor] = useState(descripcion || '')
   const [guardando, setGuardando] = useState(false)
+  const [truncado, setTruncado] = useState(false)
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const contenidoRef = useRef(null)
+
+  // `contenidoRef` solo existe montado cuando !editando && hay descripción —
+  // `editando` debe estar en las dependencias para remedir justo al volver
+  // de editar (si no, con el ref recién montado en ese mismo render, el
+  // efecto no se dispara de nuevo y `truncado` se queda con el valor de la
+  // medición anterior).
+  useLayoutEffect(() => {
+    if (!contenidoRef.current) return
+    setTruncado(contenidoRef.current.scrollHeight > contenidoRef.current.clientHeight + 2)
+  }, [descripcion, editando])
 
   async function handleGuardar() {
     setGuardando(true)
@@ -46,7 +60,7 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
           </button>
           <button
             onClick={handleCancelar}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-md transition-colors"
+            className="flex items-center gap-1 text-xs text-slate-500 dark:text-ink-300 hover:text-slate-700 dark:hover:text-ink-100 px-2.5 py-1.5 rounded-md transition-colors"
           >
             <X size={12} /> Cancelar
           </button>
@@ -59,7 +73,7 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
     return (
       <button
         onClick={() => setEditando(true)}
-        className="flex items-center gap-1 text-sm text-slate-400 hover:text-brand-700 mt-1.5 transition-colors"
+        className="flex items-center gap-1 text-sm text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 mt-1.5 transition-colors"
       >
         <Pencil size={12} /> Agregar descripción del proyecto
       </button>
@@ -68,14 +82,32 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
 
   return (
     <div className="mt-1.5 flex items-start gap-1.5 group">
-      <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 leading-relaxed flex-1" />
+      <div className="flex-1 min-w-0">
+        <div ref={contenidoRef} className="line-clamp-1">
+          <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 dark:text-ink-300 leading-relaxed" />
+        </div>
+        {truncado && (
+          <button
+            onClick={() => setModalAbierto(true)}
+            className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 mt-1"
+          >
+            Ver más
+          </button>
+        )}
+      </div>
       <button
         onClick={() => setEditando(true)}
-        className="text-slate-300 hover:text-brand-700 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
+        className="text-slate-300 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
         title="Editar descripción"
       >
         <Pencil size={12} />
       </button>
+
+      {modalAbierto && (
+        <ModalDetalleTarea titulo="Descripción del proyecto" onCerrar={() => setModalAbierto(false)}>
+          <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 dark:text-ink-300 leading-relaxed" />
+        </ModalDetalleTarea>
+      )}
     </div>
   )
 }

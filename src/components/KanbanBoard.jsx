@@ -10,6 +10,7 @@ import Avatar from './Avatar'
 import TextoEnriquecido from './TextoEnriquecido'
 import HiloComentarios from './HiloComentarios'
 import ModalDetalleTarea from './ModalDetalleTarea'
+import SelectorResponsableRapido from './SelectorResponsableRapido'
 import {
   CheckCircle2, PlayCircle, Eye, Circle, Pencil, Trash2,
   Flag, UserX, MessageCircle,
@@ -28,7 +29,7 @@ function agrupar(tareas) {
 // portal del cliente, para proyectos de tipo "continuo". El estado local
 // `columnas` se mantiene optimista durante el drag (patrón multi-container
 // de dnd-kit) y se resincroniza desde `tareas` cuando no hay drag activo.
-export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onComentar, readOnly = false, avatares = {}, equipo, miembrosPorId = {} }) {
+export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onComentar, onAsignar, readOnly = false, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [columnas, setColumnas] = useState(() => agrupar(tareas))
   const [activeId, setActiveId] = useState(null)
 
@@ -114,9 +115,11 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
             onEditar={onEditar}
             onEliminar={onEliminar}
             onComentar={onComentar}
+            onAsignar={onAsignar}
             avatares={avatares}
             equipo={equipo}
             miembrosPorId={miembrosPorId}
+            miembros={miembros}
           />
         ))}
       </div>
@@ -127,26 +130,26 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
   )
 }
 
-function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, avatares, equipo, miembrosPorId }) {
+function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, onAsignar, avatares, equipo, miembrosPorId, miembros }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
-    todo: 'text-slate-500 dark:text-slate-400',
+    todo: 'text-slate-500 dark:text-ink-300',
     doing: 'text-brand-600 dark:text-brand-400',
     revision: 'text-amber-600 dark:text-amber-400',
     done: 'text-emerald-600 dark:text-emerald-400',
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col min-h-[120px] w-72 shrink-0">
+    <div className="bg-slate-50 dark:bg-ink-900/60 border border-slate-200 dark:border-ink-500 rounded-xl flex flex-col min-h-[120px] w-72 shrink-0">
       <div className={`flex items-center gap-1.5 px-3.5 py-3 text-sm font-semibold ${colorMap[columna.columna]}`}>
         {iconMap[columna.columna]}
         {columna.label}
-        <span className="ml-auto text-xs font-normal text-slate-400 dark:text-slate-500">{tareas.length}</span>
+        <span className="ml-auto text-xs font-normal text-slate-400 dark:text-ink-400">{tareas.length}</span>
       </div>
       <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
           {tareas.map((t) => (
-            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} onComentar={onComentar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} />
+            <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} onComentar={onComentar} onAsignar={onAsignar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} miembros={miembros} />
           ))}
         </DroppableArea>
       </SortableContext>
@@ -164,7 +167,7 @@ function DroppableArea({ id, children }) {
   return <div ref={setNodeRef} className="flex-1 px-2.5 pb-2.5 space-y-2 min-h-[60px]">{children}</div>
 }
 
-function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overlay, avatares = {}, equipo, miembrosPorId = {} }) {
+function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsignar, overlay, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [modalAbierto, setModalAbierto] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, disabled: readOnly })
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
@@ -178,11 +181,15 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
   const personaAsignada = t.estado === 'completada' ? t.completadaPor : t.estado === 'en_proceso' ? t.asignadoA : responsableInfo.nombre
   const sinPersonaClara = !personaAsignada
   const numComentarios = t.comentarios?.length || 0
+  // Reasignar solo tiene sentido mientras el avatar refleja el campo
+  // `responsable` — en completada/en_proceso el avatar es info histórica
+  // (quién completó / quién la tomó), no el responsable editable.
+  const puedeReasignar = !!onAsignar && t.estado !== 'completada' && t.estado !== 'en_proceso'
 
   const badges = (
     <>
       {t.esRutaCritica && <Flag size={13} className="text-rose-500 shrink-0" title="Ruta crítica" />}
-      {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">Personalizada</span>}
+      {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300 px-1.5 py-0.5 rounded-full">Personalizada</span>}
     </>
   )
 
@@ -201,12 +208,24 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
         style={style}
         {...(!readOnly ? { ...attributes, ...listeners } : {})}
         onClick={() => !isDragging && setModalAbierto(true)}
-        className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 select-none ${readOnly ? '' : 'cursor-pointer active:cursor-grabbing'} ${overlay ? 'shadow-xl rotate-1' : 'shadow-sm hover:border-brand-300 dark:hover:border-brand-500/50 transition-colors'}`}
+        className={`bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2.5 select-none ${readOnly ? '' : 'cursor-pointer active:cursor-grabbing'} ${overlay ? 'shadow-xl rotate-1' : 'shadow-sm hover:border-brand-300 dark:hover:border-brand-500/50 transition-colors'}`}
       >
         <div className="flex items-start gap-2">
           {sinPersonaClara ? (
-            <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
-              <UserX size={13} className="text-amber-500" />
+            puedeReasignar ? (
+              <div className="mt-0.5">
+                <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={28} iconSize={13} />
+              </div>
+            ) : (
+              <div className="w-[28px] h-[28px] mt-0.5 rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0" title="No tiene un rol o persona específica asignada">
+                <UserX size={13} className="text-amber-500" />
+              </div>
+            )
+          ) : puedeReasignar ? (
+            <div className="mt-0.5">
+              <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={28} iconSize={13}>
+                <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={28} />
+              </SelectorResponsableRapido>
             </div>
           ) : (
             <div className="mt-0.5"><Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={28} /></div>
@@ -214,16 +233,16 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{t.titulo}</span>
+              <span className="text-sm font-medium text-slate-800 dark:text-ink-100">{t.titulo}</span>
               {badges}
             </div>
 
-            <div className={`text-sm mt-0.5 ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+            <div className={`text-sm mt-0.5 ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-ink-300'}`}>
               {lineaSecundaria}
             </div>
 
             {numComentarios > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full mt-1.5">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-ink-300 bg-slate-100 dark:bg-ink-700 px-2 py-0.5 rounded-full mt-1.5">
                 <MessageCircle size={12} /> {numComentarios}
               </span>
             )}
@@ -254,18 +273,26 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, overl
         <ModalDetalleTarea titulo={t.titulo} badges={badges} onCerrar={() => setModalAbierto(false)}>
           <div className="flex items-center gap-2.5">
             {sinPersonaClara ? (
-              <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0">
-                <UserX size={14} className="text-amber-500" />
-              </div>
+              puedeReasignar ? (
+                <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={30} iconSize={14} />
+              ) : (
+                <div className="w-[30px] h-[30px] rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center shrink-0">
+                  <UserX size={14} className="text-amber-500" />
+                </div>
+              )
+            ) : puedeReasignar ? (
+              <SelectorResponsableRapido miembros={miembros} onAsignar={(personaId) => onAsignar(t.id, personaId)} size={30} iconSize={14}>
+                <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
+              </SelectorResponsableRapido>
             ) : (
               <Avatar nombre={personaAsignada} avatarUrl={avatares[personaAsignada]} size={30} />
             )}
-            <div className={`text-sm ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+            <div className={`text-sm ${t.estado === 'en_proceso' ? 'text-brand-700 dark:text-brand-400' : sinPersonaClara ? 'text-amber-600 dark:text-amber-500' : 'text-slate-500 dark:text-ink-300'}`}>
               {lineaSecundaria}
             </div>
           </div>
 
-          {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-slate-300" />}
+          {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-ink-300" />}
 
           {onComentar && (
             <HiloComentarios

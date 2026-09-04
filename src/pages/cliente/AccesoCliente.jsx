@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loginCliente } from '../../data/api'
-import logo from '../../assets/logo-esbrillante.svg'
+import logo from '../../assets/logo-foco-dark.svg'
 
 export default function AccesoCliente() {
   const navigate = useNavigate()
@@ -29,7 +29,7 @@ export default function AccesoCliente() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src={logo} alt="EsBrillante" className="h-9 w-auto mx-auto mb-4" />
+          <img src={logo} alt="Foco" className="h-9 w-auto mx-auto mb-4" />
           <p className="text-brand-300 text-sm mt-1">Portal de seguimiento para clientes</p>
         </div>
 

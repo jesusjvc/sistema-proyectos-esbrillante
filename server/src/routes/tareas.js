@@ -207,6 +207,46 @@ router.post('/:tareaId/mover', requireAuth, async (req, res) => {
   }
 })
 
+// POST /api/proyectos/:slug/tareas/:tareaId/reordenar
+// Reordena una tarea dentro de su misma fase (proyectos "finito"), sin
+// tocar su estado — a diferencia de /mover, que reordena por columna
+// Kanban (estado) en proyectos "continuo".
+router.post('/:tareaId/reordenar', requireAuth, async (req, res) => {
+  const { slug, tareaId } = req.params
+  const { antesDeTareaId, despuesDeTareaId } = req.body
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const tarea = p.tareas.find((t) => t.id === tareaId)
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para operar esta tarea' })
+    }
+
+    const refId = antesDeTareaId || despuesDeTareaId
+    let orden
+    if (refId) {
+      const ref = p.tareas.find((t) => t.id === refId && t.fase === tarea.fase)
+      if (!ref) return res.status(400).json({ error: `No se encontró la tarea de referencia "${refId}" en esa fase.` })
+      const faseOrdenada = p.tareas.filter((t) => t.fase === tarea.fase && t.id !== tareaId).sort((a, b) => a.orden - b.orden)
+      orden = antesDeTareaId ? ordenAntesDe(faseOrdenada, ref) : ordenDespuesDe(faseOrdenada, ref)
+    } else {
+      const faseSinTarea = p.tareas.filter((t) => t.fase === tarea.fase && t.id !== tareaId)
+      orden = ordenAlFinal(faseSinTarea)
+    }
+
+    await prisma.tarea.update({ where: { id: tareaId }, data: { orden } })
+
+    emitirCambio(p.id)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/proyectos/:slug/tareas/:tareaId
 router.put('/:tareaId', requireAuth, async (req, res) => {
   const { slug, tareaId } = req.params

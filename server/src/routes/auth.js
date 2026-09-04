@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
     })
 
     setCookie(res, token)
-    res.json({ id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, esKarla: user.esKarla })
+    res.json({ id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, esKarla: user.esKarla, area: user.area })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
@@ -45,7 +45,7 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, avatarUrl: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, avatarUrl: true },
     })
     if (!user) return res.status(401).json({ error: 'Sesión inválida' })
     res.json(user)
@@ -70,7 +70,7 @@ router.put('/me/avatar', requireAuth, async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatarUrl },
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, avatarUrl: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, avatarUrl: true },
     })
     res.json(user)
   } catch (err) {
@@ -85,7 +85,7 @@ router.delete('/me/avatar', requireAuth, async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { avatarUrl: null },
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, avatarUrl: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, avatarUrl: true },
     })
     res.json(user)
   } catch (err) {
