@@ -3,13 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import {
-  getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea,
+  getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea, reordenarTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
   crearComentario, regenerarPasswordCliente, actualizarAreasProyecto,
 } from '../data/api'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
@@ -31,7 +36,7 @@ import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import IconGoogleDrive from '../components/IconGoogleDrive'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
-  ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
+  ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
   AlertTriangle, Flag, UserX, RefreshCw, Tag,
 } from 'lucide-react'
@@ -178,6 +183,11 @@ export default function DetalleProyecto() {
 
   async function handleMoverTarea(tareaId, datos) {
     await moverTarea(proyecto.slug, tareaId, datos)
+    await refresh()
+  }
+
+  async function handleReordenarTarea(tareaId, datos) {
+    await reordenarTarea(proyecto.slug, tareaId, datos)
     await refresh()
   }
 
@@ -393,11 +403,13 @@ export default function DetalleProyecto() {
                   equipo={proyecto.equipo}
                   miembrosPorId={miembrosPorId}
                   miembros={miembros}
+                  miembrosProyecto={miembrosProyecto}
+                  todasLasTareas={proyecto.tareas}
                   onCompletar={() => marcarCompleta(t.id)}
                   onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                   onReabrir={() => reabrir(t.id)}
                   onOmitir={() => omitir(t.id)}
-                  onEditar={() => setModalEditar(t)}
+                  onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
                   onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                   onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                   esAdmin={true}
@@ -422,11 +434,13 @@ export default function DetalleProyecto() {
                       equipo={proyecto.equipo}
                       miembrosPorId={miembrosPorId}
                       miembros={miembros}
+                      miembrosProyecto={miembrosProyecto}
+                      todasLasTareas={proyecto.tareas}
                       onCompletar={() => marcarCompleta(t.id)}
                       onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                       onReabrir={() => reabrir(t.id)}
                       onOmitir={() => omitir(t.id)}
-                      onEditar={() => setModalEditar(t)}
+                      onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
                       onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                       onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                       esAdmin={true}
@@ -531,28 +545,31 @@ export default function DetalleProyecto() {
 
                 {abierta && (
                   <div className="border-t border-slate-100 dark:border-ink-500">
-                    {tareasVisibles.map((t) => {
-                      const est = estadoCalculado(t)
-                      return (
-                        <TareaRow
-                          key={t.id}
-                          tarea={t}
-                          estado={est}
-                          avatares={avatares}
-                          equipo={proyecto.equipo}
-                          miembrosPorId={miembrosPorId}
-                          miembros={miembros}
-                          onCompletar={() => marcarCompleta(t.id)}
-                          onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
-                          onReabrir={() => reabrir(t.id)}
-                          onOmitir={() => omitir(t.id)}
-                          onEditar={() => setModalEditar(t)}
-                          onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
-                          onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
-                          esAdmin={true}
-                        />
-                      )
-                    })}
+                    <FaseTareasArrastrables tareas={tareasVisibles} onReordenar={handleReordenarTarea}>
+                      {(t) => {
+                        const est = estadoCalculado(t)
+                        return (
+                          <TareaRow
+                            tarea={t}
+                            estado={est}
+                            avatares={avatares}
+                            equipo={proyecto.equipo}
+                            miembrosPorId={miembrosPorId}
+                            miembros={miembros}
+                            miembrosProyecto={miembrosProyecto}
+                            todasLasTareas={proyecto.tareas}
+                            onCompletar={() => marcarCompleta(t.id)}
+                            onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
+                            onReabrir={() => reabrir(t.id)}
+                            onOmitir={() => omitir(t.id)}
+                            onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
+                            onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
+                            onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
+                            esAdmin={true}
+                          />
+                        )
+                      }}
+                    </FaseTareasArrastrables>
                     {ocultarCompletadas && completadas > 0 && (
                       <button
                         onClick={() => setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: false }))}
@@ -833,12 +850,100 @@ export default function DetalleProyecto() {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], onCompletar, onComentar, onReabrir, onOmitir, onEditar, onEliminar, onAsignarResponsable, esAdmin }) {
+// Arrastrar y soltar para reordenar las tareas dentro de una fase (proyectos
+// "finito"). El estado local `orden` se mantiene optimista durante el drag y
+// se resincroniza desde `tareas` (props) cuando no hay drag activo — mismo
+// patrón que el tablero Kanban en KanbanBoard.jsx, pero para una sola lista.
+function FaseTareasArrastrables({ tareas, onReordenar, children }) {
+  const [orden, setOrden] = useState(tareas)
+  const [activeId, setActiveId] = useState(null)
+
+  useEffect(() => {
+    if (activeId) return
+    setOrden(tareas)
+  }, [tareas, activeId])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  function handleDragEnd(event) {
+    const { active, over } = event
+    setActiveId(null)
+    if (!over || active.id === over.id) return
+    const idxActivo = orden.findIndex((t) => t.id === active.id)
+    const idxOver = orden.findIndex((t) => t.id === over.id)
+    if (idxActivo === -1 || idxOver === -1) return
+    const nuevoOrden = arrayMove(orden, idxActivo, idxOver)
+    setOrden(nuevoOrden)
+    const posicion = nuevoOrden.findIndex((t) => t.id === active.id)
+    const anterior = nuevoOrden[posicion - 1]
+    const siguiente = nuevoOrden[posicion + 1]
+    onReordenar(active.id, {
+      antesDeTareaId: !anterior && siguiente ? siguiente.id : undefined,
+      despuesDeTareaId: anterior ? anterior.id : undefined,
+    })
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={(e) => setActiveId(e.active.id)}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={orden.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        {orden.map((t) => (
+          <FilaArrastrable key={t.id} id={t.id}>
+            {children(t)}
+          </FilaArrastrable>
+        ))}
+      </SortableContext>
+    </DndContext>
+  )
+}
+
+function FilaArrastrable({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+      {children}
+    </div>
+  )
+}
+
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], miembrosProyecto = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin }) {
   const [modalAbierto, setModalAbierto] = useState(false)
+  const [editando, setEditando] = useState(false)
+  const [form, setForm] = useState(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
   const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
   const hayDetalle = t.queHacer || t.necesitasAntes || t.plantillaMensaje || t.queEntregas || t.descripcion || t.instruccionesCliente
+  const opcionesDependencia = todasLasTareas.filter((tt) => tt.id !== t.id)
+
+  function abrirModal(conEdicion) {
+    setForm({
+      titulo: t.titulo,
+      descripcion: t.esCliente ? '' : (t.descripcion || ''),
+      instruccionesCliente: t.esCliente ? (t.instruccionesCliente || '') : '',
+      responsable: t.responsable,
+      esCliente: t.esCliente,
+      esRutaCritica: t.esRutaCritica,
+      soloKarlaOAdmin: t.soloKarlaOAdmin,
+      plazoHoras: t.plazoHoras || '',
+      avisosDesactivados: t.avisosDesactivados || false,
+      dependencias: t.dependencias || [],
+    })
+    setEditando(conEdicion)
+    setModalAbierto(true)
+  }
+
+  async function guardarEdicion(e) {
+    e.preventDefault()
+    if (!form.titulo.trim()) return
+    await onGuardarEdicion({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null })
+    setEditando(false)
+  }
 
   function copiarPlantilla() {
     navigator.clipboard.writeText(t.plantillaMensaje)
@@ -883,7 +988,10 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   )
 
   return (
-    <div className={`px-5 py-3.5 border-b border-slate-50 dark:border-ink-500 last:border-0 ${bgMap[estado]}`}>
+    <div
+      onClick={() => abrirModal(false)}
+      className={`px-5 py-3.5 border-b border-slate-50 dark:border-ink-500 last:border-0 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-ink-900/50 transition-colors ${bgMap[estado]}`}
+    >
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{iconMap[estado]}</div>
 
@@ -936,24 +1044,17 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
             </div>
           )}
 
-          <div className="flex items-center gap-3 mt-1.5">
-            <button
-              onClick={() => setModalAbierto(true)}
-              className="text-sm text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-300 flex items-center gap-1"
-            >
-              <Info size={13} />
-              Ver detalles
-            </button>
-            {numComentarios > 0 && (
-              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-ink-300 bg-slate-100 dark:bg-ink-700 px-2 py-0.5 rounded-full">
+          {numComentarios > 0 && (
+            <div className="mt-1.5">
+              <span className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-ink-300 bg-slate-100 dark:bg-ink-700 px-2 py-0.5 rounded-full w-fit">
                 <MessageCircle size={12} /> {numComentarios}
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {esAdmin && (
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
             {(estado === 'disponible' || estado === 'en_proceso') && (
               <button onClick={onCompletar} className="text-xs bg-brand-500 hover:bg-brand-600 text-slate-900 font-semibold px-3 py-1.5 rounded-lg transition-colors">
                 Completar
@@ -972,8 +1073,8 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
             {estado !== 'omitida' && (
               <button
-                onClick={onEditar}
-                className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
+                onClick={() => abrirModal(true)}
+                className="p-1.5 text-slate-400 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
                 title="Editar tarea"
               >
                 <Pencil size={13} />
@@ -984,13 +1085,13 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
               onEliminar ? (
                 <button
                   onClick={() => setConfirmarEliminar(true)}
-                  className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                  className="p-1.5 text-slate-400 dark:text-ink-300 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                   title="Eliminar tarea"
                 >
                   <Trash2 size={13} />
                 </button>
               ) : (
-                <button onClick={onOmitir} className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-slate-500 dark:hover:text-ink-300 hover:bg-slate-100 dark:hover:bg-ink-600 rounded-lg transition-colors" title="Omitir tarea">
+                <button onClick={onOmitir} className="p-1.5 text-slate-400 dark:text-ink-300 hover:text-slate-600 dark:hover:text-ink-100 hover:bg-slate-100 dark:hover:bg-ink-600 rounded-lg transition-colors" title="Omitir tarea">
                   <X size={13} />
                 </button>
               )
@@ -1007,51 +1108,150 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
       </div>
 
       {modalAbierto && (
-        <ModalDetalleTarea titulo={t.titulo} badges={badges} onCerrar={() => setModalAbierto(false)}>
-          <div className="rounded-xl border border-brand-100 dark:border-brand-500/20 bg-brand-50 dark:bg-brand-500/10 overflow-hidden">
-            {hayDetalle && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ModalDetalleTarea
+            titulo={editando ? 'Editar tarea' : t.titulo}
+            badges={editando ? null : badges}
+            accionesHeader={
+              !editando && onGuardarEdicion && (
+                <button
+                  onClick={() => setEditando(true)}
+                  className="p-1.5 text-slate-400 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
+                  title="Editar tarea"
+                >
+                  <Pencil size={15} />
+                </button>
+              )
+            }
+            onCerrar={() => { setModalAbierto(false); setEditando(false) }}
+          >
+            {editando ? (
+              <form onSubmit={guardarEdicion} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Título *</label>
+                  <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} autoFocus />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
+                  <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
+                    <optgroup label="Rol">
+                      {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
+                    </optgroup>
+                    {miembrosProyecto.length > 0 && (
+                      <optgroup label="Persona específica">
+                        {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+                {!form.esCliente && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción interna</label>
+                    <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
+                  </div>
+                )}
+                {form.esCliente && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente</label>
+                    <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente..." minHeight="6rem" />
+                  </div>
+                )}
+                <div className="flex gap-4 flex-wrap">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
+                    <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
+                    Tarea del cliente
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
+                    <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-brand-500" />
+                    Ruta crítica
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
+                    <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-brand-500" />
+                    Solo Karla/Admin
+                  </label>
+                </div>
+                {form.esCliente && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
+                    <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer mt-2.5">
+                      <input
+                        type="checkbox"
+                        checked={!form.avisosDesactivados}
+                        onChange={(e) => setForm({ ...form, avisosDesactivados: !e.target.checked })}
+                        className="accent-brand-500"
+                      />
+                      Enviar recordatorios automáticos al cliente si se atrasa
+                    </label>
+                  </div>
+                )}
+                <SelectorDependencias
+                  opciones={opcionesDependencia}
+                  seleccionadas={form.dependencias}
+                  onChange={(dependencias) => setForm({ ...form, dependencias })}
+                />
+                <div className="flex gap-3 pt-1">
+                  <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+                    Guardar cambios
+                  </button>
+                  <button type="button" onClick={() => setEditando(false)} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            ) : (
               <>
-                {t.queHacer && (
-                  <DetalleSeccion titulo="¿Qué hay que hacer?">
-                    <TextoFormateado texto={t.queHacer} />
-                  </DetalleSeccion>
-                )}
-                {t.necesitasAntes && (
-                  <DetalleSeccion titulo="Antes de empezar">
-                    <TextoFormateado texto={t.necesitasAntes} />
-                  </DetalleSeccion>
-                )}
-                {t.plantillaMensaje && (
-                  <DetalleSeccion titulo="Plantilla de mensaje">
-                    <div className="relative">
-                      <pre className="text-xs text-slate-700 dark:text-ink-300 whitespace-pre-wrap font-sans bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
-                      <button
-                        onClick={copiarPlantilla}
-                        className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 dark:bg-ink-700 hover:bg-brand-100 dark:hover:bg-brand-500/20 text-slate-500 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
-                        title="Copiar plantilla"
-                      >
-                        {copiadoPlantilla ? <Check size={13} className="text-emerald-500 dark:text-emerald-400" /> : <Copy size={13} />}
+                <div className="rounded-xl border border-brand-100 dark:border-brand-500/20 bg-brand-50 dark:bg-brand-500/10 overflow-hidden">
+                  {hayDetalle ? (
+                    <>
+                      {t.queHacer && (
+                        <DetalleSeccion titulo="¿Qué hay que hacer?">
+                          <TextoFormateado texto={t.queHacer} />
+                        </DetalleSeccion>
+                      )}
+                      {t.necesitasAntes && (
+                        <DetalleSeccion titulo="Antes de empezar">
+                          <TextoFormateado texto={t.necesitasAntes} />
+                        </DetalleSeccion>
+                      )}
+                      {t.plantillaMensaje && (
+                        <DetalleSeccion titulo="Plantilla de mensaje">
+                          <div className="relative">
+                            <pre className="text-xs text-slate-700 dark:text-ink-300 whitespace-pre-wrap font-sans bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
+                            <button
+                              onClick={copiarPlantilla}
+                              className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 dark:bg-ink-700 hover:bg-brand-100 dark:hover:bg-brand-500/20 text-slate-500 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
+                              title="Copiar plantilla"
+                            >
+                              {copiadoPlantilla ? <Check size={13} className="text-emerald-500 dark:text-emerald-400" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        </DetalleSeccion>
+                      )}
+                      {t.queEntregas && (
+                        <DetalleSeccion titulo="Al completar esta tarea entrego">
+                          <TextoFormateado texto={t.queEntregas} />
+                        </DetalleSeccion>
+                      )}
+                      {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
+                        <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600 dark:text-ink-300" />
+                      )}
+                    </>
+                  ) : (
+                    onGuardarEdicion && (
+                      <button onClick={() => setEditando(true)} className="w-full text-left px-4 py-3 text-sm text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
+                        Sin descripción — clic para agregar
                       </button>
-                    </div>
-                  </DetalleSeccion>
-                )}
-                {t.queEntregas && (
-                  <DetalleSeccion titulo="Al completar esta tarea entrego">
-                    <TextoFormateado texto={t.queEntregas} />
-                  </DetalleSeccion>
-                )}
-                {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
-                  <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600 dark:text-ink-300" />
+                    )
+                  )}
+                </div>
+                {onComentar && (
+                  <HiloComentarios comentarios={t.comentarios} miembrosPorId={miembrosPorId} onEnviar={onComentar} />
                 )}
               </>
             )}
-            {onComentar && (
-              <div className="px-4 py-3">
-                <HiloComentarios comentarios={t.comentarios} miembrosPorId={miembrosPorId} onEnviar={onComentar} />
-              </div>
-            )}
-          </div>
-        </ModalDetalleTarea>
+          </ModalDetalleTarea>
+        </div>
       )}
     </div>
   )

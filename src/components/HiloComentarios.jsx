@@ -114,7 +114,7 @@ export default function HiloComentarios({ comentarios = [], miembrosPorId = {}, 
           <button
             type="submit"
             disabled={!texto.trim() || enviando}
-            className="flex items-center gap-1.5 text-xs font-medium bg-slate-800 dark:bg-slate-100 hover:bg-slate-900 dark:hover:bg-white disabled:opacity-40 text-white dark:text-slate-900 px-3 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 px-3 py-1.5 rounded-lg transition-colors"
           >
             <Send size={12} /> {enviando ? 'Enviando…' : 'Comentar'}
           </button>
