@@ -12,7 +12,7 @@ const RESPONSABLES = [
   { valor: 'admin', label: 'Admin' },
 ]
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400'
+const inputCls = 'w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500'
 
 /**
  * Lista de solicitudes de cambio levantadas por el cliente. Se usa tanto en
@@ -28,7 +28,7 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
 
   if (solicitudes.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-sm text-slate-400">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-400 dark:text-slate-500">
         El cliente aún no ha enviado ninguna solicitud de cambio.
       </div>
     )
@@ -37,20 +37,20 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
   return (
     <div className="space-y-3">
       {pendientes.map((s) => (
-        <div key={s.id} className="bg-white border-2 border-amber-300 rounded-xl overflow-hidden shadow-sm">
-          <div className="bg-amber-50 px-5 py-3 flex items-center gap-2">
-            <AlertCircle size={16} className="text-amber-500 shrink-0" />
-            <span className="font-semibold text-amber-800 text-sm">{s.titulo}</span>
-            <span className="ml-auto text-xs text-amber-600">{formatFechaHora(s.creadaEn)}</span>
+        <div key={s.id} className="bg-white dark:bg-slate-800 border-2 border-amber-300 dark:border-amber-500/40 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-amber-50 dark:bg-amber-500/10 px-5 py-3 flex items-center gap-2">
+            <AlertCircle size={16} className="text-amber-500 dark:text-amber-400 shrink-0" />
+            <span className="font-semibold text-amber-800 dark:text-amber-300 text-sm">{s.titulo}</span>
+            <span className="ml-auto text-xs text-amber-600 dark:text-amber-400">{formatFechaHora(s.creadaEn)}</span>
           </div>
           <div className="px-5 py-4">
-            {s.descripcion && <p className="text-sm text-slate-700 leading-relaxed mb-4 whitespace-pre-wrap">{s.descripcion}</p>}
+            {s.descripcion && <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed mb-4 whitespace-pre-wrap">{s.descripcion}</p>}
             {s.archivoUrl && (
               <a
                 href={s.archivoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 mb-4 w-fit"
+                className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 mb-4 w-fit"
               >
                 <Paperclip size={12} className="shrink-0" />
                 {s.archivoNombre || 'Ver archivo adjunto'}
@@ -65,7 +65,7 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
               </button>
               <button
                 onClick={() => setModalRechazar(s)}
-                className="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 py-2 rounded-lg text-sm transition-colors"
+                className="flex-1 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 py-2 rounded-lg text-sm transition-colors"
               >
                 Rechazar
               </button>
@@ -75,36 +75,36 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
       ))}
 
       {resueltas.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-50">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-50 dark:divide-slate-700">
           {resueltas.map((s) => (
             <div key={s.id} className="px-5 py-3.5">
               <div className="flex items-center gap-2">
                 {s.estado === 'aprobada' ? (
-                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                  <CheckCircle2 size={14} className="text-emerald-500 dark:text-emerald-400 shrink-0" />
                 ) : (
-                  <XCircle size={14} className="text-red-400 shrink-0" />
+                  <XCircle size={14} className="text-red-400 dark:text-red-500 shrink-0" />
                 )}
-                <span className="text-sm font-medium text-slate-700">{s.titulo}</span>
-                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${s.estado === 'aprobada' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{s.titulo}</span>
+                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${s.estado === 'aprobada' ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-300'}`}>
                   {s.estado === 'aprobada' ? 'Aprobada' : 'Rechazada'}
                 </span>
               </div>
-              {s.descripcion && <p className="text-sm text-slate-500 mt-1.5 ml-6 whitespace-pre-wrap">{s.descripcion}</p>}
+              {s.descripcion && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 ml-6 whitespace-pre-wrap">{s.descripcion}</p>}
               {s.archivoUrl && (
                 <a
                   href={s.archivoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-brand-700 hover:text-brand-800 mt-1.5 ml-6 w-fit"
+                  className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 mt-1.5 ml-6 w-fit"
                 >
                   <Paperclip size={12} className="shrink-0" />
                   {s.archivoNombre || 'Ver archivo adjunto'}
                 </a>
               )}
               {s.estado === 'rechazada' && s.motivoRechazo && (
-                <p className="text-sm text-red-600 mt-1.5 ml-6"><strong>Motivo:</strong> {s.motivoRechazo}</p>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1.5 ml-6"><strong>Motivo:</strong> {s.motivoRechazo}</p>
               )}
-              <p className="text-xs text-slate-400 mt-1.5 ml-6 flex items-center gap-1"><Clock size={11} /> Resuelta por {s.resueltaPor} — {formatFechaHora(s.resueltaEn)}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 ml-6 flex items-center gap-1"><Clock size={11} /> Resuelta por {s.resueltaPor} — {formatFechaHora(s.resueltaEn)}</p>
             </div>
           ))}
         </div>
@@ -156,28 +156,28 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto,
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-800">Aprobar solicitud</h3>
-          <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Aprobar solicitud</h3>
+          <button onClick={onCerrar} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="bg-slate-50 rounded-lg px-3 py-2.5">
-            <p className="text-sm font-medium text-slate-800">{solicitud.titulo}</p>
-            {solicitud.descripcion && <p className="text-sm text-slate-500 mt-1 whitespace-pre-wrap">{solicitud.descripcion}</p>}
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-lg px-3 py-2.5">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{solicitud.titulo}</p>
+            {solicitud.descripcion && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 whitespace-pre-wrap">{solicitud.descripcion}</p>}
           </div>
-          <p className="text-sm text-slate-500">Se creará como una tarea del proyecto. Define dónde entra y quién la atiende:</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Se creará como una tarea del proyecto. Define dónde entra y quién la atiende:</p>
 
           {esContinuo ? (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Columna</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Columna</label>
               <select value={form.columna} onChange={(e) => setForm({ ...form, columna: e.target.value })} className={inputCls}>
                 {KANBAN_COLUMNAS.map((c) => <option key={c.columna} value={c.columna}>{c.label}</option>)}
               </select>
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Fase</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Fase</label>
               <select value={form.fase} onChange={(e) => setForm({ ...form, fase: e.target.value })} className={inputCls}>
                 {(fases || []).map((f) => <option key={f.numero} value={f.numero}>Fase {f.numero} — {f.nombre}</option>)}
               </select>
@@ -185,7 +185,7 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto,
           )}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Responsable</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
               <optgroup label="Rol">
                 {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
@@ -202,7 +202,7 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto,
             <button type="submit" disabled={enviando} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Aprobar y crear tarea
             </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>
@@ -229,17 +229,17 @@ function ModalRechazarSolicitud({ solicitud, onGuardar, onCerrar }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-800">Rechazar solicitud</h3>
-          <button onClick={onCerrar} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">Rechazar solicitud</h3>
+          <button onClick={onCerrar} className="text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="bg-slate-50 rounded-lg px-3 py-2.5">
-            <p className="text-sm font-medium text-slate-800">{solicitud.titulo}</p>
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-lg px-3 py-2.5">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{solicitud.titulo}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Motivo del rechazo *</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Motivo del rechazo *</label>
             <textarea
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
@@ -253,7 +253,7 @@ function ModalRechazarSolicitud({ solicitud, onGuardar, onCerrar }) {
             <button type="submit" disabled={!motivo.trim() || enviando} className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Rechazar
             </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-sm transition-colors">
+            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>

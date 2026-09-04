@@ -7,15 +7,15 @@ export default function SelectorDependencias({ opciones, seleccionadas, onChange
 
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1.5">
-        Depende de <span className="font-normal text-slate-400">(no queda disponible hasta que se completen)</span>
+      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+        Depende de <span className="font-normal text-slate-400 dark:text-slate-500">(no queda disponible hasta que se completen)</span>
       </label>
-      <div className="border border-slate-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-slate-50">
+      <div className="border border-slate-200 dark:border-slate-700 rounded-lg max-h-40 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-700">
         {opciones.map((t) => (
-          <label key={t.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+          <label key={t.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700">
             <input type="checkbox" checked={seleccionadas.includes(t.id)} onChange={() => toggle(t.id)} className="accent-brand-500 shrink-0" />
-            <span className="truncate text-slate-700">{t.titulo}</span>
-            {t.esCliente && <span className="ml-auto text-[10px] shrink-0 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Cliente</span>}
+            <span className="truncate text-slate-700 dark:text-slate-300">{t.titulo}</span>
+            {t.esCliente && <span className="ml-auto text-[10px] shrink-0 bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-full">Cliente</span>}
           </label>
         ))}
       </div>

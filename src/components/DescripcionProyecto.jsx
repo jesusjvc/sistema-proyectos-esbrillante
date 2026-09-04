@@ -60,7 +60,7 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
           </button>
           <button
             onClick={handleCancelar}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-md transition-colors"
+            className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-2.5 py-1.5 rounded-md transition-colors"
           >
             <X size={12} /> Cancelar
           </button>
@@ -73,7 +73,7 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
     return (
       <button
         onClick={() => setEditando(true)}
-        className="flex items-center gap-1 text-sm text-slate-400 hover:text-brand-700 mt-1.5 transition-colors"
+        className="flex items-center gap-1 text-sm text-slate-400 dark:text-slate-500 hover:text-brand-700 dark:hover:text-brand-400 mt-1.5 transition-colors"
       >
         <Pencil size={12} /> Agregar descripción del proyecto
       </button>
@@ -84,12 +84,12 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
     <div className="mt-1.5 flex items-start gap-1.5 group">
       <div className="flex-1 min-w-0">
         <div ref={contenidoRef} className="line-clamp-1">
-          <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 leading-relaxed" />
+          <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed" />
         </div>
         {truncado && (
           <button
             onClick={() => setModalAbierto(true)}
-            className="text-xs font-medium text-brand-700 hover:text-brand-800 mt-1"
+            className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 mt-1"
           >
             Ver más
           </button>
@@ -97,7 +97,7 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
       </div>
       <button
         onClick={() => setEditando(true)}
-        className="text-slate-300 hover:text-brand-700 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
+        className="text-slate-300 dark:text-slate-600 hover:text-brand-700 dark:hover:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5"
         title="Editar descripción"
       >
         <Pencil size={12} />
