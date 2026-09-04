@@ -83,7 +83,7 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
   return (
     <div className="mt-1.5 flex items-start gap-1.5 group">
       <div className="flex-1 min-w-0">
-        <div ref={contenidoRef} className="line-clamp-3">
+        <div ref={contenidoRef} className="line-clamp-1">
           <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 leading-relaxed" />
         </div>
         {truncado && (

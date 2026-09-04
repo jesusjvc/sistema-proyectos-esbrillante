@@ -9,7 +9,7 @@ import AvatarUploader from './AvatarUploader'
 
 const SIDEBAR_COLAPSADO_KEY = 'sidebarColapsado'
 
-export default function Layout({ children, titulo, volver }) {
+export default function Layout({ children, titulo, volver, badge, acciones }) {
   const { user, setUser, logout } = useAuth()
   const { tema, toggleTema } = useTheme()
   const navigate = useNavigate()
@@ -112,12 +112,16 @@ export default function Layout({ children, titulo, volver }) {
           {volver && (
             <button
               onClick={() => navigate(volver)}
-              className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm transition-colors"
+              className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm transition-colors shrink-0"
             >
               <ChevronLeft size={16} />
             </button>
           )}
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{titulo}</h1>
+          <div className="flex items-center gap-2 min-w-0">
+            {badge}
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100 truncate">{titulo}</h1>
+          </div>
+          {acciones && <div className="flex items-center gap-2 shrink-0 ml-auto">{acciones}</div>}
         </header>
         <main className="flex-1 p-6 overflow-y-auto min-h-0">{children}</main>
       </div>

@@ -245,59 +245,60 @@ export default function DetalleProyecto() {
   const preguntasPendientes = tareasCliente.filter((t) => t.estado !== 'completada' && t.estado !== 'omitida').length
 
   return (
-    <Layout titulo={proyecto.cliente.nombreComercial} volver={base}>
-      {/* Header del proyecto — siempre visible: estado, descripción y métricas de avance */}
+    <Layout
+      titulo={proyecto.cliente.nombreComercial}
+      volver={base}
+      badge={
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusBadge(proyecto.status)}`}>
+          {statusLabel(proyecto.status)}
+        </span>
+      }
+      acciones={
+        <>
+          {proyecto.status === 'pendiente_anticipo' && esAdminRol && (
+            <button
+              onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
+              className="text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Confirmar anticipo
+            </button>
+          )}
+          {proyecto.status === 'activo' && (
+            <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg transition-colors">
+              <Pause size={14} /> Pausa
+            </button>
+          )}
+          {proyecto.status === 'en_pausa' && (
+            <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg transition-colors">
+              <Play size={14} /> Reanudar
+            </button>
+          )}
+          {proyecto.status !== 'completado' && (
+            <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
+              <XCircle size={16} />
+            </button>
+          )}
+          {esAdminRol && (
+            <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
+              <Trash2 size={16} />
+            </button>
+          )}
+        </>
+      }
+    >
+      {/* Header del proyecto — siempre visible: descripción y métricas de avance */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge(proyecto.status)}`}>
-                {statusLabel(proyecto.status)}
-              </span>
-              <span className="text-xs text-slate-400">{proyecto.proyecto.paquete}</span>
-              <button
-                onClick={handleCambiarTipo}
-                className="text-xs text-slate-400 hover:text-brand-700 underline decoration-dotted transition-colors"
-                title={esContinuo ? 'Convertir a proyecto finito (con fases)' : 'Convertir a proyecto continuo (tablero Kanban)'}
-              >
-                Cambiar a {esContinuo ? 'finito' : 'continuo'}
-              </button>
-            </div>
-            <h2 className="text-xl font-bold text-slate-800">{proyecto.cliente.nombreComercial}</h2>
-            <p className="text-sm text-slate-500 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {proyecto.status === 'pendiente_anticipo' && esAdminRol && (
-              <button
-                onClick={async () => { await confirmarAnticipo(proyecto.slug); await refresh() }}
-                className="text-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                Confirmar anticipo
-              </button>
-            )}
-            {proyecto.status === 'activo' && (
-              <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg transition-colors">
-                <Pause size={14} /> Pausa
-              </button>
-            )}
-            {proyecto.status === 'en_pausa' && (
-              <button onClick={togglePausa} className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg transition-colors">
-                <Play size={14} /> Reanudar
-              </button>
-            )}
-            {proyecto.status !== 'completado' && (
-              <button onClick={handleCerrar} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Cerrar proyecto">
-                <XCircle size={16} />
-              </button>
-            )}
-            {esAdminRol && (
-              <button onClick={() => setModalEliminar(true)} className="text-sm text-slate-400 hover:text-red-600 p-2 rounded-lg transition-colors" title="Eliminar proyecto">
-                <Trash2 size={16} />
-              </button>
-            )}
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-400">{proyecto.proyecto.paquete}</span>
+          <button
+            onClick={handleCambiarTipo}
+            className="text-xs text-slate-400 hover:text-brand-700 underline decoration-dotted transition-colors"
+            title={esContinuo ? 'Convertir a proyecto finito (con fases)' : 'Convertir a proyecto continuo (tablero Kanban)'}
+          >
+            Cambiar a {esContinuo ? 'finito' : 'continuo'}
+          </button>
         </div>
+        <p className="text-sm text-slate-500 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
 
         <DescripcionProyecto
           descripcion={proyecto.proyecto?.descripcion}
