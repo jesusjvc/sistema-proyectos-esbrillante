@@ -2,6 +2,7 @@ import { useState, useLayoutEffect, useRef } from 'react'
 import { Pencil, Check, X } from 'lucide-react'
 import EditorEnriquecido from './EditorEnriquecido'
 import TextoEnriquecido from './TextoEnriquecido'
+import ModalDetalleTarea from './ModalDetalleTarea'
 
 /**
  * Descripción libre del proyecto — contexto de qué trata y qué se busca
@@ -12,8 +13,8 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
   const [editando, setEditando] = useState(false)
   const [valor, setValor] = useState(descripcion || '')
   const [guardando, setGuardando] = useState(false)
-  const [expandido, setExpandido] = useState(false)
   const [truncado, setTruncado] = useState(false)
+  const [modalAbierto, setModalAbierto] = useState(false)
   const contenidoRef = useRef(null)
 
   // `contenidoRef` solo existe montado cuando !editando && hay descripción —
@@ -22,9 +23,9 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
   // efecto no se dispara de nuevo y `truncado` se queda con el valor de la
   // medición anterior).
   useLayoutEffect(() => {
-    if (expandido || !contenidoRef.current) return
+    if (!contenidoRef.current) return
     setTruncado(contenidoRef.current.scrollHeight > contenidoRef.current.clientHeight + 2)
-  }, [descripcion, expandido, editando])
+  }, [descripcion, editando])
 
   async function handleGuardar() {
     setGuardando(true)
@@ -82,15 +83,15 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
   return (
     <div className="mt-1.5 flex items-start gap-1.5 group">
       <div className="flex-1 min-w-0">
-        <div ref={contenidoRef} className={expandido ? '' : 'line-clamp-3'}>
+        <div ref={contenidoRef} className="line-clamp-3">
           <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 leading-relaxed" />
         </div>
-        {(truncado || expandido) && (
+        {truncado && (
           <button
-            onClick={() => setExpandido((v) => !v)}
+            onClick={() => setModalAbierto(true)}
             className="text-xs font-medium text-brand-700 hover:text-brand-800 mt-1"
           >
-            {expandido ? 'Ver menos' : 'Ver más'}
+            Ver más
           </button>
         )}
       </div>
@@ -101,6 +102,12 @@ export default function DescripcionProyecto({ descripcion, onGuardar }) {
       >
         <Pencil size={12} />
       </button>
+
+      {modalAbierto && (
+        <ModalDetalleTarea titulo="Descripción del proyecto" onCerrar={() => setModalAbierto(false)}>
+          <TextoEnriquecido html={descripcion} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed" />
+        </ModalDetalleTarea>
+      )}
     </div>
   )
 }
