@@ -1550,7 +1550,7 @@ function ModalLink({ tareaId, linkTipo, titulo, valorActual, onCompletar, onCerr
             <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={info.placeholder} className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 placeholder:text-slate-400 dark:placeholder:text-slate-500" autoFocus />
           </div>
           <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={!url.trim()} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            <button type="submit" disabled={!url.trim()} className="flex-1 bg-emerald-600 dark:bg-emerald-500 hover:bg-emerald-700 dark:hover:bg-emerald-600 disabled:opacity-40 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors">
               Completar y guardar link
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg text-sm transition-colors">
