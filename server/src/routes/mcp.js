@@ -178,9 +178,10 @@ function buildServer(usuario) {
           programador: z.string().optional().describe('userId de quien programa, o "no_aplica" si el proyecto no lo requiere'),
           adminProyecto: z.string().optional().describe('userId de quien administra el proyecto'),
         }).optional().describe('Quiénes participan en el equipo de este proyecto, por rol (userId de un usuario real del sistema). Importante definirlo desde la creación: sin esto, las tareas de rol genérico (responsable=copy/disenador/programador) no le aparecen a nadie en "Mis tareas" hasta que se asigne después.'),
+        areas: z.array(z.enum(['web', 'diseno_grafico', 'redes_sociales'])).optional().describe('Área(s) de trabajo a las que pertenece el proyecto — determina a quién le aparece por defecto en su dashboard (cada admin ve por defecto solo los proyectos de su área). Un proyecto integral que cruza varias áreas lleva varias en el arreglo. Si se omite, el proyecto queda visible en cualquier filtro de área.'),
       },
     },
-    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo }) => {
+    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo, areas }) => {
       const slug = generarSlug(clienteNombre)
       const tipoFinal = tipo === 'continuo' ? 'continuo' : 'finito'
       const password = passwordCliente || generarPasswordSimple()
@@ -229,6 +230,7 @@ function buildServer(usuario) {
             },
             condicionesTecnicas: condicionesTecnicas || {},
             equipo: equipoFinal,
+            areas: areas || [],
             passwordCliente: password,
             linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
             tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },

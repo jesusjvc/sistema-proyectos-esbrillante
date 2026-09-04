@@ -8,7 +8,7 @@ import {
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
-  crearComentario, regenerarPasswordCliente,
+  crearComentario, regenerarPasswordCliente, actualizarAreasProyecto,
 } from '../data/api'
 import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
@@ -16,6 +16,7 @@ import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
 import { useEventosProyecto } from '../hooks/useEventos'
 import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../lib/permisos'
+import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import KanbanBoard from '../components/KanbanBoard'
 import Avatar from '../components/Avatar'
 import PrototiposPanel from '../components/PrototiposPanel'
@@ -32,7 +33,7 @@ import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Info, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
-  AlertTriangle, Flag, UserX, RefreshCw,
+  AlertTriangle, Flag, UserX, RefreshCw, Tag,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -53,6 +54,7 @@ export default function DetalleProyecto() {
   const [avatares, setAvatares] = useState({})
   const [miembros, setMiembros] = useState([])
   const [editandoEquipo, setEditandoEquipo] = useState(false)
+  const [editandoAreas, setEditandoAreas] = useState(false)
   const esAdminRol = user?.rol === 'admin'
   const base = esAdminRol ? '/admin' : '/equipo'
 
@@ -66,6 +68,12 @@ export default function DetalleProyecto() {
   }, [id])
 
   const miembrosPorId = Object.fromEntries(miembros.map((m) => [m.id, m.nombre]))
+
+  async function handleGuardarAreas(areas) {
+    await actualizarAreasProyecto(proyecto.slug, areas)
+    setEditandoAreas(false)
+    await refresh()
+  }
 
   async function handleGuardarEquipo(equipo) {
     await actualizarEquipoProyecto(proyecto.slug, equipo)
@@ -615,6 +623,29 @@ export default function DetalleProyecto() {
       {/* ─── Tab: Info ─── */}
       {tab === 'info' && (
         <div className="grid grid-cols-2 gap-5">
+          <InfoCard titulo="Área del proyecto" icono={<Tag size={14} />}>
+            {editandoAreas ? (
+              <EditorAreas areasIniciales={proyecto.areas || []} onGuardar={handleGuardarAreas} onCancelar={() => setEditandoAreas(false)} />
+            ) : (
+              <>
+                {!proyecto.areas?.length ? (
+                  <p className="text-sm text-slate-400">Sin área asignada — visible en cualquier filtro de área.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {proyecto.areas.map((a) => (
+                      <span key={a} className={`text-xs px-2 py-0.5 rounded-full font-medium ${AREA_COLOR[a] || 'bg-slate-100 text-slate-500'}`}>
+                        {AREA_LABEL[a] || a}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setEditandoAreas(true)} className="text-xs text-brand-700 hover:text-brand-800 font-medium mt-1">
+                  Editar área
+                </button>
+              </>
+            )}
+          </InfoCard>
+
           <InfoCard titulo="Configuración técnica" icono={<Settings2 size={14} />}>
             <InfoBool label="Ya tiene dominio" valor={proyecto.condicionesTecnicas.tieneDominio} />
             <InfoBool label="Ya tiene hosting" valor={proyecto.condicionesTecnicas.tieneHosting} />
@@ -1290,6 +1321,49 @@ const ROLES_EQUIPO_FORM = [
   ['programador', 'Programador'],
   ['adminProyecto', 'Coordinador'],
 ]
+
+function EditorAreas({ areasIniciales, onGuardar, onCancelar }) {
+  const [areas, setAreas] = useState(areasIniciales)
+  const [guardando, setGuardando] = useState(false)
+
+  function toggle(valor) {
+    setAreas((prev) => (prev.includes(valor) ? prev.filter((a) => a !== valor) : [...prev, valor]))
+  }
+
+  async function handleGuardar() {
+    setGuardando(true)
+    try {
+      await onGuardar(areas)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-col gap-1.5">
+        {AREAS.map((a) => (
+          <label key={a.valor} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <input type="checkbox" checked={areas.includes(a.valor)} onChange={() => toggle(a.valor)} className="accent-brand-500" />
+            {a.label}
+          </label>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleGuardar}
+          disabled={guardando}
+          className="flex items-center gap-1 text-xs font-medium bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-slate-900 px-2.5 py-1.5 rounded-md transition-colors"
+        >
+          <Check size={12} /> Guardar
+        </button>
+        <button onClick={onCancelar} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-md transition-colors">
+          <X size={12} /> Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
   const [form, setForm] = useState({

@@ -8,6 +8,7 @@ import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaN
 import { FASES } from '../../data/paquetes'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { miembrosDelEquipo } from '../../lib/permisos'
+import { AREAS, AREA_LABEL, AREA_COLOR } from '../../lib/areas'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, Bell, MessageCircle, Search, X } from 'lucide-react'
 
@@ -28,6 +29,7 @@ export default function AdminDashboard() {
   const [miembros, setMiembros] = useState([])
   const [avatares, setAvatares] = useState({})
   const [filtro, setFiltro] = useState('activo')
+  const [filtroArea, setFiltroArea] = useState('mia')
   const [busqueda, setBusqueda] = useState('')
   const [cargando, setCargando] = useState(true)
 
@@ -41,6 +43,7 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setFiltroArea(user?.area ? 'mia' : 'todas') }, [user?.area])
   useEffect(() => {
     getMiembros().then((ms) => {
       setMiembros(ms)
@@ -55,8 +58,10 @@ export default function AdminDashboard() {
   }
 
   const q = busqueda.trim().toLowerCase()
+  const objetivoArea = filtroArea === 'todas' ? null : filtroArea === 'mia' ? user?.area : filtroArea
   const filtrados = proyectos
     .filter((p) => filtro === 'todos' || p.status === filtro)
+    .filter((p) => !objetivoArea || !p.areas?.length || p.areas.includes(objetivoArea))
     .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q) || p.proyecto.paquete.toLowerCase().includes(q))
 
   const counts = {
@@ -106,7 +111,7 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-3">
         {['todos', 'activo', 'en_pausa', 'pendiente_anticipo', 'completado'].map((f) => (
           <button
             key={f}
@@ -118,6 +123,39 @@ export default function AdminDashboard() {
             {f === 'todos' ? 'Todos' : STATUS_CONFIG[f]?.label}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        <span className="text-xs text-slate-400">Área:</span>
+        {user?.area && (
+          <button
+            onClick={() => setFiltroArea('mia')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filtroArea === 'mia' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            Mi área ({AREA_LABEL[user.area]})
+          </button>
+        )}
+        {AREAS.map((a) => (
+          <button
+            key={a.valor}
+            onClick={() => setFiltroArea(a.valor)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filtroArea === a.valor ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            {a.label}
+          </button>
+        ))}
+        <button
+          onClick={() => setFiltroArea('todas')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            filtroArea === 'todas' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          Todas las áreas
+        </button>
       </div>
 
       {cargando ? (
@@ -313,6 +351,9 @@ function ProyectoRow({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) {
               <AlertCircle size={11} /> {tareasVencidas} atrasada{tareasVencidas > 1 ? 's' : ''}
             </Chip>
           )}
+          {p.areas?.map((a) => (
+            <Chip key={a} className={AREA_COLOR[a] || 'bg-slate-100 text-slate-500'}>{AREA_LABEL[a] || a}</Chip>
+          ))}
         </div>
         <BadgeEntrega proyecto={p} />
       </div>

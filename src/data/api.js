@@ -39,6 +39,7 @@ export const cambiarTipoProyecto = (slug, tipo) => req('PUT', `/api/proyectos/${
 export const actualizarEquipoProyecto = (slug, equipo) => req('PUT', `/api/proyectos/${slug}/equipo`, { equipo })
 export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-visto`)
 export const regenerarPasswordCliente = (slug) => req('POST', `/api/proyectos/${slug}/regenerar-password`)
+export const actualizarAreasProyecto = (slug, areas) => req('PUT', `/api/proyectos/${slug}/areas`, { areas })
 
 // ─── Tareas ────────────────────────────────────────────────────────────────
 export const iniciarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/iniciar`)

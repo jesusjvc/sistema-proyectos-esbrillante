@@ -7,6 +7,7 @@ import { generarMensajeInicio } from '../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../data/paquetes'
 import { EQUIPO_NO_APLICA } from '../lib/permisos'
+import { AREAS } from '../lib/areas'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch } from 'lucide-react'
 
@@ -53,6 +54,7 @@ export default function NuevoProyecto() {
     anticipoConfirmado: false,
   })
   const [condiciones, setCondiciones] = useState(COND_DEFAULT)
+  const [areasProyecto, setAreasProyecto] = useState([])
   const [equipo, setEquipo] = useState({
     copy: null,
     disenador: null,
@@ -70,7 +72,14 @@ export default function NuevoProyecto() {
     if (user?.id) {
       setEquipo((prev) => ({ ...prev, adminProyecto: prev.adminProyecto || user.id }))
     }
+    if (user?.area) {
+      setAreasProyecto((prev) => (prev.length ? prev : [user.area]))
+    }
   }, [user])
+
+  function toggleArea(area) {
+    setAreasProyecto((prev) => (prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]))
+  }
 
   function toggleExtra(extra) {
     setProyectoData((prev) => ({
@@ -126,6 +135,7 @@ export default function NuevoProyecto() {
         },
         condicionesTecnicas: condiciones,
         equipo,
+        areas: areasProyecto,
         passwordCliente,
         tareas,
         creadoPor: user?.nombre,
@@ -284,6 +294,8 @@ export default function NuevoProyecto() {
               <input value={proyectoData.paquete} onChange={(e) => setProyectoData({ ...proyectoData, paquete: e.target.value })} className={inputCls} placeholder="Mantenimiento mensual" />
             </Campo>
 
+            <SelectorAreas areasProyecto={areasProyecto} onToggle={toggleArea} />
+
             <Campo label="Descripción del proyecto (opcional)">
               <EditorEnriquecido
                 value={proyectoData.descripcion}
@@ -352,6 +364,8 @@ export default function NuevoProyecto() {
                 </div>
               ))}
             </Campo>
+
+            <SelectorAreas areasProyecto={areasProyecto} onToggle={toggleArea} />
 
             <Campo label="Extras">
               <div className="grid grid-cols-2 gap-2">
@@ -602,6 +616,27 @@ export default function NuevoProyecto() {
         )}
       </div>
     </Layout>
+  )
+}
+
+function SelectorAreas({ areasProyecto, onToggle }) {
+  return (
+    <Campo label="Área(s) del proyecto">
+      <div className="flex flex-wrap gap-2">
+        {AREAS.map((a) => (
+          <label
+            key={a.valor}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
+              areasProyecto.includes(a.valor) ? 'border-brand-500 bg-brand-50 text-brand-800 font-medium' : 'border-slate-200 text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <input type="checkbox" checked={areasProyecto.includes(a.valor)} onChange={() => onToggle(a.valor)} className="accent-brand-500" />
+            {a.label}
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-slate-400 mt-1.5">Un proyecto integral puede marcar varias áreas. Sin ninguna marcada, le aparece a todos.</p>
+    </Campo>
   )
 }
 
