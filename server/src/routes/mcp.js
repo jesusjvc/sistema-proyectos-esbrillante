@@ -404,7 +404,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título).',
+      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título).',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         incluirCompletadas: z.boolean().optional().describe('Solo aplica a proyectos "finito". Si es true, agrega "tareasCompletadas" con las tareas del equipo ya completadas (id, fase, título, responsable, completadaPor, completadaEn). No cambia ningún otro listado — el propósito principal de esta tool sigue siendo mostrar qué falta.'),
@@ -451,22 +451,22 @@ function buildServer(usuario) {
           resumen.tareasCompletadas = p.tareas
             .filter((t) => !t.esCliente && t.estado === 'completada')
             .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
-            .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, responsable: t.responsable, completadaPor: t.completadaPor, completadaEn: t.completadaEn }))
+            .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable, completadaPor: t.completadaPor, completadaEn: t.completadaEn }))
         }
       }
 
       resumen.tareasEnProceso = p.tareas
         .filter((t) => !t.esCliente && t.estado === 'en_proceso')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, responsable: t.responsable }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable }))
       resumen.tareasPendientesEquipo = p.tareas
         .filter((t) => !t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, responsable: t.responsable }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable }))
       resumen.tareasPendientesCliente = p.tareas
         .filter((t) => t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras }))
       resumen.respuestasClienteRecientes = p.tareas
         .filter((t) => t.esCliente && t.estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl))
         .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
