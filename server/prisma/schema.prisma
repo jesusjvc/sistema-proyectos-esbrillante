@@ -39,7 +39,13 @@ model Proyecto {
   status String @default("pendiente_anticipo")
   tipo   String @default("finito")
 
+  // `cliente` (Json libre) sigue siendo la fuente de verdad hoy — no se toca
+  // en esta migración. `clienteId` es aditivo y opcional: se llena a mano,
+  // proyecto por proyecto, después de revisar la propuesta de agrupación
+  // (server/src/scripts/proponerAgrupacionClientes.js). Nunca a ciegas.
   cliente             Json
+  clienteId           String?
+  clienteRef          Cliente?  @relation(fields: [clienteId], references: [id])
   proyecto            Json
   condicionesTecnicas Json
   equipo              Json
@@ -59,6 +65,29 @@ model Proyecto {
   creadoEn DateTime @default(now())
 
   @@map("proyectos")
+}
+
+// Cliente real (persona/negocio), independiente de cuántos Proyecto tenga.
+// Nace vacía — se llena revisando la propuesta de agrupación de
+// proponerAgrupacionClientes.js, nunca por migración automática (con 14
+// proyectos hoy, revisar a mano toma una tarde; agrupar mal uniría a dos
+// clientes distintos bajo el mismo registro, sin forma fácil de deshacerlo
+// después de que ambos ya operen sobre él).
+model Cliente {
+  id              String  @id @default(cuid())
+  nombreComercial String
+  contactoNombre  String?
+  correo          String?
+  whatsapp        String?
+  // Copiado de la referencia informativa del primer Proyecto que se le
+  // vincule — no se recalcula solo; si cambia, se edita a mano.
+  participantes   Json    @default("[]")
+
+  proyectos Proyecto[]
+
+  creadoEn DateTime @default(now())
+
+  @@map("clientes")
 }
 
 model Tarea {
