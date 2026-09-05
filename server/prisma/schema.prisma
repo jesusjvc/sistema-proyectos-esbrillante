@@ -84,10 +84,45 @@ model Cliente {
   participantes   Json    @default("[]")
 
   proyectos Proyecto[]
+  sitios    Sitio[]
 
   creadoEn DateTime @default(now())
 
   @@map("clientes")
+}
+
+// Qué existe HOY en un sitio de un cliente — distinto de
+// Proyecto.condicionesTecnicas, que son banderas de qué había que HACER,
+// congeladas al crear el proyecto que lo construyó. Un cliente puede tener
+// varios (sitio principal, tienda). Vive colgado de Cliente, no de un
+// Proyecto puntual, porque un sitio sobrevive al proyecto que lo creó —
+// existe mientras dure el mantenimiento, aunque el proyecto ya se haya
+// cerrado hace tiempo.
+//
+// A propósito NO guarda usuarios/contraseñas de WordPress ni del hosting —
+// esas siguen su camino actual (Drive). Guardar credenciales aquí convierte
+// a Foco en una bóveda, con todo lo que implica en cifrado/auditoría; si
+// algún día se quiere resolver de verdad, el camino es un gestor de
+// contraseñas del equipo con enlace desde aquí, no un campo de texto plano.
+model Sitio {
+  id        String  @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  // Para distinguir cuando un cliente tiene más de uno (ej. "Sitio principal", "Tienda").
+  nombre                 String
+  url                    String?
+  hostingProveedor       String?
+  dnsProveedor           String?
+  tipoInstalacion        String? // WordPress | WooCommerce | otro — texto libre por ahora
+  driveFolderUrl         String?
+  contactoTecnico        String?
+  coberturaMantenimiento String? // texto libre por ahora: incluido / adicional / sin contratar
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@map("sitios")
 }
 
 model Tarea {

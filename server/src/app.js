@@ -8,6 +8,7 @@ import proyectosRouter from './routes/proyectos.js'
 import tareasRouter from './routes/tareas.js'
 import miembrosRouter from './routes/miembros.js'
 import clienteRouter from './routes/cliente.js'
+import clientesRouter from './routes/clientes.js'
 import mcpRouter from './routes/mcp.js'
 import eventosRouter from './routes/eventos.js'
 import oauthRouter from './routes/oauth.js'
@@ -44,6 +45,7 @@ app.use('/api/plantillas', plantillasRouter)
 app.use('/api/miembros', miembrosRouter)
 app.use('/api/prototipos', prototiposRouter)
 app.use('/api/cliente', clienteRouter)
+app.use('/api/clientes', clientesRouter)
 app.use('/mcp', mcpRouter)
 app.use('/api/eventos', eventosRouter)
 app.use('/oauth', oauthRouter)
