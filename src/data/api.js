@@ -22,6 +22,7 @@ export const logout = () => req('POST', '/api/auth/logout')
 export const getMe = () => req('GET', '/api/auth/me')
 export const actualizarMiAvatar = (avatarUrl) => req('PUT', '/api/auth/me/avatar', { avatarUrl })
 export const eliminarMiAvatar = () => req('DELETE', '/api/auth/me/avatar')
+export const actualizarMisHabilidades = (habilidades) => req('PUT', '/api/auth/me/habilidades', { habilidades })
 
 // ─── Proyectos ─────────────────────────────────────────────────────────────
 export const getProyectos = () => req('GET', '/api/proyectos')

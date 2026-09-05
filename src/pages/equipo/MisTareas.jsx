@@ -39,6 +39,7 @@ export default function MisTareas() {
   const esAdmin = user?.rol === 'admin' || user?.rol === 'ADMIN'
   const base = esAdmin ? '/admin' : '/equipo'
 
+  const tareasAsignadas = []
   const tareasDisponibles = []
   const tareasBloqueadas = []
   const tareasEnProceso = []
@@ -69,7 +70,13 @@ export default function MisTareas() {
           })
           return
         }
-        tareasDisponibles.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
+        // "equipo" genérico es de verdad "para cualquiera" — cualquier otro
+        // responsable (un rol puntual como copy/disenador, o una persona
+        // asignada directamente) ya es tuyo específicamente, aunque todavía
+        // no le hayas dado clic a "Empezar".
+        const item = { ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial }
+        if (t.responsable === 'equipo') tareasDisponibles.push(item)
+        else tareasAsignadas.push(item)
       })
     })
 
@@ -121,7 +128,24 @@ export default function MisTareas() {
 
         <section>
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            Tareas disponibles ({cargando ? '…' : tareasDisponibles.length})
+            Asignadas a ti ({cargando ? '…' : tareasAsignadas.length})
+          </h2>
+          {!cargando && tareasAsignadas.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
+              No tienes tareas asignadas por tu rol o directamente a ti ahora mismo.
+            </div>
+          ) : !cargando && (
+            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+              {tareasAsignadas.map((t) => (
+                <FilaTarea key={`${t.proyectoSlug}-${t.id}`} t={t} base={base} onIniciar={handleIniciar} onCompletar={handleCompletar} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            Disponibles para cualquiera del equipo ({cargando ? '…' : tareasDisponibles.length})
           </h2>
 
           {cargando ? (
@@ -135,34 +159,7 @@ export default function MisTareas() {
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
               {tareasDisponibles.map((t) => (
-                <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
-                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
-                    </div>
-                    <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
-                    {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 mt-1" />}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
-                      Ver <ChevronRight size={13} />
-                    </Link>
-                    <button
-                      onClick={() => handleIniciar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      <PlayCircle size={14} /> Empezar
-                    </button>
-                    <button
-                      onClick={() => handleCompletar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      <CheckCircle2 size={14} /> Listo
-                    </button>
-                  </div>
-                </div>
+                <FilaTarea key={`${t.proyectoSlug}-${t.id}`} t={t} base={base} onIniciar={handleIniciar} onCompletar={handleCompletar} />
               ))}
             </div>
           )}
@@ -219,5 +216,38 @@ export default function MisTareas() {
         )}
       </div>
     </Layout>
+  )
+}
+
+function FilaTarea({ t, base, onIniciar, onCompletar }) {
+  return (
+    <div className="px-5 py-4 flex items-start gap-3">
+      <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
+          <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
+        </div>
+        <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
+        {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 mt-1" />}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
+          Ver <ChevronRight size={13} />
+        </Link>
+        <button
+          onClick={() => onIniciar(t.proyectoSlug, t.id)}
+          className="flex items-center gap-1.5 text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <PlayCircle size={14} /> Empezar
+        </button>
+        <button
+          onClick={() => onCompletar(t.proyectoSlug, t.id)}
+          className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <CheckCircle2 size={14} /> Listo
+        </button>
+      </div>
+    </div>
   )
 }

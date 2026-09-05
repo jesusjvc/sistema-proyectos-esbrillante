@@ -30,6 +30,7 @@ export default function NuevoProyecto() {
   const [plantillas, setPlantillas] = useState([])
 
   const [miembros, setMiembros] = useState([])
+  const miembrosPorId = Object.fromEntries(miembros.map((m) => [m.id, m.nombre]))
   const [paso, setPaso] = useState(1)
   const [mensajeCopiado, setMensajeCopiado] = useState(false)
   const [proyectoCreado, setProyectoCreado] = useState(null)
@@ -56,11 +57,13 @@ export default function NuevoProyecto() {
   const [condiciones, setCondiciones] = useState(COND_DEFAULT)
   const [areasProyecto, setAreasProyecto] = useState([])
   const [equipo, setEquipo] = useState({
-    copy: null,
-    disenador: null,
-    programador: null,
-    adminProyecto: null,
+    copy: [],
+    disenador: [],
+    programador: [],
+    redes: [],
+    adminProyecto: [],
   })
+  const [programadorNoAplica, setProgramadorNoAplica] = useState(false)
   const [passwordCliente, setPasswordCliente] = useState(generarPasswordSimple())
 
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function NuevoProyecto() {
 
   useEffect(() => {
     if (user?.id) {
-      setEquipo((prev) => ({ ...prev, adminProyecto: prev.adminProyecto || user.id }))
+      setEquipo((prev) => ({ ...prev, adminProyecto: prev.adminProyecto.length ? prev.adminProyecto : [user.id] }))
     }
     if (user?.area) {
       setAreasProyecto((prev) => (prev.length ? prev : [user.area]))
@@ -134,7 +137,7 @@ export default function NuevoProyecto() {
           descripcion: proyectoData.descripcion.trim(),
         },
         condicionesTecnicas: condiciones,
-        equipo,
+        equipo: { ...equipo, programador: programadorNoAplica ? EQUIPO_NO_APLICA : equipo.programador },
         areas: areasProyecto,
         passwordCliente,
         tareas,
@@ -150,7 +153,7 @@ export default function NuevoProyecto() {
   }
 
   function copiarMensaje() {
-    const msg = generarMensajeInicio(proyectoCreado)
+    const msg = generarMensajeInicio(proyectoCreado, miembrosPorId)
     navigator.clipboard.writeText(msg)
     setMensajeCopiado(true)
     setTimeout(() => setMensajeCopiado(false), 2500)
@@ -477,20 +480,37 @@ export default function NuevoProyecto() {
               ['copy', 'Copy'],
               ['disenador', 'Diseñador'],
               ['programador', 'Programador'],
+              ['redes', 'Redes'],
               ['adminProyecto', 'Coordinador del proyecto'],
             ].map(([key, label]) => (
               <Campo key={key} label={label}>
-                <select
-                  value={equipo[key] ?? ''}
-                  onChange={(e) => setEquipo({ ...equipo, [key]: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">Por asignar</option>
-                  {key === 'programador' && <option value={EQUIPO_NO_APLICA}>No aplica</option>}
-                  {miembros.map((m) => (
-                    <option key={m.id} value={m.id}>{m.nombre}</option>
-                  ))}
-                </select>
+                {key === 'programador' && (
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
+                    <input type="checkbox" checked={programadorNoAplica} onChange={(e) => setProgramadorNoAplica(e.target.checked)} />
+                    No aplica
+                  </label>
+                )}
+                {!(key === 'programador' && programadorNoAplica) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {miembros.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setEquipo({
+                          ...equipo,
+                          [key]: equipo[key].includes(m.id) ? equipo[key].filter((id) => id !== m.id) : [...equipo[key], m.id],
+                        })}
+                        className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                          equipo[key].includes(m.id)
+                            ? 'bg-brand-500 border-brand-500 text-slate-900 font-medium'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        {m.nombre}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </Campo>
             ))}
 
@@ -594,7 +614,7 @@ export default function NuevoProyecto() {
                 </button>
               </div>
               <pre className="text-xs text-slate-600 whitespace-pre-wrap font-sans bg-slate-50 rounded-lg p-3 max-h-48 overflow-auto">
-                {generarMensajeInicio(proyectoCreado)}
+                {generarMensajeInicio(proyectoCreado, miembrosPorId)}
               </pre>
             </div>
 

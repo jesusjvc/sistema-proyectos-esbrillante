@@ -55,6 +55,28 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 })
 
+// PUT /api/auth/me/habilidades — el usuario edita sus propias etiquetas de
+// habilidad (lista plana, sin niveles ni jerarquía — ver docs/plan-foco.md 2.4).
+router.put('/me/habilidades', requireAuth, async (req, res) => {
+  const { habilidades } = req.body
+  if (!Array.isArray(habilidades) || habilidades.some((h) => typeof h !== 'string')) {
+    return res.status(400).json({ error: 'habilidades debe ser un array de texto' })
+  }
+  const limpio = [...new Set(habilidades.map((h) => h.trim()).filter(Boolean))].slice(0, 20).map((h) => h.slice(0, 40))
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { habilidades: limpio },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, avatarUrl: true, habilidades: true },
+    })
+    res.json(user)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/auth/me/avatar — el usuario sube su propia foto de perfil como data URL
 // (ya redimensionada/comprimida en el navegador antes de llegar aquí).
 router.put('/me/avatar', requireAuth, async (req, res) => {

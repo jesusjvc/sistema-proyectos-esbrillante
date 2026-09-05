@@ -24,6 +24,9 @@ model User {
   // Área a la que pertenece (web | diseno_grafico | redes_sociales) — determina
   // qué proyectos ve por defecto en el dashboard. null = ve todos (sin filtrar).
   area      String?
+  // Lista plana de etiquetas libres (ej. "copy", "wordpress", "elementor") —
+  // transparencia de quién puede hacer qué, sin niveles ni jerarquía.
+  habilidades String[] @default([])
 
   creadoEn DateTime @default(now())
 

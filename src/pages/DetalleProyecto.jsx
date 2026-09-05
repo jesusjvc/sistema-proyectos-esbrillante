@@ -229,7 +229,7 @@ export default function DetalleProyecto() {
   }
 
   function copiarMensaje() {
-    navigator.clipboard.writeText(generarMensajeInicio(proyecto))
+    navigator.clipboard.writeText(generarMensajeInicio(proyecto, miembrosPorId))
     setCopiado(true)
     setTimeout(() => setCopiado(false), 2000)
   }
@@ -721,6 +721,7 @@ export default function DetalleProyecto() {
                 <InfoRow label="Copy" valor={nombreEquipo(proyecto.equipo.copy, miembrosPorId)} />
                 <InfoRow label="Diseñador" valor={nombreEquipo(proyecto.equipo.disenador, miembrosPorId)} />
                 <InfoRow label="Programador" valor={nombreEquipo(proyecto.equipo.programador, miembrosPorId)} />
+                <InfoRow label="Redes" valor={nombreEquipo(proyecto.equipo.redes, miembrosPorId)} />
                 <InfoRow label="Coordinador" valor={nombreEquipo(proyecto.equipo.adminProyecto, miembrosPorId)} />
                 <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium mt-1">
                   Editar equipo
@@ -1293,6 +1294,7 @@ const RESPONSABLES = [
   { valor: 'copy', label: 'Copy' },
   { valor: 'disenador', label: 'Diseñador' },
   { valor: 'programador', label: 'Programador' },
+  { valor: 'redes', label: 'Redes' },
   { valor: 'karla', label: 'Karla (QA)' },
   { valor: 'cliente', label: 'Cliente' },
 ]
@@ -1540,7 +1542,9 @@ function InfoCard({ titulo, icono, children, fullWidth }) {
 function nombreEquipo(valor, miembrosPorId) {
   if (!valor) return null
   if (valor === EQUIPO_NO_APLICA) return 'No aplica'
-  return miembrosPorId[valor] || '—'
+  const ids = Array.isArray(valor) ? valor : [valor]
+  if (!ids.length) return null
+  return ids.map((id) => miembrosPorId[id] || '—').join(', ')
 }
 
 // Personas ya asignadas al proyecto (Copy/Diseñador/Programador/Coordinador),
@@ -1549,6 +1553,7 @@ const ROLES_EQUIPO_FORM = [
   ['copy', 'Copy'],
   ['disenador', 'Diseñador'],
   ['programador', 'Programador'],
+  ['redes', 'Redes'],
   ['adminProyecto', 'Coordinador'],
 ]
 
@@ -1595,46 +1600,81 @@ function EditorAreas({ areasIniciales, onGuardar, onCancelar }) {
   )
 }
 
+// Un rol de equipo puede tener 0, 1 o varias personas (ej. dos diseñadores
+// en un proyecto integral) — se guarda como array de userId, salvo el
+// sentinel EQUIPO_NO_APLICA ("este rol no aplica aquí"), que reemplaza
+// cualquier selección.
+function idsIniciales(valor) {
+  if (!valor || valor === EQUIPO_NO_APLICA) return []
+  return Array.isArray(valor) ? valor : [valor]
+}
+
 function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
-  const [form, setForm] = useState({
-    copy: equipo.copy || '',
-    disenador: equipo.disenador || '',
-    programador: equipo.programador || '',
-    adminProyecto: equipo.adminProyecto || '',
-  })
+  const [form, setForm] = useState(() =>
+    Object.fromEntries(ROLES_EQUIPO_FORM.map(([key]) => [key, idsIniciales(equipo[key])])),
+  )
+  const [noAplica, setNoAplica] = useState(() =>
+    Object.fromEntries(ROLES_EQUIPO_FORM.map(([key]) => [key, equipo[key] === EQUIPO_NO_APLICA])),
+  )
   const [guardando, setGuardando] = useState(false)
+
+  function toggle(rol, id) {
+    setForm((prev) => ({
+      ...prev,
+      [rol]: prev[rol].includes(id) ? prev[rol].filter((v) => v !== id) : [...prev[rol], id],
+    }))
+  }
 
   async function handleGuardar(e) {
     e.preventDefault()
     setGuardando(true)
     try {
-      await onGuardar({
-        copy: form.copy || null,
-        disenador: form.disenador || null,
-        programador: form.programador || null,
-        adminProyecto: form.adminProyecto || null,
-      })
+      const data = {}
+      for (const [key] of ROLES_EQUIPO_FORM) {
+        data[key] = noAplica[key] ? EQUIPO_NO_APLICA : form[key]
+      }
+      await onGuardar(data)
     } finally {
       setGuardando(false)
     }
   }
 
   return (
-    <form onSubmit={handleGuardar} className="space-y-2">
+    <form onSubmit={handleGuardar} className="space-y-3">
       {ROLES_EQUIPO_FORM.map(([key, label]) => (
-        <div key={key} className="flex items-center gap-2">
-          <label className="text-xs text-slate-500 dark:text-ink-300 w-24 shrink-0">{label}</label>
-          <select
-            value={form[key]}
-            onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-            className="flex-1 border border-slate-200 dark:border-ink-500 bg-white dark:bg-ink-900 text-slate-800 dark:text-ink-100 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40"
-          >
-            <option value="">Por asignar</option>
-            {key === 'programador' && <option value={EQUIPO_NO_APLICA}>No aplica</option>}
-            {miembros.map((m) => (
-              <option key={m.id} value={m.id}>{m.nombre}</option>
-            ))}
-          </select>
+        <div key={key}>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-medium text-slate-500 dark:text-ink-300">{label}</label>
+            {key === 'programador' && (
+              <label className="flex items-center gap-1 text-xs text-slate-400 dark:text-ink-400">
+                <input
+                  type="checkbox"
+                  checked={noAplica[key]}
+                  onChange={(e) => setNoAplica({ ...noAplica, [key]: e.target.checked })}
+                />
+                No aplica
+              </label>
+            )}
+          </div>
+          {!noAplica[key] && (
+            <div className="flex flex-wrap gap-1.5">
+              {miembros.length === 0 && <span className="text-xs text-slate-400 dark:text-ink-400">No hay usuarios</span>}
+              {miembros.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => toggle(key, m.id)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                    form[key].includes(m.id)
+                      ? 'bg-brand-500 border-brand-500 text-slate-900 font-medium'
+                      : 'border-slate-200 dark:border-ink-500 text-slate-500 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-700'
+                  }`}
+                >
+                  {m.nombre}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ))}
       <div className="flex items-center gap-2 pt-1">
