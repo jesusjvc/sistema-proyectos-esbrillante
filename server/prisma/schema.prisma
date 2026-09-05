@@ -64,6 +64,11 @@ model Tarea {
   proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 
   fase             Int
+  // Agrupador libre y opcional para proyectos integrales que combinan varios
+  // objetivos sin fases compartidas (ej. "Video", "Sitio web", "Redes") — la
+  // vista del proyecto agrupa por este campo cuando tiene valor, además de
+  // por fase. Cambio deliberadamente mínimo: sin tabla propia ni jerarquía.
+  frente           String?
   orden            Float    @default(0)
   titulo           String
   responsable      String   @default("equipo")

@@ -404,10 +404,13 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado.',
-      inputSchema: { slug: z.string().describe('Slug o ID del proyecto') },
+      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título).',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        incluirCompletadas: z.boolean().optional().describe('Solo aplica a proyectos "finito". Si es true, agrega "tareasCompletadas" con las tareas del equipo ya completadas (id, fase, título, responsable, completadaPor, completadaEn). No cambia ningún otro listado — el propósito principal de esta tool sigue siendo mostrar qué falta.'),
+      },
     },
-    async ({ slug }) => {
+    async ({ slug, incluirCompletadas }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -444,6 +447,12 @@ function buildServer(usuario) {
           for (const t of tareasF) porEstado[t.estado] = (porEstado[t.estado] || 0) + 1
           return { numero: f.numero, nombre: f.nombre, totalTareas: tareasF.length, porEstado }
         })
+        if (incluirCompletadas) {
+          resumen.tareasCompletadas = p.tareas
+            .filter((t) => !t.esCliente && t.estado === 'completada')
+            .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
+            .map((t) => ({ id: t.id, fase: t.fase, titulo: t.titulo, responsable: t.responsable, completadaPor: t.completadaPor, completadaEn: t.completadaEn }))
+        }
       }
 
       resumen.tareasEnProceso = p.tareas
@@ -489,21 +498,22 @@ function buildServer(usuario) {
     'registrar_actividad',
     {
       title: 'Registrar actividad',
-      description: 'Agrega una actividad no contemplada en el checklist original. En proyectos "finito": por defecto queda marcada como completada de inmediato (para reportar avance ya hecho); si está en proceso, pasar completada=false. En proyectos "continuo" (tablero Kanban) usa el parámetro columna en vez de fase/completada para elegir en qué columna aparece (default "todo"). Si es del equipo (no esCliente), aparece en el portal del cliente dentro de "¿Qué está haciendo el equipo?" (o en el tablero, si es continuo). Importante para el orden: si esta actividad debe aparecer antes o después de otra ya existente (ver ver_proyecto), usa antesDeTareaId/despuesDeTareaId — si no se especifica ninguno, se agrega al final de la fase o columna, lo cual puede quedar fuera de orden lógico.',
+      description: 'Agrega una actividad no contemplada en el checklist original. En proyectos "finito", completada es OBLIGATORIO: pasa true si ya se hizo (para reportar avance ya ocurrido) o false si es trabajo por hacer/planear — no hay default, así se evita marcar como completada una actividad que en realidad hay que planear. En proyectos "continuo" (tablero Kanban) usa el parámetro columna en vez de fase/completada para elegir en qué columna aparece (default "todo"). Si es del equipo (no esCliente), aparece en el portal del cliente dentro de "¿Qué está haciendo el equipo?" (o en el tablero, si es continuo). Importante para el orden: si esta actividad debe aparecer antes o después de otra ya existente (ver ver_proyecto), usa antesDeTareaId/despuesDeTareaId — si no se especifica ninguno, se agrega al final de la fase o columna, lo cual puede quedar fuera de orden lógico. La respuesta incluye el "id" de la tarea creada — guárdalo si otra actividad debe depender de esta (dependeDeTareaIds) o si vas a referenciarla después (antesDeTareaId/despuesDeTareaId/completar_actividad/editar_actividad); no hace falta volver a llamar ver_proyecto solo para obtenerlo.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de la actividad'),
         descripcion: z.string().optional().describe('Detalle interno de la actividad. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en el portal; si se manda texto plano se preservan los saltos de línea igual.'),
         responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'karla', 'admin']).optional().describe('A quién le corresponde esta actividad. "copy"/"disenador"/"programador" apuntan a quien ocupe ese rol en ESTE proyecto específico (así solo le aparece en "Mis tareas" a la persona correcta, no a todo el equipo). "karla"/"admin" son fijos. Usa "equipo" (default si se omite) solo cuando de verdad le pueda tocar a cualquiera del equipo asignado — abusar de este valor es lo que hace que a la gente le aparezcan en "Mis tareas" actividades que no son lo suyo.'),
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo" (usa columna en su lugar).'),
-        completada: z.boolean().optional().describe('Si es false, la actividad queda pendiente en vez de completada. Default: true. Se ignora en proyectos "continuo" (usa columna en su lugar).'),
+        completada: z.boolean().optional().describe('Obligatorio en proyectos "finito": true si ya se hizo (reportar avance ya ocurrido), false si es trabajo pendiente por hacer/planear. Sin default — decide explícitamente en cada llamada. Se ignora en proyectos "continuo" (usa columna en su lugar).'),
         columna: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Solo para proyectos tipo "continuo": columna del tablero Kanban donde debe caer la tarjeta. Default: "todo". Se ignora si se da antesDeTareaId/despuesDeTareaId (se usa la columna de esa tarjeta de referencia).'),
+        frente: z.string().optional().describe('Solo para proyectos integrales que combinan varios objetivos sin fases compartidas (ej. video corporativo + sitio + redes, donde "Config Técnica" no significa nada para el video). Texto libre (ej. "Video", "Sitio web", "Redes") — la vista del proyecto agrupa las tareas por este valor cuando lo tienen. Omite este campo en proyectos de un solo frente de trabajo.'),
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta actividad'),
         despuesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto después de la cual debe quedar esta actividad'),
         dependeDeTareaIds: z.array(z.string()).optional().describe('IDs de tareas de este mismo proyecto que deben quedar completadas antes de que esta actividad se considere disponible.'),
       },
     },
-    async ({ slug, titulo, descripcion, responsable, fase, completada, columna, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
+    async ({ slug, titulo, descripcion, responsable, fase, completada, columna, frente, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -511,23 +521,29 @@ function buildServer(usuario) {
       if (errorDeps) return fail(errorDeps)
 
       const esContinuo = p.tipo === 'continuo'
+      if (!esContinuo && completada === undefined) {
+        return fail('Falta "completada": pasa true si esta actividad ya se hizo, o false si es trabajo pendiente por hacer/planear. No tiene default para evitar marcar como completado algo que en realidad hay que planear.')
+      }
+
       const posicion = esContinuo
         ? await resolverColumnaYOrden(p, { columna, antesDeTareaId, despuesDeTareaId })
         : await resolverFaseYOrden(p, { fase, antesDeTareaId, despuesDeTareaId })
       if (posicion.error) return fail(posicion.error)
 
-      const marcarCompletada = esContinuo ? posicion.estadoFinal === 'completada' : completada !== false
+      const marcarCompletada = esContinuo ? posicion.estadoFinal === 'completada' : completada === true
       const estadoFinal = esContinuo ? posicion.estadoFinal : (marcarCompletada ? 'completada' : 'pendiente')
 
+      const id = randomUUID()
       await prisma.tarea.create({
         data: {
-          id: randomUUID(),
+          id,
           proyectoId: p.id,
           fase: esContinuo ? 1 : posicion.faseFinal,
           orden: posicion.orden,
           titulo,
           descripcion: descripcion || '',
           responsable: responsable || 'equipo',
+          frente: frente || null,
           dependencias: dependeDeTareaIds || [],
           custom: true,
           estado: estadoFinal,
@@ -540,7 +556,7 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       const ubicacion = esContinuo ? `columna "${posicion.estadoFinal}"` : `fase ${posicion.faseFinal}`
-      return ok(`Actividad "${titulo}" registrada en ${ubicacion}${esContinuo ? '' : (marcarCompletada ? ' y marcada como completada' : ' (pendiente)')}.`)
+      return ok(`Actividad "${titulo}" registrada en ${ubicacion}${esContinuo ? '' : (marcarCompletada ? ' y marcada como completada' : ' (pendiente)')}. id: "${id}"`)
     },
   )
 
@@ -548,7 +564,7 @@ function buildServer(usuario) {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero (ej. "revisa este prototipo" solo tiene sentido una vez diseñado), usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) (fotos, logo, documentos, materiales), usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto y aparezca directo en su tarjeta.',
+      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero (ej. "revisa este prototipo" solo tiene sentido una vez diseñado), usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) (fotos, logo, documentos, materiales), usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto y aparezca directo en su tarjeta. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
@@ -589,9 +605,10 @@ function buildServer(usuario) {
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
       const disponibleDeInicio = (dependeDeTareaIds || []).every((d) => completadasIds.has(d))
 
+      const id = randomUUID()
       await prisma.tarea.create({
         data: {
-          id: randomUUID(),
+          id,
           proyectoId: p.id,
           fase: esContinuo ? 1 : posicion.faseFinal,
           orden: posicion.orden,
@@ -611,7 +628,7 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       const nota = dependeDeTareaIds?.length ? ' (queda oculta para el cliente hasta completar sus dependencias)' : ''
-      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive}`)
+      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive} id: "${id}"`)
     },
   )
 
@@ -727,12 +744,13 @@ function buildServer(usuario) {
         responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'karla', 'admin']).optional().describe('Reasignar a quién le corresponde esta actividad (ver_proyecto no marca cuáles quedaron en "equipo" genérico, pero son las que más vale la pena revisar y reasignar a un rol específico — "copy"/"disenador"/"programador" resuelven a quien ocupe ese rol en este proyecto).'),
         instrucciones: z.string().optional().describe('Nuevas instrucciones para el cliente (solo aplica a solicitudes al cliente). Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado; si se manda texto plano se preservan los saltos de línea igual.'),
         plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
+        frente: z.string().optional().describe('Agrupador libre para proyectos integrales que combinan varios objetivos sin fases compartidas (ej. "Video", "Sitio web", "Redes") — la vista del proyecto agrupa por este valor. Pasa "" (string vacío) para quitarlo.'),
         antesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo antes de otra (por ID)'),
         despuesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo después de otra (por ID)'),
         dependeDeTareaIds: z.array(z.string()).optional().describe('Reemplaza la lista de tareas de las que depende esta actividad — mientras no estén todas completadas, esta tarea queda oculta/bloqueada para quien deba trabajarla (si es del cliente, no aparece en su portal). Pasa un array vacío para quitar todas las dependencias.'),
       },
     },
-    async ({ slug, tareaId, titulo, descripcion, responsable, instrucciones, plazoHoras, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
+    async ({ slug, tareaId, titulo, descripcion, responsable, instrucciones, plazoHoras, frente, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -748,6 +766,7 @@ function buildServer(usuario) {
       if (responsable !== undefined) data.responsable = responsable
       if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
+      if (frente !== undefined) data.frente = frente || null
       if (dependeDeTareaIds !== undefined) data.dependencias = dependeDeTareaIds
 
       if (antesDeTareaId || despuesDeTareaId) {

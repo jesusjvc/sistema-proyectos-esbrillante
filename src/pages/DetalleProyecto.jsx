@@ -545,31 +545,40 @@ export default function DetalleProyecto() {
 
                 {abierta && (
                   <div className="border-t border-slate-100 dark:border-ink-500">
-                    <FaseTareasArrastrables tareas={tareasVisibles} onReordenar={handleReordenarTarea}>
-                      {(t) => {
-                        const est = estadoCalculado(t)
-                        return (
-                          <TareaRow
-                            tarea={t}
-                            estado={est}
-                            avatares={avatares}
-                            equipo={proyecto.equipo}
-                            miembrosPorId={miembrosPorId}
-                            miembros={miembros}
-                            miembrosProyecto={miembrosProyecto}
-                            todasLasTareas={proyecto.tareas}
-                            onCompletar={() => marcarCompleta(t.id)}
-                            onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
-                            onReabrir={() => reabrir(t.id)}
-                            onOmitir={() => omitir(t.id)}
-                            onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
-                            onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
-                            onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
-                            esAdmin={true}
-                          />
-                        )
-                      }}
-                    </FaseTareasArrastrables>
+                    {agruparPorFrente(tareasVisibles).map((grupo) => (
+                      <div key={grupo.frente ?? '_sin_frente'}>
+                        {grupo.frente && (
+                          <div className="px-5 pt-3 pb-1 text-xs font-semibold text-slate-400 dark:text-ink-400 uppercase tracking-wide">
+                            {grupo.frente}
+                          </div>
+                        )}
+                        <FaseTareasArrastrables tareas={grupo.tareas} onReordenar={handleReordenarTarea}>
+                          {(t) => {
+                            const est = estadoCalculado(t)
+                            return (
+                              <TareaRow
+                                tarea={t}
+                                estado={est}
+                                avatares={avatares}
+                                equipo={proyecto.equipo}
+                                miembrosPorId={miembrosPorId}
+                                miembros={miembros}
+                                miembrosProyecto={miembrosProyecto}
+                                todasLasTareas={proyecto.tareas}
+                                onCompletar={() => marcarCompleta(t.id)}
+                                onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
+                                onReabrir={() => reabrir(t.id)}
+                                onOmitir={() => omitir(t.id)}
+                                onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
+                                onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
+                                onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
+                                esAdmin={true}
+                              />
+                            )
+                          }}
+                        </FaseTareasArrastrables>
+                      </div>
+                    ))}
                     {ocultarCompletadas && completadas > 0 && (
                       <button
                         onClick={() => setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: false }))}
@@ -848,6 +857,27 @@ export default function DetalleProyecto() {
       </div>
     </Layout>
   )
+}
+
+// Agrupa las tareas de una fase por su "frente" de trabajo (campo libre y
+// opcional, ver Tarea.frente) — solo relevante en proyectos integrales que
+// combinan varios objetivos sin fases compartidas (ej. video + sitio + redes).
+// Las tareas sin frente van primero, sin encabezado, para no alterar la vista
+// de un proyecto que todavía no usa el campo.
+function agruparPorFrente(tareas) {
+  const grupos = []
+  const porFrente = new Map()
+  for (const t of tareas) {
+    const clave = t.frente || null
+    if (!porFrente.has(clave)) {
+      const grupo = { frente: clave, tareas: [] }
+      porFrente.set(clave, grupo)
+      grupos.push(grupo)
+    }
+    porFrente.get(clave).tareas.push(t)
+  }
+  grupos.sort((a, b) => (a.frente === null ? -1 : b.frente === null ? 1 : 0))
+  return grupos
 }
 
 // Arrastrar y soltar para reordenar las tareas dentro de una fase (proyectos
