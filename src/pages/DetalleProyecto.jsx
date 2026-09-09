@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
+import SelectorProyecto from '../components/SelectorProyecto'
 import { useAuth } from '../context/AuthContext'
 import {
   getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea, reordenarTarea,
@@ -15,7 +16,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora } from '../data/storage'
+import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora, statusBadge, statusLabel } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
@@ -265,7 +266,7 @@ export default function DetalleProyecto() {
 
   return (
     <Layout
-      titulo={proyecto.cliente.nombreComercial}
+      titulo={<SelectorProyecto proyectoActual={proyecto} base={base} />}
       volver={base}
       badge={
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusBadge(proyecto.status)}`}>
@@ -1787,22 +1788,6 @@ function InfoBool({ label, valor }) {
       <span className={valor ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-ink-400'}>{valor ? '✓ Sí' : '✗ No'}</span>
     </div>
   )
-}
-
-function statusBadge(status) {
-  const m = {
-    activo: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-    en_pausa: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-    pendiente_anticipo: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-    completado: 'bg-slate-100 text-slate-600 dark:bg-ink-700 dark:text-ink-300',
-    cancelado: 'bg-slate-100 text-slate-500 dark:bg-ink-700 dark:text-ink-300',
-  }
-  return m[status] || m.activo
-}
-
-function statusLabel(status) {
-  const m = { activo: 'Activo', en_pausa: 'En pausa', pendiente_anticipo: 'Pendiente anticipo', completado: 'Completado', cancelado: 'Cancelado' }
-  return m[status] || status
 }
 
 function DetalleSeccion({ titulo, children }) {

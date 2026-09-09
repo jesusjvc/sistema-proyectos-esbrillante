@@ -562,3 +562,19 @@ export function tiempoTranscurrido(isoString) {
   const dias = Math.floor(horas / 24)
   return `hace ${dias} día${dias === 1 ? '' : 's'}`
 }
+
+export function statusBadge(status) {
+  const m = {
+    activo: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    en_pausa: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+    pendiente_anticipo: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+    completado: 'bg-slate-100 text-slate-600 dark:bg-ink-700 dark:text-ink-300',
+    cancelado: 'bg-slate-100 text-slate-500 dark:bg-ink-700 dark:text-ink-300',
+  }
+  return m[status] || m.activo
+}
+
+export function statusLabel(status) {
+  const m = { activo: 'Activo', en_pausa: 'En pausa', pendiente_anticipo: 'Pendiente anticipo', completado: 'Completado', cancelado: 'Cancelado' }
+  return m[status] || status
+}
