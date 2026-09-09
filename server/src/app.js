@@ -23,8 +23,15 @@ const PORT = process.env.PORT || 3001
 // correr detrás de un proxy — usado por las URLs absolutas de metadata OAuth.
 app.set('trust proxy', 1)
 
+// CLIENT_URL admite varios orígenes separados por coma — necesario mientras
+// el sistema vive en más de un dominio (foco.esbrillante.mx y el dominio
+// anterior en transición).
+const origenesPermitidos = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: origenesPermitidos,
   credentials: true,
 }))
 app.use(express.json({ limit: '2mb' }))

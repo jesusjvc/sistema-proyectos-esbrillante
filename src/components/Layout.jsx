@@ -34,14 +34,14 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
 
   return (
     <div className="h-screen flex bg-slate-50 dark:bg-ink-950 overflow-hidden">
-      <aside className={`${colapsado ? 'w-16' : 'w-60'} bg-slate-950 text-white flex flex-col shrink-0 transition-[width] duration-150`}>
-        <div className={`${colapsado ? 'px-0 py-5 flex justify-center' : 'px-5 py-5'} border-b border-slate-800 shrink-0`}>
+      <aside className={`${colapsado ? 'w-16' : 'w-60'} bg-ink-950 text-white flex flex-col shrink-0 transition-[width] duration-150`}>
+        <div className={`${colapsado ? 'px-0 py-5 flex justify-center' : 'px-5 py-5'} border-b border-ink-500 shrink-0`}>
           {colapsado ? (
             <img src={icono} alt="Foco" className="h-7 w-7" title="Foco" />
           ) : (
             <>
               <img src={logo} alt="Foco" className="h-7 w-auto" />
-              <div className="text-xs text-slate-400 mt-1.5">by EsBrillante</div>
+              <div className="text-xs text-ink-300 mt-1.5">by EsBrillante</div>
             </>
           )}
         </div>
@@ -72,18 +72,18 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
         <button
           onClick={toggleColapsado}
           title={colapsado ? 'Expandir menú' : 'Colapsar menú'}
-          className={`flex items-center gap-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-900 transition-colors border-t border-slate-800 py-2.5 shrink-0 ${colapsado ? 'justify-center' : 'justify-end px-4'}`}
+          className={`flex items-center gap-1.5 text-xs text-ink-300 hover:text-white hover:bg-ink-600 transition-colors border-t border-ink-500 py-2.5 shrink-0 ${colapsado ? 'justify-center' : 'justify-end px-4'}`}
         >
           {colapsado ? <ChevronRight size={15} /> : <><ChevronLeft size={15} /> Colapsar</>}
         </button>
 
-        <div className={`${colapsado ? 'px-2 py-3' : 'px-4 py-4'} border-t border-slate-800 shrink-0`}>
+        <div className={`${colapsado ? 'px-2 py-3' : 'px-4 py-4'} border-t border-ink-500 shrink-0`}>
           <div className={`flex items-center gap-3 ${colapsado ? 'justify-center' : ''}`}>
             <AvatarUploader user={user} onUpdated={(u) => setUser({ ...u, rol: u.rol.toLowerCase() })} />
             {!colapsado && (
               <div className="min-w-0">
                 <div className="text-sm font-medium text-white truncate">{user?.nombre || '—'}</div>
-                <div className="text-xs text-slate-500 capitalize">{user?.rol}</div>
+                <div className="text-xs text-ink-300 capitalize">{user?.rol}</div>
               </div>
             )}
           </div>
@@ -91,7 +91,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
             <button
               onClick={salir}
               title="Cerrar sesión"
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 text-xs text-ink-300 hover:text-white transition-colors"
             >
               <LogOut size={13} />
               {!colapsado && 'Cerrar sesión'}
@@ -99,7 +99,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
             <button
               onClick={toggleTema}
               title={tema === 'dark' ? 'Cambiar a claro' : 'Cambiar a oscuro'}
-              className={`flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors ${colapsado ? '' : 'ml-auto'}`}
+              className={`flex items-center gap-1 text-xs text-ink-300 hover:text-white transition-colors ${colapsado ? '' : 'ml-auto'}`}
             >
               {tema === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
             </button>
@@ -135,7 +135,7 @@ function NavLink({ to, icon, label, active, colapsado }) {
       to={to}
       title={colapsado ? label : undefined}
       className={`flex items-center gap-2.5 py-2 rounded-lg text-sm transition-colors ${colapsado ? 'justify-center px-2' : 'px-3'} ${
-        active ? 'bg-brand-500 text-slate-900 font-medium' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+        active ? 'bg-brand-500 text-slate-900 font-medium' : 'text-ink-300 hover:bg-ink-800 hover:text-white'
       }`}
     >
       {icon}
