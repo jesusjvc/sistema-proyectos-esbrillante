@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import prisma from '../lib/prisma.js'
 import { firmarToken, setCookie, clearCookie } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/auth.js'
+import { generarApiKey } from '../lib/apiKeys.js'
 
 const router = Router()
 
@@ -88,6 +89,53 @@ router.delete('/me/avatar', requireAuth, async (req, res) => {
       select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, avatarUrl: true },
     })
     res.json(user)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// GET /api/auth/me/api-keys — nunca incluye el hash ni el token completo.
+router.get('/me/api-keys', requireAuth, async (req, res) => {
+  try {
+    const keys = await prisma.apiKey.findMany({
+      where: { userId: req.user.id },
+      select: { id: true, nombre: true, prefijo: true, creadaEn: true, ultimoUso: true, revocadaEn: true },
+      orderBy: { creadaEn: 'desc' },
+    })
+    res.json(keys)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/auth/me/api-keys — el token completo solo se devuelve aquí, una vez.
+router.post('/me/api-keys', requireAuth, async (req, res) => {
+  const nombre = typeof req.body?.nombre === 'string' ? req.body.nombre.trim().slice(0, 60) : ''
+
+  try {
+    const { token, hash, prefijo } = generarApiKey()
+    const key = await prisma.apiKey.create({
+      data: { userId: req.user.id, nombre, prefijo, hash },
+      select: { id: true, nombre: true, prefijo: true, creadaEn: true },
+    })
+    res.status(201).json({ ...key, token })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// DELETE /api/auth/me/api-keys/:id — solo revoca keys propias.
+router.delete('/me/api-keys/:id', requireAuth, async (req, res) => {
+  try {
+    const { count } = await prisma.apiKey.updateMany({
+      where: { id: req.params.id, userId: req.user.id, revocadaEn: null },
+      data: { revocadaEn: new Date() },
+    })
+    if (!count) return res.status(404).json({ error: 'Key no encontrada' })
+    res.json({ ok: true })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'crypto'
 import { verificarToken } from '../lib/jwt.js'
 import { baseUrl } from '../lib/baseUrl.js'
+import { esTokenApiKey, hashearApiKey } from '../lib/apiKeys.js'
 import prisma from '../lib/prisma.js'
 
 const IDENTIDAD_MCP_COMPARTIDA = { id: 'mcp', email: 'mcp@esbrillante.mx', nombre: 'Claude Code (MCP)', rol: 'ADMIN', esKarla: false }
@@ -65,6 +66,21 @@ export async function requireMcpAuth(req, res, next) {
       }
     } catch {
       // Token inválido/expirado: cae al 401 de abajo.
+    }
+
+    // API key personal generada desde el portal (self-service) — igual que el
+    // token OAuth, resuelve la identidad real del dueño, así que respeta sus
+    // permisos por proyecto en vez de operar como el admin genérico "mcp".
+    if (esTokenApiKey(token)) {
+      const apiKey = await prisma.apiKey.findUnique({ where: { hash: hashearApiKey(token) } })
+      if (apiKey && !apiKey.revocadaEn) {
+        const user = await prisma.user.findUnique({ where: { id: apiKey.userId } })
+        if (user && user.activo) {
+          prisma.apiKey.update({ where: { id: apiKey.id }, data: { ultimoUso: new Date() } }).catch(() => {})
+          req.user = { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, esKarla: user.esKarla }
+          return next()
+        }
+      }
     }
   }
 

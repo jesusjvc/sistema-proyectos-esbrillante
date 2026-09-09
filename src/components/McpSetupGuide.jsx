@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Copy, Check, Sparkles } from 'lucide-react'
+import ApiKeysManager from './ApiKeysManager'
 
 const MCP_URL = 'https://api-proyectos.esbrillante.mx/mcp'
 
@@ -78,55 +79,60 @@ function TabCli() {
   const [shell, setShell] = useState('bash')
 
   const cmdExport = shell === 'fish'
-    ? 'set -x ESBRILLANTE_MCP_KEY "<pide-esta-key-a-un-admin>"'
-    : 'export ESBRILLANTE_MCP_KEY="<pide-esta-key-a-un-admin>"'
+    ? 'set -x ESBRILLANTE_MCP_KEY "<pega-aquí-tu-key-generada-arriba>"'
+    : 'export ESBRILLANTE_MCP_KEY="<pega-aquí-tu-key-generada-arriba>"'
 
   const cmdAdd = shell === 'fish'
     ? `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \\\n  --header "Authorization: Bearer $ESBRILLANTE_MCP_KEY" \\\n  --scope user`
     : `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \\\n  --header "Authorization: Bearer \${ESBRILLANTE_MCP_KEY}" \\\n  --scope user`
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-      <p className="text-sm text-slate-600 leading-relaxed">
-        Conecta tu Claude Code local (en la terminal) usando una API key compartida — pídesela a un admin
-        por un canal seguro, nunca la subas a un repo ni la compartas fuera del equipo.
-      </p>
-
-      <div className="flex items-center gap-1.5 text-xs">
-        {['bash', 'fish'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setShell(s)}
-            className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
-              shell === s ? 'bg-brand-500 text-slate-900' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-            }`}
-          >
-            {s === 'bash' ? 'bash / zsh' : 'fish'}
-          </button>
-        ))}
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-2">
+        <p className="text-sm text-slate-600 leading-relaxed">
+          Conecta tu Claude Code local (en la terminal) con tu propia API key personal. Tus acciones vía CLI
+          quedan a tu nombre y respetan lo que tienes asignado, igual que con Claude Cowork.
+        </p>
       </div>
 
-      <ol className="space-y-3">
-        <PasoItem n={1}>
-          Exporta la key en tu shell:
-          <CopyBlock value={cmdExport} className="mt-2" multiline />
-        </PasoItem>
-        <PasoItem n={2}>
-          Agrega el MCP (queda guardado en tu <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">~/.claude.json</code>, disponible en todos tus repos):
-          <CopyBlock value={cmdAdd} className="mt-2" multiline />
-        </PasoItem>
-        <PasoItem n={3}>
-          Verifica la conexión con <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">claude mcp list</code> (fuera de una sesión) o{' '}
-          <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">/mcp</code> (dentro de una sesión) — debe aparecer{' '}
-          <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">esbrillante-seguimiento</code> conectado.
-        </PasoItem>
-      </ol>
+      <ApiKeysManager />
 
-      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
-        Esta key es compartida: tus acciones vía CLI quedan a nombre de "Claude Code (MCP)", no del tuyo, y
-        sin las restricciones de permisos por proyecto. Si quieres que tus acciones queden registradas a tu
-        nombre y respeten lo que tienes asignado, usa mejor Claude Cowork.
-      </p>
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <div className="flex items-center gap-1.5 text-xs">
+          {['bash', 'fish'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setShell(s)}
+              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+                shell === s ? 'bg-brand-500 text-slate-900' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {s === 'bash' ? 'bash / zsh' : 'fish'}
+            </button>
+          ))}
+        </div>
+
+        <ol className="space-y-3">
+          <PasoItem n={1}>
+            Exporta la key que generaste arriba en tu shell:
+            <CopyBlock value={cmdExport} className="mt-2" multiline />
+          </PasoItem>
+          <PasoItem n={2}>
+            Agrega el MCP (queda guardado en tu <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">~/.claude.json</code>, disponible en todos tus repos):
+            <CopyBlock value={cmdAdd} className="mt-2" multiline />
+          </PasoItem>
+          <PasoItem n={3}>
+            Verifica la conexión con <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">claude mcp list</code> (fuera de una sesión) o{' '}
+            <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">/mcp</code> (dentro de una sesión) — debe aparecer{' '}
+            <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">esbrillante-seguimiento</code> conectado.
+          </PasoItem>
+        </ol>
+
+        <p className="text-xs text-slate-400 leading-relaxed">
+          ¿Vas a conectar una automatización en vez de tu cuenta personal? Un admin puede darte la key
+          compartida del sistema para ese caso — no la uses para tu propio CLI.
+        </p>
+      </div>
     </div>
   )
 }

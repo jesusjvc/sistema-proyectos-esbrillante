@@ -25,9 +25,35 @@ model User {
   // qué proyectos ve por defecto en el dashboard. null = ve todos (sin filtrar).
   area      String?
 
+  apiKeys ApiKey[]
+
   creadoEn DateTime @default(now())
 
   @@map("users")
+}
+
+// API key personal para conectar por MCP/CLI (Claude Code) a nombre propio,
+// en vez de la MCP_API_KEY compartida. Se genera desde el portal, se muestra
+// completa una sola vez y de ahí en adelante solo se ve `prefijo` — perderla
+// significa revocarla y generar otra, no hay forma de recuperarla.
+model ApiKey {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Etiqueta libre para reconocerla en la lista (ej. "laptop trabajo"). Opcional.
+  nombre String @default("")
+  // Primeros caracteres del token, visibles en la UI para identificarla sin
+  // volver a mostrarla completa.
+  prefijo String
+  // sha256 hex del token completo — el token en claro nunca se guarda.
+  hash    String @unique
+
+  ultimoUso  DateTime?
+  creadaEn   DateTime  @default(now())
+  revocadaEn DateTime?
+
+  @@map("api_keys")
 }
 
 model Proyecto {
