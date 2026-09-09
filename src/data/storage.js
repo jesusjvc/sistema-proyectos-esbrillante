@@ -528,7 +528,14 @@ function generarPassword() {
 
 export function formatFecha(isoString) {
   if (!isoString) return '—'
-  return new Date(isoString).toLocaleDateString('es-MX', {
+  // Una fecha "sola" (YYYY-MM-DD, sin hora) hay que anclarla a medianoche
+  // LOCAL — si no, new Date() la interpreta como medianoche UTC y el
+  // toLocaleDateString la corre un día hacia atrás en cualquier huso
+  // detrás de UTC (ej. México). Los timestamps completos (con hora/Z) no
+  // llevan este ajuste porque sí representan un instante real.
+  const soloFecha = /^\d{4}-\d{2}-\d{2}$/.test(isoString)
+  const fecha = soloFecha ? new Date(`${isoString}T00:00:00`) : new Date(isoString)
+  return fecha.toLocaleDateString('es-MX', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

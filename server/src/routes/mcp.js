@@ -378,25 +378,39 @@ function buildServer(usuario) {
   server.registerTool(
     'editar_proyecto',
     {
-      title: 'Editar descripción del proyecto',
-      description: 'Actualiza la descripción libre de qué trata el proyecto y qué se busca lograr — le da contexto al equipo. Sobreescribe la descripción existente por completo (no la concatena).',
+      title: 'Editar descripción o fecha de entrega del proyecto',
+      description: 'Actualiza la descripción libre del proyecto y/o su fecha estimada de entrega. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
-        descripcion: z.string().describe('Nueva descripción del proyecto'),
+        descripcion: z.string().optional().describe('Nueva descripción del proyecto'),
+        fechaEstimadaEntrega: z.string().optional().describe('Nueva fecha estimada de entrega, formato YYYY-MM-DD. Solo aplica a proyectos "finito".'),
       },
     },
-    async ({ slug, descripcion }) => {
+    async ({ slug, descripcion, fechaEstimadaEntrega }) => {
+      if (descripcion === undefined && fechaEstimadaEntrega === undefined) {
+        return fail('Manda al menos descripcion o fechaEstimadaEntrega.')
+      }
+
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (fechaEstimadaEntrega !== undefined && p.tipo === 'continuo') {
+        return fail(`El proyecto "${slug}" es de tipo continuo y no tiene fecha de entrega.`)
+      }
+
+      const cambios = {}
+      if (descripcion !== undefined) cambios.descripcion = descripcion
+      if (fechaEstimadaEntrega !== undefined) cambios.fechaEstimadaEntrega = fechaEstimadaEntrega
 
       await prisma.proyecto.update({
         where: { id: p.id },
-        data: { proyecto: { ...p.proyecto, descripcion } },
+        data: { proyecto: { ...p.proyecto, ...cambios } },
       })
-      await logEntry(p.id, usuario.nombre, 'Descripción del proyecto actualizada')
+
+      const detalle = Object.keys(cambios).map((c) => c === 'descripcion' ? 'descripción' : `entrega → ${fechaEstimadaEntrega}`).join(', ')
+      await logEntry(p.id, usuario.nombre, 'Proyecto editado', detalle)
       emitirCambio(p.id)
 
-      return ok(`Descripción del proyecto "${slug}" actualizada.`)
+      return ok(`Proyecto "${slug}" actualizado (${detalle}).`)
     },
   )
 

@@ -238,6 +238,28 @@ router.put('/:slug/descripcion', requireAuth, async (req, res) => {
   }
 })
 
+// PUT /api/proyectos/:slug/fecha-entrega
+router.put('/:slug/fecha-entrega', requireAuth, async (req, res) => {
+  const { fechaEstimadaEntrega } = req.body
+  if (fechaEstimadaEntrega !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(fechaEstimadaEntrega || '')) {
+    return res.status(400).json({ error: 'fechaEstimadaEntrega inválida — usa formato YYYY-MM-DD' })
+  }
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (p.tipo === 'continuo') return res.status(400).json({ error: 'Un proyecto continuo no tiene fecha de entrega' })
+
+    const proyecto = { ...p.proyecto, fechaEstimadaEntrega }
+    await prisma.proyecto.update({ where: { id: p.id }, data: { proyecto } })
+    emitirCambio(p.id)
+    res.json({ ok: true, fechaEstimadaEntrega: proyecto.fechaEstimadaEntrega })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/proyectos/:slug/equipo
 router.put('/:slug/equipo', requireAuth, async (req, res) => {
   const { equipo } = req.body

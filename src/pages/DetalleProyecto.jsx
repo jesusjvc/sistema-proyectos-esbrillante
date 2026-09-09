@@ -7,7 +7,7 @@ import {
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
-  aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, crearCarpetaDriveProyecto,
+  aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, actualizarFechaEntrega, crearCarpetaDriveProyecto,
   crearComentario, regenerarPasswordCliente, actualizarAreasProyecto,
 } from '../data/api'
 import {
@@ -27,6 +27,7 @@ import Avatar from '../components/Avatar'
 import PrototiposPanel from '../components/PrototiposPanel'
 import PanelSolicitudes from '../components/PanelSolicitudes'
 import DescripcionProyecto from '../components/DescripcionProyecto'
+import FechaEntregaProyecto from '../components/FechaEntregaProyecto'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import TextoEnriquecido from '../components/TextoEnriquecido'
 import HiloComentarios from '../components/HiloComentarios'
@@ -356,7 +357,14 @@ export default function DetalleProyecto() {
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
-            <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5">{esContinuo ? 'Continuo' : formatFecha(proyecto.proyecto.fechaEstimadaEntrega)}</div>
+            {esContinuo ? (
+              <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5">Continuo</div>
+            ) : (
+              <FechaEntregaProyecto
+                fecha={proyecto.proyecto.fechaEstimadaEntrega}
+                onGuardar={async (fecha) => { await actualizarFechaEntrega(proyecto.slug, fecha); await refresh() }}
+              />
+            )}
           </div>
         </div>
       </div>
