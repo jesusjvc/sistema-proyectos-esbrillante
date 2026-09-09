@@ -75,16 +75,27 @@ function TabCowork() {
   )
 }
 
+const SHELLS = {
+  bash: {
+    label: 'bash / zsh — macOS / Linux',
+    cmdExport: 'export ESBRILLANTE_MCP_KEY="<pega-aquí-tu-key-generada-arriba>"',
+    cmdAdd: `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \\\n  --header "Authorization: Bearer \${ESBRILLANTE_MCP_KEY}" \\\n  --scope user`,
+  },
+  fish: {
+    label: 'fish — macOS / Linux',
+    cmdExport: 'set -x ESBRILLANTE_MCP_KEY "<pega-aquí-tu-key-generada-arriba>"',
+    cmdAdd: `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \\\n  --header "Authorization: Bearer $ESBRILLANTE_MCP_KEY" \\\n  --scope user`,
+  },
+  powershell: {
+    label: 'PowerShell — Windows',
+    cmdExport: '$env:ESBRILLANTE_MCP_KEY = "<pega-aquí-tu-key-generada-arriba>"',
+    cmdAdd: `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \`\n  --header "Authorization: Bearer $env:ESBRILLANTE_MCP_KEY" \`\n  --scope user`,
+  },
+}
+
 function TabCli() {
   const [shell, setShell] = useState('bash')
-
-  const cmdExport = shell === 'fish'
-    ? 'set -x ESBRILLANTE_MCP_KEY "<pega-aquí-tu-key-generada-arriba>"'
-    : 'export ESBRILLANTE_MCP_KEY="<pega-aquí-tu-key-generada-arriba>"'
-
-  const cmdAdd = shell === 'fish'
-    ? `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \\\n  --header "Authorization: Bearer $ESBRILLANTE_MCP_KEY" \\\n  --scope user`
-    : `claude mcp add --transport http esbrillante-seguimiento ${MCP_URL} \\\n  --header "Authorization: Bearer \${ESBRILLANTE_MCP_KEY}" \\\n  --scope user`
+  const { cmdExport, cmdAdd } = SHELLS[shell]
 
   return (
     <div className="space-y-4">
@@ -98,8 +109,8 @@ function TabCli() {
       <ApiKeysManager />
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-        <div className="flex items-center gap-1.5 text-xs">
-          {['bash', 'fish'].map((s) => (
+        <div className="flex items-center gap-1.5 text-xs flex-wrap">
+          {Object.entries(SHELLS).map(([s, { label }]) => (
             <button
               key={s}
               onClick={() => setShell(s)}
@@ -107,7 +118,7 @@ function TabCli() {
                 shell === s ? 'bg-brand-500 text-slate-900' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
               }`}
             >
-              {s === 'bash' ? 'bash / zsh' : 'fish'}
+              {label}
             </button>
           ))}
         </div>
