@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { envolverHtmlDeCorreo } from './emailTemplate.js'
 
 function mailtrapConfigurado() {
   return !!(process.env.MAILTRAP_SMTP_HOST && process.env.MAILTRAP_SMTP_USER && process.env.MAILTRAP_SMTP_PASS && process.env.MAILTRAP_FROM_EMAIL)
@@ -31,7 +32,7 @@ async function enviarEmail({ to, nombreDestino, asunto, texto, html }) {
       to: nombreDestino ? `"${nombreDestino}" <${to}>` : to,
       subject: asunto,
       text: texto,
-      html: html || texto,
+      html: envolverHtmlDeCorreo(html || `<p>${texto}</p>`),
     })
     return { enviado: true }
   } catch (err) {
