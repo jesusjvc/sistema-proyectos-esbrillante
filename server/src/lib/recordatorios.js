@@ -9,8 +9,7 @@ function tareaVencida(t) {
     && (Date.now() - new Date(t.disponibleDesde).getTime()) > t.plazoHoras * HORA_MS
 }
 
-function elegibleParaRecordatorio(t) {
-  if (t.avisosDesactivados) return false
+function pasaronVeinticuatroHoras(t) {
   if (!t.ultimoRecordatorioEn) return true
   return (Date.now() - new Date(t.ultimoRecordatorioEn).getTime()) >= DIA_MS
 }
@@ -25,8 +24,16 @@ function formatoAtraso(disponibleDesde, plazoHoras) {
 
 // Revisa todos los proyectos activos y envía un correo (uno por proyecto,
 // agrupando todas sus tareas vencidas) al cliente cuando alguna tarea suya
-// superó su plazoHoras y no tiene los avisos apagados. No reenvía antes de
-// 24h por tarea (ultimoRecordatorioEn).
+// superó su plazoHoras y no tiene los avisos apagados.
+//
+// El disparo es a nivel PROYECTO, no por tarea: basta con que UNA tarea
+// vencida ya cumpla su ventana de 24h para mandar el correo, pero ese
+// correo incluye TODAS las vencidas del proyecto y resincroniza el
+// ultimoRecordatorioEn de todas al mismo instante. Si se disparara por
+// tarea individual, cada una arrastraría su propio reloj y el cliente
+// terminaría recibiendo dos correos separados el mismo día conforme sus
+// ventanas de 24h se desalinean (pasó en producción: EE Shipping recibió
+// dos avisos el mismo día por esto).
 export async function revisarRecordatoriosVencidos() {
   const proyectos = await prisma.proyecto.findMany({
     where: { status: 'activo' },
@@ -34,8 +41,9 @@ export async function revisarRecordatoriosVencidos() {
   })
 
   for (const p of proyectos) {
-    const vencidas = p.tareas.filter((t) => tareaVencida(t) && elegibleParaRecordatorio(t))
+    const vencidas = p.tareas.filter((t) => tareaVencida(t) && !t.avisosDesactivados)
     if (!vencidas.length) continue
+    if (!vencidas.some(pasaronVeinticuatroHoras)) continue
 
     const correo = p.cliente?.correo
     if (!correo) continue

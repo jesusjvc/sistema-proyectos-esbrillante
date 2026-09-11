@@ -23,6 +23,7 @@
     "google-auth-library": "^9.15.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.0",
+    "nodemailer": "^10.0.7",
     "prisma": "^5.22.0",
     "zod": "^3.24.1"
   },
