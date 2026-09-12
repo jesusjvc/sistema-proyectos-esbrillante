@@ -75,34 +75,43 @@ export async function revisarRecordatoriosVencidos() {
 
     // El webhook es un canal aparte (pensado para una app externa de
     // WhatsApp) — se dispara junto con el correo pero no depende de que
-    // este tenga éxito, ni su resultado bloquea nada de lo que sigue.
-    dispararWebhookRecordatorio({
+    // este tenga éxito.
+    const resultadoWebhook = await dispararWebhookRecordatorio({
       tipo: 'recordatorio_tareas_vencidas',
       proyecto: { slug: p.slug, nombre: nombreCliente, urlPortal: linkProyecto },
       cliente: { nombre: nombreCliente, correo, whatsapp: p.cliente?.whatsapp || null },
       tareas: items,
     })
 
-    const { enviado } = await enviarEmail({
+    const { enviado, motivo: motivoEmail } = await enviarEmail({
       to: correo,
       nombreDestino: nombreCliente,
       asunto: `⏰ Tienes ${items.length} actividad${items.length > 1 ? 'es' : ''} pendiente${items.length > 1 ? 's' : ''} — ${nombreCliente}`,
       texto,
       html,
     })
+
+    // Se deja registro SIEMPRE (éxito o falla) — antes solo se guardaba
+    // cuando el correo salía bien, así que un fallo de Mailtrap era
+    // invisible: parecía que el sistema simplemente no había hecho nada.
+    const canales = [enviado ? 'correo enviado' : `correo NO enviado (${motivoEmail || 'motivo desconocido'})`]
+    if (resultadoWebhook.motivo !== 'Webhook no configurado') {
+      canales.push(resultadoWebhook.disparado ? 'webhook enviado' : `webhook NO enviado (${resultadoWebhook.motivo})`)
+    }
+    await prisma.logEntry.create({
+      data: {
+        proyectoId: p.id,
+        usuario: 'Sistema',
+        accion: enviado ? 'Recordatorio enviado al cliente' : 'Recordatorio: intento fallido',
+        detalle: `${items.map((i) => i.titulo).join(', ')} — ${canales.join(', ')}`,
+      },
+    })
+
     if (!enviado) continue
 
     const now = new Date()
     await Promise.all(vencidas.map((t) =>
       prisma.tarea.update({ where: { id: t.id }, data: { ultimoRecordatorioEn: now } })
     ))
-    await prisma.logEntry.create({
-      data: {
-        proyectoId: p.id,
-        usuario: 'Sistema',
-        accion: 'Recordatorio enviado al cliente',
-        detalle: items.map((i) => i.titulo).join(', '),
-      },
-    })
   }
 }
