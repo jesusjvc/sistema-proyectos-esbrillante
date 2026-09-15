@@ -253,7 +253,8 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
   const usuario = req.user.nombre
   const campos = ['titulo', 'descripcion', 'queHacer', 'necesitasAntes', 'plantillaMensaje',
     'queEntregas', 'responsable', 'instruccionesCliente', 'plazoHoras',
-    'esRutaCritica', 'soloKarlaOAdmin', 'esCliente', 'dependencias', 'avisosDesactivados']
+    'esRutaCritica', 'soloKarlaOAdmin', 'esCliente', 'dependencias', 'avisosDesactivados',
+    'prioridad', 'fechaLimite']
 
   try {
     const p = await getProyecto(slug)
@@ -291,9 +292,9 @@ router.post('/', requireAuth, async (req, res) => {
     const p = await getProyecto(slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias } = req.body
+    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite } = req.body
 
-    const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias })
+    const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite })
     await logEntry(p.id, usuario, 'Tarea agregada', nueva.titulo)
 
     emitirCambio(p.id)

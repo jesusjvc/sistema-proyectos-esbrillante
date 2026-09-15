@@ -6,6 +6,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import { KANBAN_COLUMNAS } from '../data/kanban'
 import { infoResponsable } from '../lib/permisos'
+import { formatFecha } from '../data/storage'
 import Avatar from './Avatar'
 import TextoEnriquecido from './TextoEnriquecido'
 import HiloComentarios from './HiloComentarios'
@@ -189,6 +190,12 @@ function TareaCard({ tarea: t, readOnly, onEditar, onEliminar, onComentar, onAsi
   const badges = (
     <>
       {t.esRutaCritica && <Flag size={13} className="text-rose-500 shrink-0" title="Ruta crítica" />}
+      {t.prioridad === 'urgente' && <span className="text-[10px] bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 px-1.5 py-0.5 rounded-full">Urgente</span>}
+      {t.fechaLimite && t.estado !== 'completada' && (
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${new Date(t.fechaLimite) < new Date() ? 'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300' : 'bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300'}`}>
+          {formatFecha(t.fechaLimite)}
+        </span>
+      )}
       {t.custom && <span className="text-[10px] bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300 px-1.5 py-0.5 rounded-full">Personalizada</span>}
     </>
   )

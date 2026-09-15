@@ -16,7 +16,7 @@ import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion } from '../lib/notificaciones.js'
-import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
+import { activarTareasClienteDisponibles, aprobarSolicitud } from '../lib/tareaHelpers.js'
 
 const router = Router()
 
@@ -760,12 +760,14 @@ function buildServer(usuario) {
         instrucciones: z.string().optional().describe('Nuevas instrucciones para el cliente (solo aplica a solicitudes al cliente). Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado; si se manda texto plano se preservan los saltos de línea igual.'),
         plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
         frente: z.string().optional().describe('Agrupador libre para proyectos integrales que combinan varios objetivos sin fases compartidas (ej. "Video", "Sitio web", "Redes") — la vista del proyecto agrupa por este valor. Pasa "" (string vacío) para quitarlo.'),
+        prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional().describe('Prioridad de esta tarea para el equipo — distinta de plazoHoras (que solo aplica a tareas del cliente). Determina el orden en "Mis tareas".'),
+        fechaLimite: z.string().optional().describe('Fecha límite del equipo para esta tarea, formato YYYY-MM-DD. Distinta del plazo del cliente.'),
         antesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo antes de otra (por ID)'),
         despuesDeTareaId: z.string().optional().describe('Reposicionar esta tarea justo después de otra (por ID)'),
         dependeDeTareaIds: z.array(z.string()).optional().describe('Reemplaza la lista de tareas de las que depende esta actividad — mientras no estén todas completadas, esta tarea queda oculta/bloqueada para quien deba trabajarla (si es del cliente, no aparece en su portal). Pasa un array vacío para quitar todas las dependencias.'),
       },
     },
-    async ({ slug, tareaId, titulo, descripcion, responsable, instrucciones, plazoHoras, frente, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
+    async ({ slug, tareaId, titulo, descripcion, responsable, instrucciones, plazoHoras, frente, prioridad, fechaLimite, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -782,6 +784,8 @@ function buildServer(usuario) {
       if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
       if (frente !== undefined) data.frente = frente || null
+      if (prioridad !== undefined) data.prioridad = prioridad
+      if (fechaLimite !== undefined) data.fechaLimite = new Date(fechaLimite)
       if (dependeDeTareaIds !== undefined) data.dependencias = dependeDeTareaIds
 
       if (antesDeTareaId || despuesDeTareaId) {
@@ -859,6 +863,52 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       return ok('Nota interna registrada.')
+    },
+  )
+
+  server.registerTool(
+    'crear_solicitud_interna',
+    {
+      title: 'Registrar un ticket de trabajo suelto',
+      description: 'Registra un ticket de trabajo que llegó por fuera del portal del cliente (WhatsApp, teléfono, o detectado por el propio equipo) — típico de mantenimiento web (corregir una falla, actualizar información) o trabajo suelto de diseño. A diferencia de una solicitud del portal, este NO queda pendiente de aprobación: se crea y se convierte en tarea real de inmediato, porque ya lo capturó alguien del equipo con criterio. Úsalo sobre un proyecto "continuo" que sirva de cola de tickets (uno por sitio para mantenimiento, uno por cliente para diseño suelto) — el ticket cae directo en su tablero Kanban.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto continuo que sirve de cola de tickets'),
+        titulo: z.string().describe('Título breve del ticket'),
+        descripcion: z.string().optional().describe('Detalle de qué hay que hacer'),
+        tipo: z.enum(['falla', 'actualizacion', 'preventivo', 'consulta']).optional().describe('Naturaleza del ticket, para reportes después'),
+        cobertura: z.enum(['incluido', 'adicional', 'por_valorar']).optional().describe('Si cae dentro de lo ya contratado, es trabajo adicional, o hay que revisarlo — solo se guarda como dato, no dispara ningún flujo de aprobación de cobro'),
+        origen: z.enum(['whatsapp', 'telefono', 'interno']).optional().describe('De dónde vino el ticket (default "interno" — detectado por el equipo, no reportado directamente por el cliente)'),
+        sitioId: z.string().optional().describe('ID del Sitio (mantenimiento web) al que pertenece este ticket, si aplica'),
+        clienteId: z.string().optional().describe('ID del Cliente (diseño u otro trabajo suelto) al que pertenece este ticket, si aplica'),
+        responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin']).optional().describe('A quién le corresponde — mismo criterio que registrar_actividad'),
+        columna: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Columna del tablero Kanban donde debe caer (default "todo")'),
+        prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional(),
+        fechaLimite: z.string().optional().describe('Fecha límite del equipo, formato YYYY-MM-DD'),
+      },
+    },
+    async ({ slug, titulo, descripcion, tipo, cobertura, origen, sitioId, clienteId, responsable, columna, prioridad, fechaLimite }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (p.tipo !== 'continuo') return fail(`El proyecto "${slug}" no es de tipo continuo — los tickets sueltos deben caer en un proyecto continuo que sirva de cola (uno por sitio o por cliente).`)
+
+      const solicitud = await prisma.solicitud.create({
+        data: {
+          proyectoId: p.id,
+          titulo,
+          descripcion: descripcion || '',
+          tipo: tipo || null,
+          cobertura: cobertura || null,
+          origen: origen || 'interno',
+          sitioId: sitioId || null,
+          clienteId: clienteId || null,
+        },
+      })
+
+      const { tarea } = await aprobarSolicitud(p, solicitud, { columna, responsable, prioridad, fechaLimite }, usuario.nombre)
+      await logEntry(p.id, usuario.nombre, 'Ticket registrado', `${solicitud.titulo} — origen: ${solicitud.origen}`)
+      emitirCambio(p.id)
+
+      return ok(`Ticket "${titulo}" registrado y agregado al tablero (id de la tarea: ${tarea.id}).`)
     },
   )
 

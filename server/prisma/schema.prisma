@@ -109,8 +109,9 @@ model Cliente {
   // vincule — no se recalcula solo; si cambia, se edita a mano.
   participantes   Json    @default("[]")
 
-  proyectos Proyecto[]
-  sitios    Sitio[]
+  proyectos   Proyecto[]
+  sitios      Sitio[]
+  solicitudes Solicitud[]
 
   creadoEn DateTime @default(now())
 
@@ -148,6 +149,8 @@ model Sitio {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
+  solicitudes Solicitud[]
+
   @@map("sitios")
 }
 
@@ -173,6 +176,13 @@ model Tarea {
   plantillaMensaje String   @default("")
   queEntregas      String   @default("")
   linkTipo         String?
+
+  // Prioridad y fecha límite propias del equipo, independientes de
+  // plazoHoras/disponibleDesde (que solo aplican a tareas esCliente y
+  // gatillan recordatorios). Cualquier tarea del equipo puede tener las
+  // suyas — es lo que permite ordenar "Mis tareas" por lo urgente.
+  prioridad   String? // 'urgente' | 'normal' | 'cuando_se_pueda'
+  fechaLimite DateTime?
 
   esCliente            Boolean @default(false)
   instruccionesCliente String  @default("")
@@ -277,6 +287,20 @@ model Solicitud {
 
   archivoUrl    String?
   archivoNombre String?
+
+  // Trabajo suelto (4.3–4.5 de plan-foco.md): de dónde vino el ticket y de
+  // qué se trata — no cambia el flujo de aprobación existente, solo lo
+  // describe. 'portal' es el default porque hasta ahora era el único origen.
+  tipo      String? // 'falla' | 'actualizacion' | 'preventivo' | 'consulta'
+  cobertura String? // 'incluido' | 'adicional' | 'por_valorar'
+  origen    String  @default("portal") // 'portal' | 'whatsapp' | 'telefono' | 'interno'
+
+  // Mantenimiento cuelga del Sitio, diseño/otro trabajo suelto cuelga del
+  // Cliente — además del proyecto (que sigue siendo el tablero/cola real).
+  sitioId   String?
+  sitio     Sitio?   @relation(fields: [sitioId], references: [id])
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
 
   creadaEn DateTime @default(now())
 

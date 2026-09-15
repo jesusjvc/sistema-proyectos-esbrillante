@@ -8,7 +8,7 @@ import {
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
-  aprobarSolicitud, rechazarSolicitud, actualizarDescripcion, actualizarFechaEntrega, crearCarpetaDriveProyecto,
+  aprobarSolicitud, rechazarSolicitud, crearSolicitudInterna, actualizarDescripcion, actualizarFechaEntrega, crearCarpetaDriveProyecto,
   crearComentario, regenerarPasswordCliente, actualizarAreasProyecto,
 } from '../data/api'
 import {
@@ -180,6 +180,11 @@ export default function DetalleProyecto() {
 
   async function handleRechazarSolicitud(id, motivo) {
     await rechazarSolicitud(proyecto.slug, id, motivo)
+    await refresh()
+  }
+
+  async function handleCrearTicket(datos) {
+    await crearSolicitudInterna(proyecto.slug, datos)
     await refresh()
   }
 
@@ -471,6 +476,7 @@ export default function DetalleProyecto() {
           miembrosProyecto={miembrosProyecto}
           onAprobar={handleAprobarSolicitud}
           onRechazar={handleRechazarSolicitud}
+          onCrearTicket={handleCrearTicket}
         />
       )}
 
@@ -973,6 +979,8 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
       plazoHoras: t.plazoHoras || '',
       avisosDesactivados: t.avisosDesactivados || false,
       dependencias: t.dependencias || [],
+      prioridad: t.prioridad || '',
+      fechaLimite: t.fechaLimite ? t.fechaLimite.slice(0, 10) : '',
     })
     setEditando(conEdicion)
     setModalAbierto(true)
@@ -981,7 +989,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   async function guardarEdicion(e) {
     e.preventDefault()
     if (!form.titulo.trim()) return
-    await onGuardarEdicion({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null })
+    await onGuardarEdicion({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null, prioridad: form.prioridad || null, fechaLimite: form.fechaLimite || null })
     setEditando(false)
   }
 
@@ -1021,6 +1029,12 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   const badges = (
     <>
       {t.esRutaCritica && <Flag size={13} className="text-rose-500 dark:text-rose-400 shrink-0" title="Ruta crítica" />}
+      {t.prioridad === 'urgente' && <span className="text-xs bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full">Urgente</span>}
+      {t.fechaLimite && estado !== 'completada' && (
+        <span className={`text-xs px-2 py-0.5 rounded-full ${new Date(t.fechaLimite) < new Date() ? 'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300' : 'bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300'}`}>
+          Límite: {formatFecha(t.fechaLimite)}
+        </span>
+      )}
       {t.esCliente && <span className="text-xs bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">Cliente</span>}
       {t.soloKarlaOAdmin && <span className="text-xs bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">Solo Karla/Admin</span>}
       {t.custom && <span className="text-xs bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300 px-2 py-0.5 rounded-full">Personalizada</span>}
@@ -1210,6 +1224,20 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                     Solo Karla/Admin
                   </label>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Prioridad</label>
+                    <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className={inputCls}>
+                      <option value="">Normal</option>
+                      <option value="urgente">Urgente</option>
+                      <option value="cuando_se_pueda">Cuando se pueda</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Fecha límite (equipo)</label>
+                    <input type="date" value={form.fechaLimite} onChange={(e) => setForm({ ...form, fechaLimite: e.target.value })} className={inputCls} />
+                  </div>
+                </div>
                 {form.esCliente && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
@@ -1320,13 +1348,15 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
     plazoHoras: tarea.plazoHoras || '',
     avisosDesactivados: tarea.avisosDesactivados || false,
     dependencias: tarea.dependencias || [],
+    prioridad: tarea.prioridad || '',
+    fechaLimite: tarea.fechaLimite ? tarea.fechaLimite.slice(0, 10) : '',
   })
   const opcionesDependencia = todasLasTareas.filter((t) => t.id !== tarea.id)
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!form.titulo.trim()) return
-    onGuardar({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null })
+    onGuardar({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null, prioridad: form.prioridad || null, fechaLimite: form.fechaLimite || null })
   }
 
   return (
@@ -1385,6 +1415,21 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
             </label>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Prioridad</label>
+              <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className={inputCls}>
+                <option value="">Normal</option>
+                <option value="urgente">Urgente</option>
+                <option value="cuando_se_pueda">Cuando se pueda</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Fecha límite (equipo)</label>
+              <input type="date" value={form.fechaLimite} onChange={(e) => setForm({ ...form, fechaLimite: e.target.value })} className={inputCls} />
+            </div>
+          </div>
+
           {form.esCliente && (
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
@@ -1434,6 +1479,8 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
     plazoHoras: '',
     columna: esContinuo ? contexto : 'todo',
     dependencias: [],
+    prioridad: '',
+    fechaLimite: '',
   })
 
   function handleSubmit(e) {
@@ -1449,6 +1496,8 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
       esCliente: form.esCliente,
       plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null,
       dependencias: form.dependencias,
+      prioridad: form.prioridad || null,
+      fechaLimite: form.fechaLimite || null,
     })
   }
 
@@ -1478,6 +1527,21 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
             <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
             Es una tarea del cliente
           </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Prioridad</label>
+              <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className={inputCls}>
+                <option value="">Normal</option>
+                <option value="urgente">Urgente</option>
+                <option value="cuando_se_pueda">Cuando se pueda</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Fecha límite (equipo)</label>
+              <input type="date" value={form.fechaLimite} onChange={(e) => setForm({ ...form, fechaLimite: e.target.value })} className={inputCls} />
+            </div>
+          </div>
 
           {!form.esCliente && (
             <>

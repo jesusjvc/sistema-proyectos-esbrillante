@@ -62,6 +62,7 @@ export const crearComentario = (slug, tareaId, data) => req('POST', `/api/proyec
 // ─── Solicitudes ───────────────────────────────────────────────────────────
 export const aprobarSolicitud = (slug, id, data) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/aprobar`, data)
 export const rechazarSolicitud = (slug, id, motivo) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/rechazar`, { motivo })
+export const crearSolicitudInterna = (slug, data) => req('POST', `/api/proyectos/${slug}/solicitudes`, data)
 
 // ─── Prototipos (esbrillante-pages-mcp) ──────────────────────────────────────
 export const getPrototipos = () => req('GET', '/api/prototipos')

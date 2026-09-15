@@ -528,13 +528,16 @@ function generarPassword() {
 
 export function formatFecha(isoString) {
   if (!isoString) return '—'
-  // Una fecha "sola" (YYYY-MM-DD, sin hora) hay que anclarla a medianoche
-  // LOCAL — si no, new Date() la interpreta como medianoche UTC y el
-  // toLocaleDateString la corre un día hacia atrás en cualquier huso
-  // detrás de UTC (ej. México). Los timestamps completos (con hora/Z) no
-  // llevan este ajuste porque sí representan un instante real.
-  const soloFecha = /^\d{4}-\d{2}-\d{2}$/.test(isoString)
-  const fecha = soloFecha ? new Date(`${isoString}T00:00:00`) : new Date(isoString)
+  // Una fecha "sola" hay que anclarla a medianoche LOCAL — si no, new Date()
+  // la interpreta como medianoche UTC y el toLocaleDateString la corre un
+  // día hacia atrás en cualquier huso detrás de UTC (ej. México). Pasa con
+  // "YYYY-MM-DD" plano (de un <input type="date">) y también con lo que
+  // devuelve la API para una columna DateTime que en realidad solo guarda
+  // una fecha (fechaLimite, fechaEstimadaEntrega): siempre serializa medianoche
+  // UTC exacta ("...T00:00:00.000Z"), a diferencia de un timestamp real
+  // (creadoEn, completadaEn) que prácticamente nunca cae justo ahí.
+  const soloFecha = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(isoString)
+  const fecha = soloFecha ? new Date(`${isoString.slice(0, 10)}T00:00:00`) : new Date(isoString)
   return fecha.toLocaleDateString('es-MX', {
     day: '2-digit',
     month: 'short',

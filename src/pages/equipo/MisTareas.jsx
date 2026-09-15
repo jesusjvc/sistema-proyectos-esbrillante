@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
-import { formatFechaHora } from '../../data/storage'
+import { formatFechaHora, formatFecha } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { tareaLeCorresponde, tareaAsignadaDirectamente, RESPONSABLE_LABEL } from '../../lib/permisos'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
@@ -79,6 +79,20 @@ export default function MisTareas() {
         else tareasAsignadas.push(item)
       })
     })
+
+  // Urgente primero, luego por fecha límite más próxima (sin fecha al final).
+  const ordenPrioridad = { urgente: 0, normal: 1, cuando_se_pueda: 2 }
+  function porPrioridad(a, b) {
+    const pa = ordenPrioridad[a.prioridad] ?? 1
+    const pb = ordenPrioridad[b.prioridad] ?? 1
+    if (pa !== pb) return pa - pb
+    if (a.fechaLimite && b.fechaLimite) return new Date(a.fechaLimite) - new Date(b.fechaLimite)
+    if (a.fechaLimite) return -1
+    if (b.fechaLimite) return 1
+    return 0
+  }
+  tareasAsignadas.sort(porPrioridad)
+  tareasDisponibles.sort(porPrioridad)
 
   const tareasRecientes = proyectos
     .filter((p) => p.status !== 'cancelado')
@@ -227,6 +241,12 @@ function FilaTarea({ t, base, onIniciar, onCompletar }) {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
           <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
+          {t.prioridad === 'urgente' && <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">Urgente</span>}
+          {t.fechaLimite && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${new Date(t.fechaLimite) < new Date() ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>
+              Límite: {formatFecha(t.fechaLimite)}
+            </span>
+          )}
         </div>
         <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
         {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 mt-1" />}

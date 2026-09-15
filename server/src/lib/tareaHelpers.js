@@ -7,7 +7,7 @@ import { estadoDeColumna } from './kanban.js'
 // paquete) para un proyecto. Compartido entre POST /tareas (alta directa) y
 // la aprobación de una Solicitud del cliente (server/src/routes/solicitudes.js).
 // No escribe LogEntry — cada caller registra el log con su propio texto.
-export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias }) {
+export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite }) {
   const esContinuo = p.tipo === 'continuo'
   const faseFinal = esContinuo ? 1 : (fase || 1)
   const estadoFinal = esContinuo && !esCliente ? (estadoDeColumna(columna) || 'pendiente') : 'pendiente'
@@ -44,8 +44,26 @@ export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, 
       custom: true,
       estado: estadoFinal,
       disponibleDesde: disponibleDeInicio ? new Date() : null,
+      prioridad: prioridad || null,
+      fechaLimite: fechaLimite ? new Date(fechaLimite) : null,
     },
   })
+}
+
+// Convierte una Solicitud pendiente en una Tarea real — compartido entre la
+// aprobación manual (equipo/admin resolviendo una solicitud del cliente,
+// server/src/routes/solicitudes.js POST /:id/aprobar) y la creación interna
+// de un ticket (POST / en la misma ruta), que se autoaprueba de una vez.
+export async function aprobarSolicitud(p, solicitud, { fase, columna, responsable, dependencias, prioridad, fechaLimite }, usuario) {
+  const nueva = await crearTareaCustom(p, {
+    fase, columna, titulo: solicitud.titulo, descripcion: solicitud.descripcion,
+    responsable, esCliente: false, dependencias, prioridad, fechaLimite,
+  })
+  const actualizada = await prisma.solicitud.update({
+    where: { id: solicitud.id },
+    data: { estado: 'aprobada', tareaId: nueva.id, resueltaPor: usuario, resueltaEn: new Date() },
+  })
+  return { tarea: nueva, solicitud: actualizada }
 }
 
 // Marca `disponibleDesde` en las tareas de cliente que ya tienen todas sus
