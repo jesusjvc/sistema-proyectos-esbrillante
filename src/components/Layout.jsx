@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, ChevronRight, Users, Package, Sun, Moon, LayoutTemplate, Terminal } from 'lucide-react'
+import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, ChevronRight, Users, Package, Sun, Moon, LayoutTemplate, Terminal, Wrench, Menu, X } from 'lucide-react'
 import logo from '../assets/logo-foco-dark.svg'
 import icono from '../assets/icon-foco.svg'
 import AvatarUploader from './AvatarUploader'
@@ -15,6 +15,9 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [colapsado, setColapsado] = useState(() => localStorage.getItem(SIDEBAR_COLAPSADO_KEY) === '1')
+  const [menuMovil, setMenuMovil] = useState(false)
+
+  useEffect(() => { setMenuMovil(false) }, [location.pathname])
 
   async function salir() {
     await logout()
@@ -34,7 +37,8 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
 
   return (
     <div className="h-screen flex bg-slate-50 dark:bg-ink-950 overflow-hidden">
-      <aside className={`${colapsado ? 'w-16' : 'w-60'} bg-ink-950 text-white flex flex-col shrink-0 transition-[width] duration-150`}>
+      {menuMovil && <button className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMenuMovil(false)} aria-label="Cerrar menu" />}
+      <aside className={`${colapsado ? 'md:w-16' : 'md:w-60'} w-60 fixed md:static inset-y-0 left-0 z-50 bg-ink-950 text-white flex flex-col shrink-0 transition-[width,transform] duration-150 ${menuMovil ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className={`${colapsado ? 'px-0 py-5 flex justify-center' : 'px-5 py-5'} border-b border-ink-500 shrink-0`}>
           {colapsado ? (
             <img src={icono} alt="Foco" className="h-7 w-7" title="Foco" />
@@ -50,6 +54,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
           {esAdmin && (
             <>
               <NavLink to="/admin" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/admin'} colapsado={colapsado} />
+              <NavLink to="/admin/mantenimiento" icon={<Wrench size={16} />} label="Mantenimiento" active={location.pathname.startsWith('/admin/mantenimiento')} colapsado={colapsado} />
               <NavLink to="/admin/proyecto/nuevo" icon={<PlusCircle size={16} />} label="Nuevo proyecto" active={location.pathname === '/admin/proyecto/nuevo'} colapsado={colapsado} />
               <NavLink to="/admin/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/admin/tareas'} colapsado={colapsado} />
               <NavLink to="/admin/paquetes" icon={<Package size={16} />} label="Paquetes" active={location.pathname.startsWith('/admin/paquetes')} colapsado={colapsado} />
@@ -61,6 +66,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
           {esEquipo && (
             <>
               <NavLink to="/equipo" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/equipo'} colapsado={colapsado} />
+              <NavLink to="/equipo/mantenimiento" icon={<Wrench size={16} />} label="Mantenimiento" active={location.pathname.startsWith('/equipo/mantenimiento')} colapsado={colapsado} />
               <NavLink to="/equipo/proyecto/nuevo" icon={<PlusCircle size={16} />} label="Nuevo proyecto" active={location.pathname === '/equipo/proyecto/nuevo'} colapsado={colapsado} />
               <NavLink to="/equipo/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/equipo/tareas'} colapsado={colapsado} />
               <NavLink to="/equipo/prototipos" icon={<LayoutTemplate size={16} />} label="Prototipos" active={location.pathname === '/equipo/prototipos'} colapsado={colapsado} />
@@ -86,6 +92,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
                 <div className="text-xs text-ink-300 capitalize">{user?.rol}</div>
               </div>
             )}
+            <button onClick={() => setMenuMovil(false)} className="md:hidden absolute right-3 top-4 w-10 h-10 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-ink-800" aria-label="Cerrar menu"><X size={18} /></button>
           </div>
           <div className={`mt-3 flex items-center gap-3 ${colapsado ? 'flex-col' : ''}`}>
             <button
@@ -108,7 +115,8 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <header className="bg-white dark:bg-ink-800 border-b border-slate-200 dark:border-ink-500 px-6 py-4 flex items-center gap-3 shrink-0">
+        <header className="bg-white dark:bg-ink-800 border-b border-slate-200 dark:border-ink-500 px-4 md:px-6 py-4 flex items-center gap-3 shrink-0">
+          <button onClick={() => { setColapsado(false); setMenuMovil(true) }} className="md:hidden w-10 h-10 -ml-2 rounded-lg flex items-center justify-center text-slate-500 dark:text-ink-300 hover:bg-slate-100 dark:hover:bg-ink-700" aria-label="Abrir menu"><Menu size={19} /></button>
           {volver && (
             <button
               onClick={() => navigate(volver)}

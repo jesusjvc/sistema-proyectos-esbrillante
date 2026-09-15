@@ -47,6 +47,20 @@ export const marcarVisto = (slug) => req('POST', `/api/proyectos/${slug}/marcar-
 export const regenerarPasswordCliente = (slug) => req('POST', `/api/proyectos/${slug}/regenerar-password`)
 export const actualizarAreasProyecto = (slug, areas) => req('PUT', `/api/proyectos/${slug}/areas`, { areas })
 
+// ─── Mantenimiento ─────────────────────────────────────────────────────────
+export const getIncidencias = () => req('GET', '/api/incidencias')
+export const crearIncidencia = (data) => req('POST', '/api/incidencias', data)
+export const actualizarIncidencia = (id, data) => req('PUT', `/api/incidencias/${id}`, data)
+export const getClientes = () => req('GET', '/api/clientes')
+export const getCliente = (id) => req('GET', `/api/clientes/${id}`)
+// El CRM es la fuente obligatoria de clientes: buscar en el CRM,
+// importar de ahí, o dar de alta primero en el CRM y luego vincular.
+export const buscarClientesCrm = (q) => req('GET', `/api/clientes/crm/buscar?q=${encodeURIComponent(q)}`)
+export const vincularClienteCrm = (crmId, contactoId) => req('POST', '/api/clientes/crm/vincular', { crmId, contactoId })
+export const registrarClienteCrm = (data) => req('POST', '/api/clientes/crm', data)
+export const crearCliente = (crmId, contactoId) => req('POST', '/api/clientes', { crmId, contactoId })
+export const crearSitio = (clienteId, data) => req('POST', `/api/clientes/${clienteId}/sitios`, data)
+
 // ─── Tareas ────────────────────────────────────────────────────────────────
 export const iniciarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/iniciar`)
 export const completarTarea = (slug, tareaId) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/completar`)

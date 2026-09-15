@@ -101,6 +101,7 @@ model Proyecto {
 // después de que ambos ya operen sobre él).
 model Cliente {
   id              String  @id @default(cuid())
+  crmId           String? @unique
   nombreComercial String
   contactoNombre  String?
   correo          String?
@@ -112,6 +113,7 @@ model Cliente {
   proyectos   Proyecto[]
   sitios      Sitio[]
   solicitudes Solicitud[]
+  incidencias Incidencia[]
 
   creadoEn DateTime @default(now())
 
@@ -138,6 +140,7 @@ model Sitio {
 
   // Para distinguir cuando un cliente tiene más de uno (ej. "Sitio principal", "Tienda").
   nombre                 String
+  dominio                String? @unique
   url                    String?
   hostingProveedor       String?
   dnsProveedor           String?
@@ -145,6 +148,12 @@ model Sitio {
   driveFolderUrl         String?
   contactoTecnico        String?
   coberturaMantenimiento String? // texto libre por ahora: incluido / adicional / sin contratar
+  infraestructura        String  @default("sin_localizar")
+  enhancedSiteId         String?
+  enhancedServerId       String?
+  cloudflareZoneId       String?
+
+  incidencias Incidencia[]
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -152,6 +161,47 @@ model Sitio {
   solicitudes Solicitud[]
 
   @@map("sitios")
+}
+
+// Mesa interna de mantenimiento web. Una incidencia pertenece al cliente y al
+// sitio afectados, no a un Proyecto: así una sola bandeja reúne todos los
+// reportes sin crear un proyecto artificial por cliente.
+model Incidencia {
+  id       String @id @default(cuid())
+  folio    Int    @unique @default(autoincrement())
+
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  sitioId   String
+  sitio     Sitio   @relation(fields: [sitioId], references: [id], onDelete: Restrict)
+
+  titulo         String
+  descripcion    String @default("")
+  estado         String @default("todo") // todo | doing | revision | done
+  prioridad      String @default("normal") // urgente | normal | cuando_se_pueda
+  cobertura      String @default("por_valorar") // incluido | cortesia | adicional | por_valorar
+  infraestructura String @default("sin_localizar") // esbrillante | externa | sin_localizar
+  origen         String @default("interno") // whatsapp | telefono | interno | monitoreo
+  tipo           String @default("falla") // falla | actualizacion | preventivo | consulta
+  responsableId  String?
+  reportadoPor   String?
+  telefonoOrigen String?
+  fechaLimite    DateTime?
+
+  diagnostico String @default("")
+  resolucion  String @default("")
+  causaRaiz   String @default("")
+  archivada   Boolean @default(false)
+
+  iniciadoEn  DateTime?
+  resueltoEn  DateTime?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([estado, prioridad, creadoEn])
+  @@index([clienteId])
+  @@index([sitioId])
+  @@map("incidencias")
 }
 
 model Tarea {

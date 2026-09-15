@@ -27,3 +27,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Artefactos locales de desarrollo (capturas de revisión, sesiones de navegador, diseño)
+.impeccable/
+.playwright-cli/
+docs/desing.pen

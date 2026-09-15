@@ -17,6 +17,8 @@ import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, aprobarSolicitud } from '../lib/tareaHelpers.js'
+import { importarClienteCrm, normBusqueda, dominioDesde, crmConfigurado } from '../lib/clientesCrm.js'
+import { listarCustomers, buscarContacts, terminoSeguro } from '../lib/perfexClient.js'
 
 const router = Router()
 
@@ -1047,6 +1049,240 @@ function buildServer(usuario) {
           ? ` — se avisó por correo a ${usuariosMencionados.map((u) => u.nombre).join(', ')}`
           : ''
       return ok(`Comentario agregado a "${tarea.titulo}"${aviso}.`)
+    },
+  )
+
+  // ─── Mantenimiento web (tickets) ──────────────────────────────────────────
+  // Mismo modelo y flujo que la interfaz /admin/mantenimiento: el CRM es la
+  // fuente de verdad de clientes (se importa/vincula automáticamente si hace
+  // falta) y cada ticket pertenece a un cliente y a un sitio concretos.
+
+  const INCLUDE_TICKET = {
+    cliente: { select: { id: true, crmId: true, nombreComercial: true, contactoNombre: true, correo: true, whatsapp: true } },
+    sitio: true,
+  }
+
+  function ticketResumen(t) {
+    return {
+      folio: `WEB-${String(t.folio).padStart(4, '0')}`,
+      id: t.id,
+      titulo: t.titulo,
+      estado: t.estado,
+      prioridad: t.prioridad,
+      cliente: t.cliente?.nombreComercial,
+      sitio: t.sitio?.dominio,
+      responsable: t.responsableId || null,
+      creadoEn: t.creadoEn,
+      ...(t.estado !== 'done' ? {} : { resueltoEn: t.resueltoEn }),
+    }
+  }
+
+  // Resuelve un cliente desde cualquier identificador: id local, crmId,
+  // nombre comercial (Foco primero, CRM después — importando si hace falta),
+  // nombre de contacto, correo o teléfono.
+  async function resolverClienteTicket(param) {
+    const directo = await prisma.cliente.findFirst({ where: { OR: [{ id: param }, { crmId: param }] } })
+    if (directo) return { cliente: directo, aviso: '' }
+
+    const nq = normBusqueda(param)
+    if (!nq) return {}
+
+    const locales = await prisma.cliente.findMany()
+    const local = locales.find((c) => normBusqueda(c.nombreComercial) === nq)
+      || locales.find((c) => normBusqueda(c.nombreComercial).includes(nq) || nq.includes(normBusqueda(c.nombreComercial)))
+    if (local) return { cliente: local, aviso: '' }
+
+    if (crmConfigurado()) {
+      // Empresas del CRM (listado cacheado, inmune al WAF) por nombre normalizado
+      let customers = []
+      try { customers = await listarCustomers() } catch { customers = [] }
+      const match = customers.find((c) => normBusqueda(c.company) === nq)
+        || customers.find((c) => normBusqueda(c.company).includes(nq) || nq.includes(normBusqueda(c.company)))
+      if (match) {
+        const { cliente } = await importarClienteCrm(String(match.userid))
+        return { cliente, aviso: `Cliente importado del CRM (crmId ${match.userid}).` }
+      }
+      // Contactos del CRM por nombre/correo/teléfono (con truco de sufijo para teléfonos con espacios)
+      const termino = terminoSeguro(param)
+      let contactos = []
+      try { contactos = await buscarContacts(termino) } catch { contactos = [] }
+      const digitos = param.replace(/\D/g, '')
+      if (digitos.length >= 7 && !contactos.length) {
+        try { contactos = await buscarContacts(digitos.slice(-4)) } catch { contactos = [] }
+        contactos = contactos.filter((c) => String(c.phonenumber || '').replace(/\D/g, '').includes(digitos))
+      }
+      const porDatos = contactos.find((c) =>
+        normBusqueda(`${c.firstname} ${c.lastname}`).includes(nq)
+        || normBusqueda(c.email) === nq)
+        || contactos.find((c) => String(c.phonenumber || '').replace(/\D/g, '').includes(digitos))
+      if (porDatos?.userid) {
+        const { cliente } = await importarClienteCrm(String(porDatos.userid))
+        return { cliente, aviso: `Cliente vinculado por contacto del CRM (crmId ${porDatos.userid}).` }
+      }
+    }
+    return {}
+  }
+
+  server.registerTool(
+    'listar_tickets',
+    {
+      title: 'Listar tickets de mantenimiento',
+      description: 'Lista los tickets de la mesa de mantenimiento web (no archivados) con folio, problema, estado, prioridad, cliente, sitio y antigüedad. Filtra opcionalmente por estado (todo/doing/revision/done), prioridad (urgente/normal/cuando_se_pueda) o texto libre (folio, problema, cliente o dominio). "todo" en estado devuelve TODOS incluyendo resueltos; por defecto devuelve solo los abiertos (no done).',
+      inputSchema: {
+        estado: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Filtrar por estado. OJO: "todo" significa literalmente estado Por hacer; usa incluirResueltos para ver todo.'),
+        prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional(),
+        texto: z.string().optional().describe('Busca en folio, problema, cliente y dominio'),
+        incluirResueltos: z.boolean().optional().describe('true para incluir también los resueltos (done). Default: solo abiertos.'),
+      },
+    },
+    async ({ estado, prioridad, texto, incluirResueltos }) => {
+      const norm = (s) => String(s || '').toLowerCase()
+      const nTexto = norm(texto)
+      const tickets = await prisma.incidencia.findMany({
+        where: { archivada: false, ...(estado ? { estado } : incluirResueltos ? {} : { estado: { not: 'done' } }), ...(prioridad ? { prioridad } : {}) },
+        include: INCLUDE_TICKET,
+        orderBy: { creadoEn: 'asc' },
+      })
+      const filtrados = nTexto ? tickets.filter((t) =>
+        [t.titulo, `WEB-${String(t.folio).padStart(4, '0')}`, t.cliente?.nombreComercial, t.sitio?.dominio]
+          .some((v) => norm(v).includes(nTexto))) : tickets
+      const ORDEN = { urgente: 0, normal: 1, cuando_se_pueda: 2 }
+      filtrados.sort((a, b) => (ORDEN[a.prioridad] ?? 9) - (ORDEN[b.prioridad] ?? 9))
+      return ok(JSON.stringify(filtrados.map(ticketResumen), null, 2))
+    },
+  )
+
+  server.registerTool(
+    'crear_ticket',
+    {
+      title: 'Crear ticket de mantenimiento',
+      description: 'Registra un ticket en la mesa de mantenimiento web. El cliente se resuelve automáticamente desde lo que mandes — id de Foco, crmId del CRM, nombre de la empresa, nombre de contacto, correo o teléfono (si no está en Foco, se importa del CRM y queda vinculado; el CRM es la fuente obligatoria de clientes). El sitio también se resuelve solo: si el cliente tiene un único sitio se usa; si mandas un dominio que no existe, se registra como sitio nuevo. Título del problema es el único dato realmente obligatorio.',
+      inputSchema: {
+        titulo: z.string().describe('Problema reportado, breve y claro (ej. "El sitio muestra un error crítico al entrar")'),
+        cliente: z.string().describe('Cliente: id de Foco, crmId del CRM, empresa, contacto, correo o teléfono'),
+        sitio: z.string().optional().describe('Dominio del sitio afectado (ej. "banhomerealestate.com") o id del sitio en Foco. Si se omite y el cliente tiene un solo sitio, se usa ese.'),
+        descripcion: z.string().optional().describe('Qué reportaron, desde cuándo ocurre, contexto útil'),
+        prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional().describe('Default: normal'),
+        origen: z.enum(['whatsapp', 'telefono', 'interno', 'monitoreo']).optional().describe('Canal por donde llegó. Default: interno'),
+        tipo: z.enum(['falla', 'actualizacion', 'preventivo', 'consulta']).optional().describe('Default: falla'),
+        cobertura: z.enum(['incluido', 'cortesia', 'adicional', 'por_valorar']).optional().describe('Default: la del sitio o por_valorar'),
+        responsable: z.string().optional().describe('userId o nombre de la persona del equipo responsable'),
+        telefonoOrigen: z.string().optional().describe('Teléfono de donde llegó el reporte (típico de WhatsApp)'),
+        fechaLimite: z.string().optional().describe('Fecha límite YYYY-MM-DD'),
+      },
+    },
+    async ({ titulo, cliente: clienteParam, sitio: sitioParam, descripcion, prioridad, origen, tipo, cobertura, responsable, telefonoOrigen, fechaLimite }) => {
+      if (!titulo?.trim()) return fail('El título del problema es obligatorio.')
+
+      const { cliente, aviso } = await resolverClienteTicket(String(clienteParam).trim())
+      if (!cliente) {
+        return fail(`No encontré ese cliente en Foco ni en el CRM ("${clienteParam}"). Si es un cliente nuevo, hay que registrarlo primero en el CRM (en Foco: Nuevo ticket → buscar → registrar en el CRM) y volver a intentar.`)
+      }
+
+      // Sitio: por id/dominio dentro del cliente; único sitio; o registro nuevo.
+      let sitio
+      if (sitioParam) {
+        const dom = dominioDesde(sitioParam) || sitioParam.trim().toLowerCase()
+        sitio = await prisma.sitio.findFirst({ where: { clienteId: cliente.id, OR: [{ id: sitioParam }, { dominio: dom }] } })
+        if (!sitio) {
+          if (!dom.includes('.')) return fail(`No encontré el sitio "${sitioParam}" del cliente "${cliente.nombreComercial}" y no parece un dominio válido para registrarlo.`)
+          sitio = await prisma.sitio.create({ data: { clienteId: cliente.id, nombre: 'Sitio principal', dominio: dom, url: `https://${dom}`, coberturaMantenimiento: cobertura || null } })
+        }
+      } else {
+        const sitios = await prisma.sitio.findMany({ where: { clienteId: cliente.id } })
+        if (sitios.length === 1) {
+          sitio = sitios[0]
+        } else if (sitios.length > 1) {
+          return fail(`El cliente "${cliente.nombreComercial}" tiene ${sitios.length} sitios — dime cuál está afectado: ${sitios.map((s) => s.dominio || s.nombre).join(', ')}.`)
+        } else {
+          return fail(`El cliente "${cliente.nombreComercial}" no tiene sitios registrados. Manda el dominio del sitio afectado en "sitio" y lo registro con el ticket.`)
+        }
+      }
+
+      let responsableId = null
+      if (responsable) {
+        const usuario = await prisma.user.findFirst({ where: { OR: [{ id: responsable }, { nombre: { contains: responsable } }], activo: true } })
+        if (!usuario) return fail(`No encontré a nadie activo que coincida con "${responsable}".`)
+        responsableId = usuario.id
+      }
+
+      const ticket = await prisma.incidencia.create({
+        data: {
+          clienteId: cliente.id,
+          sitioId: sitio.id,
+          titulo: titulo.trim(),
+          descripcion: descripcion?.trim() || '',
+          estado: 'todo',
+          prioridad: prioridad || 'normal',
+          cobertura: cobertura || sitio.coberturaMantenimiento || 'por_valorar',
+          infraestructura: sitio.infraestructura || 'sin_localizar',
+          origen: origen || 'interno',
+          tipo: tipo || 'falla',
+          responsableId,
+          reportadoPor: usuario.nombre,
+          telefonoOrigen: telefonoOrigen || null,
+          fechaLimite: fechaLimite ? new Date(fechaLimite) : null,
+        },
+        include: INCLUDE_TICKET,
+      })
+      emitirCambio('incidencias')
+
+      return ok(`Ticket WEB-${String(ticket.folio).padStart(4, '0')} creado para "${cliente.nombreComercial}" (${sitio.dominio || sitio.nombre}).${aviso ? ' ' + aviso : ''}${responsableId ? ` Responsable asignado.` : ''} Estado: Por hacer.`)
+    },
+  )
+
+  server.registerTool(
+    'actualizar_ticket',
+    {
+      title: 'Actualizar ticket de mantenimiento',
+      description: 'Actualiza un ticket de la mesa de mantenimiento: estado, prioridad, cobertura, responsable, diagnóstico, causa raíz, resolución, fecha límite o archivado. Se identifica por folio (ej. "WEB-0001" o "1") o por id. Al marcar estado "doing" se registra cuándo se empezó; al marcar "done", cuándo se resolvió.',
+      inputSchema: {
+        ticket: z.string().describe('Folio (WEB-0001 o 1) o id del ticket'),
+        estado: z.enum(['todo', 'doing', 'revision', 'done']).optional(),
+        prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional(),
+        cobertura: z.enum(['incluido', 'cortesia', 'adicional', 'por_valorar']).optional(),
+        infraestructura: z.enum(['esbrillante', 'externa', 'sin_localizar']).optional(),
+        responsable: z.string().optional().describe('userId o nombre de la persona del equipo'),
+        diagnostico: z.string().optional().describe('Qué se encontró durante la revisión'),
+        causaRaiz: z.string().optional().describe('Qué originó el problema'),
+        resolucion: z.string().optional().describe('Qué se hizo y cómo se verificó'),
+        fechaLimite: z.string().optional().describe('Fecha límite YYYY-MM-DD (vacío para quitarla)'),
+        archivada: z.boolean().optional().describe('true para archivar el ticket'),
+      },
+    },
+    async ({ ticket: ticketParam, estado, prioridad, cobertura, infraestructura, responsable, diagnostico, causaRaiz, resolucion, fechaLimite, archivada }) => {
+      const folio = /^WEB-?(\d+)$/i.exec(String(ticketParam).trim())
+      const where = folio ? { folio: Number(folio[1]) } : { id: ticketParam }
+      const actual = await prisma.incidencia.findUnique({ where })
+      if (!actual) return fail(`No encontré el ticket "${ticketParam}".`)
+
+      const data = {}
+      if (estado) data.estado = estado
+      if (prioridad) data.prioridad = prioridad
+      if (cobertura) data.cobertura = cobertura
+      if (infraestructura) data.infraestructura = infraestructura
+      if (diagnostico !== undefined) data.diagnostico = diagnostico
+      if (causaRaiz !== undefined) data.causaRaiz = causaRaiz
+      if (resolucion !== undefined) data.resolucion = resolucion
+      if (archivada !== undefined) data.archivada = archivada
+      if (fechaLimite !== undefined) data.fechaLimite = fechaLimite ? new Date(fechaLimite) : null
+      if (responsable !== undefined) {
+        if (!responsable) data.responsableId = null
+        else {
+          const usuario = await prisma.user.findFirst({ where: { OR: [{ id: responsable }, { nombre: { contains: responsable } }], activo: true } })
+          if (!usuario) return fail(`No encontré a nadie activo que coincida con "${responsable}".`)
+          data.responsableId = usuario.id
+        }
+      }
+      if (estado === 'doing' && !actual.iniciadoEn) data.iniciadoEn = new Date()
+      if (estado === 'done') data.resueltoEn = actual.resueltoEn || new Date()
+      if (estado && estado !== 'done') data.resueltoEn = null
+
+      if (!Object.keys(data).length) return fail('No mandaste ningún cambio.')
+
+      const actualizado = await prisma.incidencia.update({ where: { id: actual.id }, data, include: INCLUDE_TICKET })
+      emitirCambio('incidencias')
+      return ok(`Ticket WEB-${String(actualizado.folio).padStart(4, '0')} actualizado: ${JSON.stringify(ticketResumen(actualizado))}`)
     },
   )
 
