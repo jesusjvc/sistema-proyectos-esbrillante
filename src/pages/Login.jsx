@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Sun, Moon } from 'lucide-react'
-import { login } from '../data/api'
+import { login, iniciarSesionGoogle } from '../data/api'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import icono from '../assets/icon-foco.svg'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 export default function Login() {
   const navigate = useNavigate()
@@ -14,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const googleBtnRef = useRef(null)
 
   useEffect(() => {
     if (user?.rol === 'admin') navigate('/admin', { replace: true })
@@ -33,6 +36,41 @@ export default function Login() {
       setCargando(false)
     }
   }
+
+  const handleGoogleCredential = useCallback(async (respuesta) => {
+    setError('')
+    setCargando(true)
+    try {
+      const data = await iniciarSesionGoogle(respuesta.credential)
+      setUser({ ...data, rol: data.rol.toLowerCase() })
+    } catch (err) {
+      setError(err.message || 'No se pudo iniciar sesión con Google')
+    } finally {
+      setCargando(false)
+    }
+  }, [setUser])
+
+  // El script de Google Identity Services se carga async en index.html — puede
+  // no estar listo todavía cuando este componente monta, así que se reintenta
+  // hasta que aparezca en vez de asumir que ya existe.
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleBtnRef.current) return
+
+    function render() {
+      if (!window.google?.accounts?.id) return false
+      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential })
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: String(googleBtnRef.current.offsetWidth || 320),
+      })
+      return true
+    }
+
+    if (render()) return
+    const intervalo = setInterval(() => { if (render()) clearInterval(intervalo) }, 200)
+    return () => clearInterval(intervalo)
+  }, [handleGoogleCredential])
 
   return (
     <div className="min-h-screen flex relative">
@@ -113,6 +151,17 @@ export default function Login() {
               Entrar
             </button>
           </form>
+
+          {GOOGLE_CLIENT_ID && (
+            <div className="mt-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-slate-200 dark:bg-[#3D4554]" />
+                <span className="text-xs text-slate-400 dark:text-ink-400">o</span>
+                <div className="flex-1 h-px bg-slate-200 dark:bg-[#3D4554]" />
+              </div>
+              <div ref={googleBtnRef} className="flex justify-center" />
+            </div>
+          )}
 
           <div className="text-center mt-6">
             <a href="/cliente" className="text-[#1D4ED8] dark:text-[#93C5FD] hover:text-[#1a43b8] dark:hover:text-[#bfdbfe] text-sm font-medium transition-colors">

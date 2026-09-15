@@ -1,11 +1,27 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
+import { OAuth2Client } from 'google-auth-library'
 import prisma from '../lib/prisma.js'
 import { firmarToken, setCookie, clearCookie } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/auth.js'
 import { generarApiKey } from '../lib/apiKeys.js'
 
 const router = Router()
+const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null
+
+// Firma la cookie de sesión y arma la respuesta — compartido entre login con
+// correo/contraseña y login con Google, ambos terminan en la misma sesión.
+function iniciarSesion(res, user) {
+  const token = firmarToken({
+    id: user.id,
+    email: user.email,
+    nombre: user.nombre,
+    rol: user.rol,
+    esKarla: user.esKarla,
+  })
+  setCookie(res, token)
+  res.json({ id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, esKarla: user.esKarla, area: user.area })
+}
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -19,19 +35,39 @@ router.post('/login', async (req, res) => {
     const ok = await bcrypt.compare(password, user.password)
     if (!ok) return res.status(401).json({ error: 'Credenciales incorrectas' })
 
-    const token = firmarToken({
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      rol: user.rol,
-      esKarla: user.esKarla,
-    })
-
-    setCookie(res, token)
-    res.json({ id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, esKarla: user.esKarla, area: user.area })
+    iniciarSesion(res, user)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/auth/google — login con Google Identity Services. No da de alta
+// cuentas nuevas: el correo verificado por Google debe coincidir con un User
+// ya existente y activo (los da de alta un admin en /admin/equipo, igual que
+// siempre). No se restringe por dominio (hd) — el control real es este match.
+router.post('/google', async (req, res) => {
+  if (!googleClient) return res.status(503).json({ error: 'Login con Google no está configurado' })
+
+  const { credential } = req.body
+  if (!credential) return res.status(400).json({ error: 'Falta el credential de Google' })
+
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID })
+    const payload = ticket.getPayload()
+    if (!payload?.email || !payload.email_verified) {
+      return res.status(401).json({ error: 'No se pudo verificar el correo de Google' })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: payload.email.toLowerCase().trim() } })
+    if (!user || !user.activo) {
+      return res.status(401).json({ error: 'No hay una cuenta con ese correo — pide a un admin que te dé de alta primero.' })
+    }
+
+    iniciarSesion(res, user)
+  } catch (err) {
+    console.error('Login con Google:', err)
+    res.status(401).json({ error: 'No se pudo verificar la sesión de Google' })
   }
 })
 
