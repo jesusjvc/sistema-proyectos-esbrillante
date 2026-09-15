@@ -1,14 +1,28 @@
-export function generarMensajeInicio(proyecto) {
+// Devuelve los nombres (separados por coma) de quienes ocupan `rol` en
+// `equipo` — acepta el shape legado (un userId como string) y el actual
+// (array de userIds). null si el rol no aplica o no tiene a nadie asignado.
+function nombresDeRol(equipo, rol, miembrosPorId) {
+  const v = equipo?.[rol]
+  if (!v || v === 'no_aplica') return null
+  const ids = Array.isArray(v) ? v : [v]
+  const nombres = ids.map((id) => miembrosPorId?.[id] || id).filter(Boolean)
+  return nombres.length ? nombres.join(', ') : null
+}
+
+export function generarMensajeInicio(proyecto, miembrosPorId = {}) {
   const { cliente, proyecto: p, equipo, condicionesTecnicas } = proyecto
 
   const equipoTexto = [
-    equipo.copy && equipo.copy !== 'Por asignar' ? `• Copy: ${equipo.copy}` : null,
-    equipo.disenador && equipo.disenador !== 'Por asignar' ? `• Diseñador: ${equipo.disenador}` : null,
-    equipo.programador && equipo.programador !== 'No aplica' && equipo.programador !== 'Por asignar'
-      ? `• Programador: ${equipo.programador}`
-      : null,
-    equipo.adminProyecto ? `• Coordinador: ${equipo.adminProyecto}` : null,
+    ['copy', 'Copy'],
+    ['disenador', 'Diseñador'],
+    ['programador', 'Programador'],
+    ['redes', 'Redes'],
+    ['adminProyecto', 'Coordinador'],
   ]
+    .map(([rol, label]) => {
+      const nombres = nombresDeRol(equipo, rol, miembrosPorId)
+      return nombres ? `• ${label}: ${nombres}` : null
+    })
     .filter(Boolean)
     .join('\n')
 

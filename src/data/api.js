@@ -25,6 +25,7 @@ export const eliminarMiAvatar = () => req('DELETE', '/api/auth/me/avatar')
 export const listarMisApiKeys = () => req('GET', '/api/auth/me/api-keys')
 export const crearApiKey = (nombre) => req('POST', '/api/auth/me/api-keys', { nombre })
 export const revocarApiKey = (id) => req('DELETE', `/api/auth/me/api-keys/${id}`)
+export const actualizarMisHabilidades = (habilidades) => req('PUT', '/api/auth/me/habilidades', { habilidades })
 
 // ─── Proyectos ─────────────────────────────────────────────────────────────
 export const getProyectos = () => req('GET', '/api/proyectos')

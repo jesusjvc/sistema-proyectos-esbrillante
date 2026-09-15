@@ -5,7 +5,12 @@ import { getMiembros, crearMiembro, editarMiembro, eliminarMiembro } from '../..
 import { AREAS, AREA_LABEL } from '../../lib/areas'
 import { Plus, Pencil, Trash2, Check, X, Shield, Star } from 'lucide-react'
 
-const FORM_VACIO = { nombre: '', email: '', password: '', rol: 'EQUIPO', esKarla: false, area: '' }
+const FORM_VACIO = { nombre: '', email: '', password: '', rol: 'EQUIPO', esKarla: false, area: '', habilidadesTexto: '' }
+
+// "copy, wordpress, elementor" <-> ['copy', 'wordpress', 'elementor']
+function textoAHabilidades(texto) {
+  return [...new Set(texto.split(',').map((h) => h.trim()).filter(Boolean))]
+}
 
 export default function Equipo() {
   const [miembros, setMiembros] = useState([])
@@ -16,6 +21,12 @@ export default function Equipo() {
   const [nuevoForm, setNuevoForm] = useState(FORM_VACIO)
   const [mostrarNuevo, setMostrarNuevo] = useState(false)
   const [error, setError] = useState('')
+  const [filtroHabilidad, setFiltroHabilidad] = useState(null)
+
+  const todasLasHabilidades = [...new Set(miembros.flatMap((m) => m.habilidades || []))].sort()
+  const miembrosFiltrados = filtroHabilidad
+    ? miembros.filter((m) => (m.habilidades || []).includes(filtroHabilidad))
+    : miembros
 
   async function cargar() {
     try {
@@ -29,12 +40,12 @@ export default function Equipo() {
 
   function iniciarEdicion(m) {
     setEditandoId(m.id)
-    setEditForm({ nombre: m.nombre, email: m.email, rol: m.rol, esKarla: m.esKarla, area: m.area || '', password: '' })
+    setEditForm({ nombre: m.nombre, email: m.email, rol: m.rol, esKarla: m.esKarla, area: m.area || '', password: '', habilidadesTexto: (m.habilidades || []).join(', ') })
   }
 
   async function guardarEdicion(id) {
     if (!editForm.nombre.trim()) return
-    const data = { nombre: editForm.nombre, email: editForm.email, rol: editForm.rol, esKarla: editForm.esKarla, area: editForm.area || null }
+    const data = { nombre: editForm.nombre, email: editForm.email, rol: editForm.rol, esKarla: editForm.esKarla, area: editForm.area || null, habilidades: textoAHabilidades(editForm.habilidadesTexto) }
     if (editForm.password) data.password = editForm.password
     await editarMiembro(id, data)
     setEditandoId(null)
@@ -54,7 +65,7 @@ export default function Equipo() {
       return
     }
     try {
-      await crearMiembro({ nombre: nuevoForm.nombre, email: nuevoForm.email, password: nuevoForm.password, rol: nuevoForm.rol, esKarla: nuevoForm.esKarla, area: nuevoForm.area || null })
+      await crearMiembro({ nombre: nuevoForm.nombre, email: nuevoForm.email, password: nuevoForm.password, rol: nuevoForm.rol, esKarla: nuevoForm.esKarla, area: nuevoForm.area || null, habilidades: textoAHabilidades(nuevoForm.habilidadesTexto) })
       setNuevoForm(FORM_VACIO)
       setMostrarNuevo(false)
       cargar()
@@ -66,15 +77,32 @@ export default function Equipo() {
   return (
     <Layout titulo="Equipo">
       <div className="max-w-xl">
-        <p className="text-sm text-slate-500 mb-6">
+        <p className="text-sm text-slate-500 mb-4">
           Los miembros del equipo acceden al sistema con su correo y contraseña.
         </p>
+
+        {todasLasHabilidades.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-4">
+            <span className="text-xs text-slate-400 mr-1">Filtrar por habilidad:</span>
+            {todasLasHabilidades.map((h) => (
+              <button
+                key={h}
+                onClick={() => setFiltroHabilidad(filtroHabilidad === h ? null : h)}
+                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  filtroHabilidad === h ? 'bg-brand-500 border-brand-500 text-slate-900 font-medium' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        )}
 
         {cargando ? (
           <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
-            {miembros.map((m, idx) => (
+            {miembrosFiltrados.map((m, idx) => (
               <div key={m.id} className={`px-5 py-4 flex items-center gap-3 ${idx !== 0 ? 'border-t border-slate-100' : ''}`}>
                 {editandoId === m.id ? (
                   <div className="flex-1 flex flex-col gap-2">
@@ -98,6 +126,12 @@ export default function Equipo() {
                         onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                         placeholder="Nueva contraseña (opcional)"
                         className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-48"
+                      />
+                      <input
+                        value={editForm.habilidadesTexto}
+                        onChange={(e) => setEditForm({ ...editForm, habilidadesTexto: e.target.value })}
+                        placeholder="Habilidades separadas por coma (ej. copy, wordpress)"
+                        className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 flex-1 min-w-[16rem]"
                       />
                     </div>
                     <div className="flex items-center gap-4">
@@ -148,6 +182,13 @@ export default function Equipo() {
                         {m.area && <span className="text-xs text-slate-500">· {AREA_LABEL[m.area]}</span>}
                         {!m.activo && <span className="text-xs text-red-400">Inactivo</span>}
                       </div>
+                      {m.habilidades?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {m.habilidades.map((h) => (
+                            <span key={h} className="text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{h}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => iniciarEdicion(m)} className="p-1.5 text-slate-400 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors"><Pencil size={14} /></button>
@@ -165,6 +206,7 @@ export default function Equipo() {
                     <input value={nuevoForm.nombre} onChange={(e) => setNuevoForm({ ...nuevoForm, nombre: e.target.value })} placeholder="Nombre" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-36" autoFocus />
                     <input value={nuevoForm.email} onChange={(e) => setNuevoForm({ ...nuevoForm, email: e.target.value })} placeholder="Email" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-48" />
                     <input type="password" value={nuevoForm.password} onChange={(e) => setNuevoForm({ ...nuevoForm, password: e.target.value })} placeholder="Contraseña" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 w-40" />
+                    <input value={nuevoForm.habilidadesTexto} onChange={(e) => setNuevoForm({ ...nuevoForm, habilidadesTexto: e.target.value })} placeholder="Habilidades separadas por coma" className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 flex-1 min-w-[16rem]" />
                   </div>
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">

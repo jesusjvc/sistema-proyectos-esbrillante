@@ -20,6 +20,7 @@ const RESPONSABLES = [
   { valor: 'copy', label: 'Copy' },
   { valor: 'disenador', label: 'Diseñador' },
   { valor: 'programador', label: 'Programador' },
+  { valor: 'redes', label: 'Redes' },
   { valor: 'karla', label: 'Karla (QA)' },
   { valor: 'cliente', label: 'Cliente' },
 ]
