@@ -29,10 +29,10 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        style={children ? undefined : { width: size, height: size }}
+        style={{ width: size, height: size }}
         className={
           children
-            ? 'rounded-full ring-offset-2 dark:ring-offset-ink-800 hover:ring-2 hover:ring-brand-300 transition-all'
+            ? 'rounded-full flex items-center justify-center ring-offset-2 dark:ring-offset-ink-800 hover:ring-2 hover:ring-brand-300 transition-all'
             : 'rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors'
         }
         title={children ? 'Cambiar responsable' : 'Sin responsable — clic para asignar a alguien'}

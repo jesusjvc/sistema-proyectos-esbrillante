@@ -71,8 +71,8 @@ export async function aprobarSolicitud(p, solicitud, { fase, columna, responsabl
 // momento en que empieza a correr `plazoHoras` para recordatorios y el
 // badge de "atrasada". Se llama después de cualquier cambio que pueda
 // completar una tarea (puede liberar la dependencia de otra tarea cliente).
-export async function activarTareasClienteDisponibles(proyectoId) {
-  const tareas = await prisma.tarea.findMany({ where: { proyectoId } })
+export async function activarTareasClienteDisponibles(proyectoId, db = prisma) {
+  const tareas = await db.tarea.findMany({ where: { proyectoId } })
   const completadasIds = new Set(tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
   const activables = tareas.filter((t) =>
     t.esCliente && t.estado === 'pendiente' && !t.disponibleDesde &&
@@ -80,6 +80,6 @@ export async function activarTareasClienteDisponibles(proyectoId) {
   )
   if (!activables.length) return
   await Promise.all(activables.map((t) =>
-    prisma.tarea.update({ where: { id: t.id }, data: { disponibleDesde: new Date() } })
+    db.tarea.update({ where: { id: t.id }, data: { disponibleDesde: new Date() } })
   ))
 }

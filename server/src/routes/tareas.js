@@ -1,9 +1,9 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
-import { requireAuth, requireAdmin } from '../middleware/auth.js'
+import { requireAuth } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { tareaLeCorresponde } from '../lib/permisos.js'
+import { tareaLeCorresponde, usuarioParticipaEnProyecto } from '../lib/permisos.js'
 import { crearTareaCustom, activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import comentariosRouter from './comentarios.js'
 
@@ -12,6 +12,8 @@ const router = Router({ mergeParams: true })
 router.use('/:tareaId/comentarios', comentariosRouter)
 
 const ESTADOS_TABLERO = ['pendiente', 'en_proceso', 'revision', 'completada']
+const PRIORIDADES = ['urgente', 'normal', 'cuando_se_pueda']
+const RESPONSABLES_ESPECIALES = ['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin', 'cliente']
 
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
@@ -23,6 +25,101 @@ async function getProyecto(slug) {
 async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
+
+function normalizarFechaLimite(valor) {
+  if (!valor) return null
+  const fecha = new Date(`${String(valor).slice(0, 10)}T12:00:00.000Z`)
+  if (Number.isNaN(fecha.getTime())) {
+    const error = new Error('Fecha límite inválida')
+    error.status = 400
+    throw error
+  }
+  return fecha
+}
+
+// POST /api/proyectos/:slug/tareas/masivo
+// Aplica una sola operación a varias tareas de forma atómica. Además de
+// evitar estados parciales, valida todas las tareas antes de modificar una.
+router.post('/masivo', requireAuth, async (req, res) => {
+  const { slug } = req.params
+  const { tareaIds, tipo, valor } = req.body
+  const ids = [...new Set(Array.isArray(tareaIds) ? tareaIds : [])]
+  const tiposPermitidos = ['estado', 'responsable', 'prioridad', 'fechaLimite', 'eliminar']
+
+  if (!ids.length || ids.length > 100) return res.status(400).json({ error: 'Selecciona entre 1 y 100 tareas' })
+  if (!tiposPermitidos.includes(tipo)) return res.status(400).json({ error: 'Acción masiva inválida' })
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const seleccionadas = ids.map((id) => p.tareas.find((tarea) => tarea.id === id)).filter(Boolean)
+    if (seleccionadas.length !== ids.length) return res.status(404).json({ error: 'Una o más tareas no existen en este proyecto' })
+    if (seleccionadas.some((tarea) => !tareaLeCorresponde(tarea, p.equipo, req.user))) {
+      return res.status(403).json({ error: 'No tienes permiso para operar una o más tareas seleccionadas' })
+    }
+    if (tipo === 'estado' && !ESTADOS_TABLERO.includes(valor)) return res.status(400).json({ error: 'Estado inválido' })
+    if (tipo === 'prioridad' && !PRIORIDADES.includes(valor)) return res.status(400).json({ error: 'Prioridad inválida' })
+    if (tipo === 'responsable' && !usuarioParticipaEnProyecto(p.equipo, valor)) {
+      return res.status(400).json({ error: 'El responsable debe participar en el proyecto' })
+    }
+    if (tipo === 'eliminar' && seleccionadas.some((tarea) => !tarea.custom)) {
+      return res.status(400).json({ error: 'Solo se pueden eliminar tareas personalizadas' })
+    }
+    if (tipo === 'eliminar') {
+      const dependientes = p.tareas.filter((tarea) => !ids.includes(tarea.id) && tarea.dependencias.some((id) => ids.includes(id)))
+      if (dependientes.length) {
+        return res.status(400).json({ error: `No se pueden eliminar: ${dependientes.length} tarea${dependientes.length === 1 ? '' : 's'} depende${dependientes.length === 1 ? '' : 'n'} de la selección` })
+      }
+    }
+
+    const fechaLimite = tipo === 'fechaLimite' ? normalizarFechaLimite(valor) : undefined
+    const ahora = new Date()
+    const usuario = req.user.nombre
+
+    await prisma.$transaction(async (tx) => {
+      if (tipo === 'eliminar') {
+        await tx.tarea.deleteMany({ where: { id: { in: ids }, proyectoId: p.id } })
+      } else if (tipo === 'estado') {
+        const idsQueCambian = seleccionadas.filter((tarea) => tarea.estado !== valor).map((tarea) => tarea.id)
+        let siguienteOrden = ordenAlFinal(p.tareas.filter((tarea) => tarea.estado === valor && !idsQueCambian.includes(tarea.id)))
+        for (const tarea of seleccionadas) {
+          if (tarea.estado === valor) continue
+          const data = { estado: valor, orden: siguienteOrden++ }
+          if (valor === 'completada') {
+            data.completadaPor = usuario
+            data.completadaEn = ahora
+          } else if (tarea.estado === 'completada') {
+            data.completadaPor = null
+            data.completadaEn = null
+          }
+          if (valor === 'en_proceso') data.asignadoA = usuario
+          await tx.tarea.update({ where: { id: tarea.id }, data })
+        }
+      } else {
+        const data = tipo === 'fechaLimite' ? { fechaLimite } : { [tipo]: valor }
+        await tx.tarea.updateMany({ where: { id: { in: ids }, proyectoId: p.id }, data })
+      }
+
+      if (tipo === 'estado' && valor === 'completada') await activarTareasClienteDisponibles(p.id, tx)
+
+      await tx.logEntry.create({
+        data: {
+          proyectoId: p.id,
+          usuario,
+          accion: tipo === 'eliminar' ? 'Tareas eliminadas' : 'Tareas actualizadas',
+          detalle: `${seleccionadas.length} tarea${seleccionadas.length === 1 ? '' : 's'} · ${tipo}`,
+        },
+      })
+    })
+
+    emitirCambio(p.id)
+    res.json({ ok: true, actualizadas: seleccionadas.length })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
 
 // Defensa en profundidad: en la UI, "Mis tareas" ya no ofrece iniciar/completar
 // una tarea bloqueada, pero eso es solo convención de frontend — sin esto,
@@ -259,9 +356,26 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
   try {
     const p = await getProyecto(slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const tareaActual = p.tareas.find((tarea) => tarea.id === tareaId)
+    if (!tareaActual) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tareaActual, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para editar esta tarea' })
+    }
 
     const data = {}
     campos.forEach((c) => { if (req.body[c] !== undefined) data[c] = req.body[c] })
+
+    if (data.fechaLimite !== undefined) {
+      if (!data.fechaLimite) {
+        data.fechaLimite = null
+      } else {
+        data.fechaLimite = normalizarFechaLimite(data.fechaLimite)
+      }
+    }
+
+    if (data.responsable && !RESPONSABLES_ESPECIALES.includes(data.responsable) && !usuarioParticipaEnProyecto(p.equipo, data.responsable)) {
+      return res.status(400).json({ error: 'El responsable debe participar en el proyecto' })
+    }
 
     if (data.dependencias) {
       const idsProyecto = new Set(p.tareas.map((t) => t.id))
@@ -278,6 +392,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
     emitirCambio(p.id)
     res.json(tarea)
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
   }
@@ -317,7 +432,12 @@ router.delete('/:tareaId', requireAuth, async (req, res) => {
 
     const tarea = await prisma.tarea.findFirst({ where: { id: tareaId, proyectoId: p.id } })
     if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar esta tarea' })
+    }
     if (!tarea.custom) return res.status(400).json({ error: 'Solo se pueden eliminar tareas personalizadas' })
+    const dependiente = p.tareas.find((item) => item.id !== tareaId && item.dependencias.includes(tareaId))
+    if (dependiente) return res.status(400).json({ error: `No se puede eliminar porque "${dependiente.titulo}" depende de esta tarea` })
 
     await prisma.tarea.delete({ where: { id: tareaId } })
     await logEntry(p.id, usuario, 'Tarea eliminada', tarea.titulo)

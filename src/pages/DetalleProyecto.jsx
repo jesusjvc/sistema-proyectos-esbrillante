@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import SelectorProyecto from '../components/SelectorProyecto'
 import { useAuth } from '../context/AuthContext'
 import {
-  getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea, reordenarTarea,
+  getProyecto, completarTarea, reabrirTarea, omitirTarea, moverTarea, actualizarTareasMasivo, reordenarTarea,
   iniciarPausa, terminarPausa, cerrarProyecto, confirmarAnticipo,
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
@@ -24,6 +24,7 @@ import { useEventosProyecto } from '../hooks/useEventos'
 import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import KanbanBoard from '../components/KanbanBoard'
+import TablaTareasContinuas from '../components/TablaTareasContinuas'
 import Avatar from '../components/Avatar'
 import PrototiposPanel from '../components/PrototiposPanel'
 import PanelSolicitudes from '../components/PanelSolicitudes'
@@ -40,7 +41,7 @@ import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
-  AlertTriangle, Flag, UserX, RefreshCw, Tag,
+  AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -51,6 +52,7 @@ export default function DetalleProyecto() {
   const [faseAbierta, setFaseAbierta] = useState(null)
   const [faseOcultarCompletadas, setFaseOcultarCompletadas] = useState({})
   const [tab, setTab] = useState('tareas')
+  const [vistaContinuo, setVistaContinuo] = useState('tabla')
   const [copiado, setCopiado] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
   const [modalNueva, setModalNueva] = useState(null)
@@ -191,6 +193,14 @@ export default function DetalleProyecto() {
   async function handleMoverTarea(tareaId, datos) {
     await moverTarea(proyecto.slug, tareaId, datos)
     await refresh()
+  }
+
+  async function handleAccionMasivaTareas(tareaIds, tipo, valor) {
+    try {
+      await actualizarTareasMasivo(proyecto.slug, { tareaIds, tipo, valor })
+    } finally {
+      await refresh()
+    }
   }
 
   async function handleReordenarTarea(tareaId, datos) {
@@ -483,26 +493,60 @@ export default function DetalleProyecto() {
       {/* ─── Tab: Tareas ─── */}
       {tab === 'tareas' && esContinuo && (
         <div className="space-y-3">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="inline-flex h-[52px] md:h-10 p-1 bg-slate-100 dark:bg-ink-900 rounded-lg" aria-label="Vista de tareas">
+              <button
+                onClick={() => setVistaContinuo('tabla')}
+                className={`inline-flex h-11 md:h-8 items-center gap-1.5 px-3 rounded-md text-sm transition-colors ${vistaContinuo === 'tabla' ? 'bg-white dark:bg-ink-700 text-slate-800 dark:text-ink-100 shadow-sm' : 'text-slate-500 dark:text-ink-400'}`}
+                aria-pressed={vistaContinuo === 'tabla'}
+              >
+                <LayoutList size={15} /> Tabla
+              </button>
+              <button
+                onClick={() => setVistaContinuo('kanban')}
+                className={`inline-flex h-11 md:h-8 items-center gap-1.5 px-3 rounded-md text-sm transition-colors ${vistaContinuo === 'kanban' ? 'bg-white dark:bg-ink-700 text-slate-800 dark:text-ink-100 shadow-sm' : 'text-slate-500 dark:text-ink-400'}`}
+                aria-pressed={vistaContinuo === 'kanban'}
+              >
+                <Columns3 size={15} /> Kanban
+              </button>
+            </div>
             <button
               onClick={() => setModalNueva('todo')}
-              className="flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
+              className="flex min-h-11 md:min-h-10 items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
             >
-              <Plus size={16} /> Nueva tarjeta
+              <Plus size={16} /> Nueva tarea
             </button>
           </div>
-          <KanbanBoard
-            tareas={proyecto.tareas}
-            avatares={avatares}
-            equipo={proyecto.equipo}
-            miembrosPorId={miembrosPorId}
-            miembros={miembros}
-            onMover={handleMoverTarea}
-            onEditar={(t) => setModalEditar(t)}
-            onEliminar={(t) => handleEliminarTarea(t.id)}
-            onComentar={comentar}
-            onAsignar={asignarResponsable}
-          />
+          {vistaContinuo === 'tabla' ? (
+            <TablaTareasContinuas
+              tareas={proyecto.tareas}
+              usuario={user}
+              avatares={avatares}
+              equipo={proyecto.equipo}
+              miembrosPorId={miembrosPorId}
+              miembros={miembrosProyecto}
+              onMover={handleMoverTarea}
+              onActualizar={handleGuardarEdicion}
+              onAccionMasiva={handleAccionMasivaTareas}
+              onEditar={(t) => setModalEditar(t)}
+              onEliminar={(t) => handleEliminarTarea(t.id)}
+              onComentar={comentar}
+              onAsignar={asignarResponsable}
+            />
+          ) : (
+            <KanbanBoard
+              tareas={proyecto.tareas}
+              avatares={avatares}
+              equipo={proyecto.equipo}
+              miembrosPorId={miembrosPorId}
+              miembros={miembrosProyecto}
+              onMover={handleMoverTarea}
+              onEditar={(t) => setModalEditar(t)}
+              onEliminar={(t) => handleEliminarTarea(t.id)}
+              onComentar={comentar}
+              onAsignar={asignarResponsable}
+            />
+          )}
         </div>
       )}
 
@@ -622,7 +666,7 @@ export default function DetalleProyecto() {
       {modalEditar && (
         <ModalEditarTarea
           tarea={modalEditar}
-          miembrosProyecto={miembros}
+          miembrosProyecto={miembrosProyecto}
           todasLasTareas={proyecto.tareas}
           onGuardar={(cambios) => handleGuardarEdicion(modalEditar.id, cambios)}
           onCerrar={() => setModalEditar(null)}
@@ -633,7 +677,7 @@ export default function DetalleProyecto() {
       {modalNueva !== null && (
         <ModalNuevaTarea
           contexto={modalNueva}
-          miembrosProyecto={miembros}
+          miembrosProyecto={miembrosProyecto}
           todasLasTareas={proyecto.tareas}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
