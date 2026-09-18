@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import Layout from '../components/Layout'
+import { FechaRapida, PopoverRapido, PrioridadRapida, SelectorFecha } from '../components/TablaTareasContinuas'
 import { useAuth } from '../context/AuthContext'
 import { useEventosGlobal } from '../hooks/useEventos'
+import { formatFecha } from '../data/storage'
 import {
-  actualizarIncidencia, buscarClientesCrm, crearIncidencia, crearSitio,
+  actualizarIncidencia, actualizarIncidenciasMasivo, buscarClientesCrm, crearIncidencia, crearSitio,
   getCliente, getClientes, getIncidencias, getMiembros,
   registrarClienteCrm, vincularClienteCrm,
 } from '../data/api'
 import {
   AlertCircle, ArrowUpDown,
-  Building2, ChevronDown, Columns3, ExternalLink, Filter, LayoutList, Plus, Search, SlidersHorizontal,
-  UserRound, UserPlus, Wrench, X,
+  Building2, CalendarDays, Check, ChevronDown, Columns3, ExternalLink, Filter, LayoutList, Plus, Search, SlidersHorizontal,
+  UserRound, UserPlus, UserX, Wrench, X,
 } from 'lucide-react'
 
 const ESTADOS = [
@@ -92,6 +94,83 @@ function dominioSitio(sitio) {
   }
 }
 
+function ResponsableRapido({ ticket, miembros, onActualizar, disabled }) {
+  const actual = miembros.find((miembro) => miembro.id === ticket.responsableId)
+  return (
+    <PopoverRapido
+      label={`Asignar responsable de ${folio(ticket.folio)}`}
+      ancho={248}
+      renderButton={({ abierto, botonRef, toggle }) => (
+        <button
+          ref={botonRef}
+          onClick={toggle}
+          disabled={disabled}
+          aria-expanded={abierto}
+          className="inline-flex min-h-11 max-w-40 items-center gap-2 rounded-lg px-2 text-xs text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 dark:text-ink-300 dark:hover:bg-ink-700 md:min-h-8"
+        >
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${actual ? 'bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-300' : 'border border-dashed border-amber-400 text-amber-500'}`}>
+            {actual ? <UserRound size={12} /> : <UserX size={12} />}
+          </span>
+          <span className="truncate">{actual?.nombre || 'Sin asignar'}</span>
+        </button>
+      )}
+    >
+      {(cerrar) => (
+        <>
+          <p className="px-2 pb-1.5 pt-1 text-xs font-medium text-slate-500 dark:text-ink-300">Responsable</p>
+          <button onClick={async () => { if (await onActualizar(ticket.id, { responsableId: null })) cerrar() }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-ink-600">
+            <UserX size={15} className="text-slate-400" /> Sin asignar
+            {!ticket.responsableId && <Check size={15} className="ml-auto text-brand-700 dark:text-brand-300" />}
+          </button>
+          {miembros.map((miembro) => (
+            <button key={miembro.id} onClick={async () => { if (await onActualizar(ticket.id, { responsableId: miembro.id })) cerrar() }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:bg-ink-600">
+              <UserRound size={15} className="text-slate-400" /> <span className="truncate">{miembro.nombre}</span>
+              {ticket.responsableId === miembro.id && <Check size={15} className="ml-auto text-brand-700 dark:text-brand-300" />}
+            </button>
+          ))}
+        </>
+      )}
+    </PopoverRapido>
+  )
+}
+
+function BarraMasiva({ cantidad, miembros, procesando, onAplicar, onLimpiar }) {
+  const claseControl = 'h-10 shrink-0 rounded-lg border border-ink-500 bg-ink-800 px-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50'
+  return (
+    <div className="fixed bottom-4 left-3 right-3 z-50 mx-auto flex max-w-4xl items-center gap-2 overflow-x-auto rounded-xl bg-ink-950 px-3 py-3 text-white shadow-[0_12px_36px_rgba(15,23,42,0.3)] md:bottom-5 md:left-1/2 md:right-auto md:-translate-x-1/2" role="region" aria-label="Acciones masivas de tickets" aria-busy={procesando}>
+      <span className="shrink-0 border-r border-ink-500 pr-3 text-sm font-semibold tabular-nums">{cantidad} seleccionado{cantidad === 1 ? '' : 's'}</span>
+      <select value="" onChange={(event) => event.target.value && onAplicar('estado', event.target.value)} disabled={procesando} className={claseControl} aria-label="Cambiar estado de tickets seleccionados"><option value="">Estado</option>{ESTADOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
+      <select value="" onChange={(event) => event.target.value && onAplicar('responsableId', event.target.value === '__sin_asignar' ? null : event.target.value)} disabled={procesando} className={claseControl} aria-label="Asignar responsable a tickets seleccionados"><option value="">Responsable</option><option value="__sin_asignar">Sin asignar</option>{miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}</select>
+      <select value="" onChange={(event) => event.target.value && onAplicar('prioridad', event.target.value)} disabled={procesando} className={claseControl} aria-label="Cambiar prioridad de tickets seleccionados"><option value="">Prioridad</option>{PRIORIDADES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
+      <PopoverRapido
+        label="Cambiar fecha límite de tickets seleccionados"
+        ancho={typeof window !== 'undefined' && window.innerWidth >= 768 ? 560 : 320}
+        renderButton={({ abierto, botonRef, toggle }) => <button ref={botonRef} onClick={toggle} disabled={procesando} aria-expanded={abierto} className={`${claseControl} inline-flex items-center gap-2`}><CalendarDays size={15} /> Fecha</button>}
+      >
+        {(cerrar) => <SelectorFecha fechaActual={null} onGuardar={async (fecha) => { if (await onAplicar('fechaLimite', fecha)) cerrar() }} />}
+      </PopoverRapido>
+      <button onClick={onLimpiar} disabled={procesando} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink-300 transition-colors hover:bg-ink-800 hover:text-white disabled:opacity-50" aria-label="Cancelar selección"><X size={16} /></button>
+    </div>
+  )
+}
+
+function FechaFormulario({ value, onChange }) {
+  return (
+    <PopoverRapido
+      label="Elegir fecha límite"
+      ancho={typeof window !== 'undefined' && window.innerWidth >= 768 ? 560 : 320}
+      renderButton={({ abierto, botonRef, toggle }) => (
+        <button ref={botonRef} type="button" onClick={toggle} aria-expanded={abierto} className={`${inputCls} flex items-center gap-2 text-left`}>
+          <CalendarDays size={16} className="shrink-0 text-slate-400" />
+          <span className={value ? '' : 'text-slate-400 dark:text-ink-400'}>{value ? formatFecha(value) : 'Sin fecha límite'}</span>
+        </button>
+      )}
+    >
+      {(cerrar) => <SelectorFecha fechaActual={value || null} onGuardar={(fecha) => { onChange(fecha || ''); cerrar() }} />}
+    </PopoverRapido>
+  )
+}
+
 export default function Mantenimiento() {
   const { user } = useAuth()
   const [incidencias, setIncidencias] = useState([])
@@ -106,6 +185,9 @@ export default function Mantenimiento() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [orden, setOrden] = useState('prioridad')
   const [seleccionados, setSeleccionados] = useState([])
+  const [actualizandoId, setActualizandoId] = useState(null)
+  const [procesandoMasivo, setProcesandoMasivo] = useState(false)
+  const [errorAccion, setErrorAccion] = useState('')
   const [vista, setVista] = useState(() => localStorage.getItem('mantenimientoVista') || 'lista')
   const [panel, setPanel] = useState(null)
 
@@ -137,6 +219,20 @@ export default function Mantenimiento() {
     setPanel((actual) => actual?.id === id ? actualizado : actual)
   }
 
+  async function actualizarRapido(id, cambios) {
+    setActualizandoId(id)
+    setErrorAccion('')
+    try {
+      await actualizar(id, cambios)
+      return true
+    } catch (err) {
+      setErrorAccion(err.message || 'No pudimos guardar el cambio')
+      return false
+    } finally {
+      setActualizandoId(null)
+    }
+  }
+
   const q = busqueda.trim().toLowerCase()
   const filtradas = incidencias
     .filter((ticket) => estado === 'todos' || (estado === 'abiertos' ? ticket.estado !== 'done' : ticket.estado === estado))
@@ -156,12 +252,22 @@ export default function Mantenimiento() {
     revision: incidencias.filter((ticket) => ticket.estado === 'revision').length,
   }
 
-  const miembrosPorId = Object.fromEntries(miembros.map((miembro) => [miembro.id, miembro]))
   const filtrosActivos = Number(prioridad !== 'todas') + Number(responsable !== 'todos')
 
-  async function aplicarMasivo(cambios) {
-    await Promise.all(seleccionados.map((id) => actualizar(id, cambios)))
-    setSeleccionados([])
+  async function aplicarMasivo(tipo, valor) {
+    setProcesandoMasivo(true)
+    setErrorAccion('')
+    try {
+      await actualizarIncidenciasMasivo({ incidenciaIds: seleccionados, tipo, valor })
+      await cargar()
+      setSeleccionados([])
+      return true
+    } catch (err) {
+      setErrorAccion(err.message || 'No pudimos actualizar todos los tickets')
+      return false
+    } finally {
+      setProcesandoMasivo(false)
+    }
   }
 
   return (
@@ -217,6 +323,7 @@ export default function Mantenimiento() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto bg-slate-50 dark:bg-ink-950">
+          {errorAccion && <div role="alert" className="m-4 rounded-lg bg-rose-100 px-3 py-2 text-sm text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">{errorAccion}</div>}
           {error ? (
             <EstadoMensaje icon={<AlertCircle size={22} />} titulo="No pudimos cargar los tickets" detalle={error} accion="Reintentar" onAccion={cargar} />
           ) : cargando ? (
@@ -224,17 +331,13 @@ export default function Mantenimiento() {
           ) : filtradas.length === 0 ? (
             <EstadoMensaje icon={<Filter size={22} />} titulo={incidencias.length ? 'No hay tickets con estos filtros' : 'La mesa de mantenimiento esta vacia'} detalle={incidencias.length ? 'Prueba otra busqueda o limpia los filtros.' : 'Crea el primer reporte para empezar a operar esta bandeja.'} accion={incidencias.length ? 'Limpiar filtros' : 'Crear ticket'} onAccion={() => incidencias.length ? (setBusqueda(''), setEstado('abiertos'), setPrioridad('todas'), setResponsable('todos')) : setPanel('nuevo')} />
           ) : vista === 'lista' ? (
-            <VistaLista tickets={filtradas} miembrosPorId={miembrosPorId} onAbrir={setPanel} onActualizar={actualizar} seleccionados={seleccionados} onSeleccionar={setSeleccionados} />
+            <VistaLista tickets={filtradas} miembros={miembros} onAbrir={setPanel} onActualizar={actualizarRapido} actualizandoId={actualizandoId} seleccionados={seleccionados} onSeleccionar={setSeleccionados} />
           ) : (
-            <VistaKanban tickets={filtradas} miembrosPorId={miembrosPorId} onAbrir={setPanel} onActualizar={actualizar} />
+            <VistaKanban tickets={filtradas} miembros={miembros} onAbrir={setPanel} onActualizar={actualizarRapido} actualizandoId={actualizandoId} />
           )}
         </div>
         {seleccionados.length > 0 && (
-          <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 bg-ink-950 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-3">
-            <span className="text-sm font-medium whitespace-nowrap">{seleccionados.length} seleccionado{seleccionados.length === 1 ? '' : 's'}</span>
-            <select defaultValue="" onChange={(event) => { if (event.target.value) aplicarMasivo({ estado: event.target.value }); event.target.value = '' }} className="h-9 bg-ink-800 border border-ink-500 rounded-lg px-2 text-sm" aria-label="Cambiar estado de seleccionados"><option value="">Mover a...</option>{ESTADOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
-            <button onClick={() => setSeleccionados([])} className="w-9 h-9 rounded-lg flex items-center justify-center text-ink-300 hover:text-white hover:bg-ink-800" aria-label="Cancelar selección"><X size={15} /></button>
-          </div>
+          <BarraMasiva cantidad={seleccionados.length} miembros={miembros} procesando={procesandoMasivo} onAplicar={aplicarMasivo} onLimpiar={() => setSeleccionados([])} />
         )}
       </div>
 
@@ -259,7 +362,7 @@ function Filtro({ label, value, onChange, opciones }) {
   )
 }
 
-function VistaLista({ tickets, miembrosPorId, onAbrir, onActualizar, seleccionados, onSeleccionar }) {
+function VistaLista({ tickets, miembros, onAbrir, onActualizar, actualizandoId, seleccionados, onSeleccionar }) {
   const todosSeleccionados = tickets.length > 0 && tickets.every((ticket) => seleccionados.includes(ticket.id))
 
   function toggle(id) {
@@ -286,7 +389,6 @@ function VistaLista({ tickets, miembrosPorId, onAbrir, onActualizar, seleccionad
           <tbody className="divide-y divide-slate-200 dark:divide-ink-500 bg-white dark:bg-ink-800">
             {tickets.map((ticket) => {
               const estado = estadoInfo(ticket.estado)
-              const prioridad = prioridadInfo(ticket.prioridad)
               return (
                 <tr key={ticket.id} className="group hover:bg-brand-50/45 dark:hover:bg-brand-500/5 transition-colors">
                   <td className="pl-4 py-3"><input type="checkbox" checked={seleccionados.includes(ticket.id)} onChange={() => toggle(ticket.id)} aria-label={`Seleccionar ${folio(ticket.folio)}`} className="accent-brand-500" /></td>
@@ -300,14 +402,14 @@ function VistaLista({ tickets, miembrosPorId, onAbrir, onActualizar, seleccionad
                     <a href={ticket.sitio.url || `https://${dominioSitio(ticket.sitio)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-300" onClick={(event) => event.stopPropagation()}>{dominioSitio(ticket.sitio)} <ExternalLink size={10} /></a>
                   </td>
                   <td className="px-3 py-3">
-                    <select value={ticket.estado} onChange={(event) => onActualizar(ticket.id, { estado: event.target.value })} className={`h-8 w-full rounded-lg px-2 text-xs font-medium border-0 outline-none focus:ring-2 focus:ring-brand-400 ${estado.badge}`} aria-label={`Estado de ${folio(ticket.folio)}`}>
+                    <select value={ticket.estado} onChange={(event) => onActualizar(ticket.id, { estado: event.target.value })} disabled={actualizandoId === ticket.id} className={`h-8 w-full rounded-lg px-2 text-xs font-medium border-0 outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50 ${estado.badge}`} aria-label={`Estado de ${folio(ticket.folio)}`}>
                       {ESTADOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                     </select>
                   </td>
-                  <td className="px-3 py-3"><span className={`inline-flex px-2 py-1 rounded-md text-xs font-medium ${prioridad.className}`}>{prioridad.label}</span></td>
+                  <td className="px-3 py-3"><PrioridadRapida tarea={ticket} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} /></td>
                   <td className="px-3 py-3 text-xs text-slate-600 dark:text-ink-300">{opcionLabel(COBERTURAS, ticket.cobertura)}</td>
-                  <td className="px-3 py-3 text-slate-600 dark:text-ink-300"><span className="inline-flex items-center gap-2"><span className="w-6 h-6 rounded-full bg-slate-100 dark:bg-ink-700 flex items-center justify-center"><UserRound size={12} /></span>{miembrosPorId[ticket.responsableId]?.nombre || 'Sin asignar'}</span></td>
-                  <td className="px-3 py-3 text-xs tabular-nums text-slate-500 dark:text-ink-400">{ticket.fechaLimite ? new Date(ticket.fechaLimite).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : antiguedad(ticket.creadoEn)}</td>
+                  <td className="px-3 py-3"><ResponsableRapido ticket={ticket} miembros={miembros} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} /></td>
+                  <td className="px-3 py-3"><FechaRapida tarea={ticket} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} /></td>
                 </tr>
               )
             })}
@@ -317,25 +419,34 @@ function VistaLista({ tickets, miembrosPorId, onAbrir, onActualizar, seleccionad
 
       <div className="md:hidden divide-y divide-slate-200 dark:divide-ink-500 bg-white dark:bg-ink-800">
         {tickets.map((ticket) => (
-          <button key={ticket.id} onClick={() => onAbrir(ticket)} className="w-full text-left px-4 py-4 hover:bg-slate-50 dark:hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-400">
-            <div className="flex items-start gap-3">
-              <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${estadoInfo(ticket.estado).dot}`} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2"><span className="font-mono text-[11px] text-slate-400 dark:text-ink-400">{folio(ticket.folio)}</span><span className="text-xs text-slate-400 dark:text-ink-400">{antiguedad(ticket.creadoEn)}</span></div>
-                <p className="font-medium text-sm text-slate-900 dark:text-ink-100 mt-1">{ticket.titulo}</p>
-                <p className="text-xs text-slate-500 dark:text-ink-300 mt-1 truncate">{ticket.cliente.nombreComercial} · {dominioSitio(ticket.sitio)}</p>
-                <p className="text-xs text-slate-400 dark:text-ink-400 mt-1 truncate">{miembrosPorId[ticket.responsableId]?.nombre || 'Sin asignar'} · {opcionLabel(COBERTURAS, ticket.cobertura)}{ticket.fechaLimite ? ` · vence ${new Date(ticket.fechaLimite).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}` : ''}</p>
-                <div className="flex gap-1.5 mt-2"><span className={`px-2 py-1 rounded-md text-[11px] font-medium ${estadoInfo(ticket.estado).badge}`}>{estadoInfo(ticket.estado).label}</span><span className={`px-2 py-1 rounded-md text-[11px] font-medium ${prioridadInfo(ticket.prioridad).className}`}>{prioridadInfo(ticket.prioridad).label}</span></div>
-              </div>
+          <article key={ticket.id} className={`space-y-3 px-4 py-4 ${seleccionados.includes(ticket.id) ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}>
+            <div className="flex items-start gap-2">
+              <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-slate-100 focus-within:ring-2 focus-within:ring-brand-400 dark:hover:bg-ink-700">
+                <input type="checkbox" checked={seleccionados.includes(ticket.id)} onChange={() => toggle(ticket.id)} aria-label={`Seleccionar ${folio(ticket.folio)}`} className="h-4 w-4 accent-brand-500" />
+              </label>
+              <button onClick={() => onAbrir(ticket)} className="min-h-11 min-w-0 flex-1 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400">
+                <span className="flex items-center justify-between gap-2"><span className="font-mono text-[11px] text-slate-400 dark:text-ink-400">{folio(ticket.folio)}</span><span className="text-xs text-slate-400 dark:text-ink-400">{antiguedad(ticket.creadoEn)}</span></span>
+                <span className="mt-1 block text-sm font-medium text-slate-900 dark:text-ink-100">{ticket.titulo}</span>
+                <span className="mt-1 block truncate text-xs text-slate-500 dark:text-ink-300">{ticket.cliente.nombreComercial} · {dominioSitio(ticket.sitio)}</span>
+              </button>
             </div>
-          </button>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <select value={ticket.estado} onChange={(event) => onActualizar(ticket.id, { estado: event.target.value })} disabled={actualizandoId === ticket.id} className={`h-11 w-full rounded-lg border-0 px-2 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50 ${estadoInfo(ticket.estado).badge}`} aria-label={`Estado de ${folio(ticket.folio)}`}>{ESTADOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
+              <PrioridadRapida tarea={ticket} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <ResponsableRapido ticket={ticket} miembros={miembros} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} />
+              <FechaRapida tarea={ticket} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} />
+            </div>
+            <p className="text-xs text-slate-400 dark:text-ink-400">{opcionLabel(COBERTURAS, ticket.cobertura)}</p>
+          </article>
         ))}
       </div>
     </>
   )
 }
 
-function VistaKanban({ tickets, miembrosPorId, onAbrir, onActualizar }) {
+function VistaKanban({ tickets, miembros, onAbrir, onActualizar, actualizandoId }) {
   const [arrastrando, setArrastrando] = useState(null)
   return (
     <div className="h-full flex gap-4 p-5 overflow-x-auto">
@@ -347,7 +458,7 @@ function VistaKanban({ tickets, miembrosPorId, onAbrir, onActualizar }) {
             <div className="p-2.5 space-y-2.5 overflow-y-auto min-h-24">
               {columna.map((ticket) => (
                 <article key={ticket.id} draggable onDragStart={() => setArrastrando(ticket.id)} onDragEnd={() => setArrastrando(null)} className={`bg-white dark:bg-ink-800 rounded-lg border border-slate-200 dark:border-ink-500 p-3 shadow-sm ${arrastrando === ticket.id ? 'opacity-50' : ''}`}>
-                  <div className="flex items-center justify-between gap-2"><span className="font-mono text-[11px] text-slate-400 dark:text-ink-400">{folio(ticket.folio)}</span><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${prioridadInfo(ticket.prioridad).className}`}>{prioridadInfo(ticket.prioridad).label}</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="font-mono text-[11px] text-slate-400 dark:text-ink-400">{folio(ticket.folio)}</span><div draggable={false} onPointerDown={(event) => event.stopPropagation()}><PrioridadRapida tarea={ticket} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} /></div></div>
                   <button onClick={() => onAbrir(ticket)} className="block w-full text-left text-sm font-medium text-slate-900 dark:text-ink-100 hover:text-brand-800 dark:hover:text-brand-300 mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm">{ticket.titulo}</button>
                   <p className="text-xs text-slate-500 dark:text-ink-300 mt-2 truncate">{ticket.cliente.nombreComercial}</p>
                   <p className="text-xs text-slate-400 dark:text-ink-400 truncate">{dominioSitio(ticket.sitio)}</p>
@@ -356,7 +467,11 @@ function VistaKanban({ tickets, miembrosPorId, onAbrir, onActualizar }) {
                       {ESTADOS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                     </select>
                   </label>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-ink-500 flex items-center justify-between gap-2 text-xs text-slate-400 dark:text-ink-400"><span>{miembrosPorId[ticket.responsableId]?.nombre || 'Sin asignar'}</span><span>{antiguedad(ticket.creadoEn)}</span></div>
+                  <div draggable={false} onPointerDown={(event) => event.stopPropagation()} className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-ink-500">
+                    <ResponsableRapido ticket={ticket} miembros={miembros} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} />
+                    <FechaRapida tarea={ticket} onActualizar={onActualizar} disabled={actualizandoId === ticket.id} />
+                  </div>
+                  <p className="mt-1 text-right text-[11px] text-slate-400 dark:text-ink-400">{antiguedad(ticket.creadoEn)}</p>
                 </article>
               ))}
               {!columna.length && <div className="h-20 border border-dashed border-slate-300 dark:border-ink-500 rounded-lg flex items-center justify-center text-xs text-slate-400 dark:text-ink-400">Suelta un ticket aquí</div>}
@@ -772,7 +887,7 @@ function PanelNuevo({ clientes, miembros, user, onCerrar, onCreado, onClienteNue
         </div>
 
         <Campo label="Responsable"><select value={form.responsableId} onChange={(event) => setForm({ ...form, responsableId: event.target.value })} className={inputCls}><option value="">Sin asignar</option>{miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}</select></Campo>
-        <Campo label="Fecha límite"><input type="date" value={form.fechaLimite} onChange={(event) => setForm({ ...form, fechaLimite: event.target.value })} className={inputCls} /></Campo>
+        <Campo label="Fecha límite"><FechaFormulario value={form.fechaLimite} onChange={(fechaLimite) => setForm({ ...form, fechaLimite })} /></Campo>
       </form>
     </Panel>
   )
@@ -854,7 +969,7 @@ function PanelDetalle({ ticket, miembros, onCerrar, onGuardar }) {
         </div>
 
         <Campo label="Responsable"><select value={form.responsableId} onChange={(event) => setForm({ ...form, responsableId: event.target.value })} className={inputCls}><option value="">Sin asignar</option>{miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}</select></Campo>
-        <Campo label="Fecha límite"><input type="date" value={form.fechaLimite} onChange={(event) => setForm({ ...form, fechaLimite: event.target.value })} className={inputCls} /></Campo>
+        <Campo label="Fecha límite"><FechaFormulario value={form.fechaLimite} onChange={(fechaLimite) => setForm({ ...form, fechaLimite })} /></Campo>
 
         <section className="space-y-4 pt-1">
           <div className="flex items-center gap-2"><Wrench size={15} className="text-slate-400" /><h3 className="text-sm font-semibold text-slate-800 dark:text-ink-100">Trabajo técnico</h3></div>

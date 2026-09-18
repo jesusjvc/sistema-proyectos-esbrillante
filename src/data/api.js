@@ -51,6 +51,7 @@ export const actualizarAreasProyecto = (slug, areas) => req('PUT', `/api/proyect
 export const getIncidencias = () => req('GET', '/api/incidencias')
 export const crearIncidencia = (data) => req('POST', '/api/incidencias', data)
 export const actualizarIncidencia = (id, data) => req('PUT', `/api/incidencias/${id}`, data)
+export const actualizarIncidenciasMasivo = (data) => req('POST', '/api/incidencias/masivo', data)
 export const getClientes = () => req('GET', '/api/clientes')
 export const getCliente = (id) => req('GET', `/api/clientes/${id}`)
 // El CRM es la fuente obligatoria de clientes: buscar en el CRM,

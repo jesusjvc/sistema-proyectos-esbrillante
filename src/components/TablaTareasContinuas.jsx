@@ -34,7 +34,7 @@ function fechaLocal(fecha) {
 }
 
 function estaVencida(tarea) {
-  if (!tarea.fechaLimite || tarea.estado === 'completada') return false
+  if (!tarea.fechaLimite || tarea.estado === 'completada' || tarea.estado === 'done') return false
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   return fechaLocal(tarea.fechaLimite) < hoy
@@ -97,7 +97,7 @@ function calcularPosicionPopover(boton, panel, ancho) {
   return { top, left }
 }
 
-function PopoverRapido({ label, renderButton, children, ancho = 280 }) {
+export function PopoverRapido({ label, renderButton, children, ancho = 280 }) {
   const [abierto, setAbierto] = useState(false)
   const [posicion, setPosicion] = useState({ top: 0, left: 0 })
   const botonRef = useRef(null)
@@ -154,7 +154,7 @@ function PopoverRapido({ label, renderButton, children, ancho = 280 }) {
   )
 }
 
-function PrioridadRapida({ tarea, onActualizar, disabled }) {
+export function PrioridadRapida({ tarea, onActualizar, disabled }) {
   const actual = PRIORIDAD[tarea.prioridad] || PRIORIDAD.normal
   return (
     <PopoverRapido
@@ -192,7 +192,7 @@ function PrioridadRapida({ tarea, onActualizar, disabled }) {
   )
 }
 
-function SelectorFecha({ fechaActual, onGuardar, permitirQuitar = true }) {
+export function SelectorFecha({ fechaActual, onGuardar, permitirQuitar = true }) {
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   const fechaSeleccionada = fechaActual ? fechaLocal(fechaActual) : null
@@ -263,7 +263,7 @@ function SelectorFecha({ fechaActual, onGuardar, permitirQuitar = true }) {
   )
 }
 
-function FechaRapida({ tarea, onActualizar, disabled }) {
+export function FechaRapida({ tarea, onActualizar, disabled }) {
   return (
     <PopoverRapido
       label={`Cambiar fecha límite de ${tarea.titulo}`}
