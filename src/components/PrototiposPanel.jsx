@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getPrototipos, actualizarPrototipo, eliminarPrototipo } from '../data/api'
 import { ESTADO_CONFIG, ESTADO_OPCIONES } from '../data/prototipos'
 import ModalNuevoPrototipo from './ModalNuevoPrototipo'
+import { useAuth } from '../context/AuthContext'
 import { ExternalLink, Download, Trash2, Plus, MessageCircle } from 'lucide-react'
 
 /**
@@ -9,6 +10,7 @@ import { ExternalLink, Download, Trash2, Plus, MessageCircle } from 'lucide-reac
  * Se usa desde DetalleProyecto, la misma página tanto para admin como equipo.
  */
 export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
+  const { user } = useAuth()
   const [prototipos, setPrototipos] = useState(null)
   const [error, setError] = useState('')
   const [modalNuevo, setModalNuevo] = useState(false)
@@ -30,6 +32,15 @@ export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
     if (!confirm(`¿Eliminar "${p.nombre_original}"? Esta acción no se puede deshacer.`)) return
     await eliminarPrototipo(p.slug)
     cargar()
+  }
+
+  // El link del cliente vive aparte (portal/solicitud) — este siempre lo abre alguien del equipo,
+  // así que se manda identificado (rol=equipo + su nombre real de Foco) para que revision.js no le
+  // pida su nombre y no etiquete sus comentarios como "Cliente".
+  function urlEquipo(p) {
+    const params = new URLSearchParams({ rol: 'equipo' })
+    if (user?.nombre) params.set('nombre', user.nombre)
+    return `${p.url}?${params.toString()}`
   }
 
   if (error) return <div className="text-sm text-red-600">{error}</div>
@@ -76,7 +87,7 @@ export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
                   {ESTADO_OPCIONES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
                 <div className="flex items-center gap-2 shrink-0">
-                  <a href={p.url} target="_blank" rel="noreferrer" className="text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400" title="Ver"><ExternalLink size={15} /></a>
+                  <a href={urlEquipo(p)} target="_blank" rel="noreferrer" className="text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400" title="Ver"><ExternalLink size={15} /></a>
                   {p.archivo && (
                     <a href={`${p.url}/download`} className="text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400" title="Descargar HTML"><Download size={15} /></a>
                   )}

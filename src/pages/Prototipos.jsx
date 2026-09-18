@@ -47,6 +47,15 @@ export default function Prototipos() {
     cargar()
   }
 
+  // El link del cliente vive aparte (portal/solicitud) — este siempre lo abre alguien del equipo,
+  // así que se manda identificado (rol=equipo + su nombre real de Foco) para que revision.js no le
+  // pida su nombre y no etiquete sus comentarios como "Cliente".
+  function urlEquipo(p) {
+    const params = new URLSearchParams({ rol: 'equipo' })
+    if (user?.nombre) params.set('nombre', user.nombre)
+    return `${p.url}?${params.toString()}`
+  }
+
   if (error) return <Layout titulo="Prototipos"><div className="text-sm text-red-600">{error}</div></Layout>
   if (!prototipos) {
     return (
@@ -133,7 +142,7 @@ export default function Prototipos() {
                           ))}
                         </select>
                         <div className="flex items-center gap-2 shrink-0">
-                          <a href={p.url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-700" title="Ver"><ExternalLink size={15} /></a>
+                          <a href={urlEquipo(p)} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-700" title="Ver"><ExternalLink size={15} /></a>
                           {p.archivo && (
                             <a href={`${p.url}/download`} className="text-slate-400 hover:text-brand-700" title="Descargar HTML"><Download size={15} /></a>
                           )}
