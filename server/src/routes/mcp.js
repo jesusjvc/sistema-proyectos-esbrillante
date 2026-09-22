@@ -28,6 +28,39 @@ function urlPortalCliente(slug) {
   return `${PORTAL_CLIENTE_BASE_URL}/${slug}`
 }
 
+// El editor de descripción de tareas (EditorEnriquecido) guarda HTML — un agente por MCP lee
+// mejor texto plano. Sin librería de parseo de HTML en el proyecto; suficiente para el HTML
+// simple que produce ese editor (párrafos, saltos, negritas, listas, links).
+function htmlATexto(html) {
+  if (!html) return ''
+  return html
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// Campos de detalle de una tarea del equipo (descripción libre, o los de una tarea materializada
+// desde plantilla) — se omiten si están vacíos para no inflar la respuesta de ver_proyecto con
+// tareas que no tienen nada más que el título. Antes ninguna tarea de ver_proyecto los incluía,
+// así que un agente no tenía forma de leer lo que alguien haya escrito ahí (reportado por el
+// usuario: "Conectar sistema a la Web real..." en E&E Shipping tenía detalle invisible por MCP).
+function detalleTarea(t) {
+  return {
+    ...(t.descripcion ? { descripcion: htmlATexto(t.descripcion) } : {}),
+    ...(t.queHacer ? { queHacer: htmlATexto(t.queHacer) } : {}),
+    ...(t.necesitasAntes ? { necesitasAntes: htmlATexto(t.necesitasAntes) } : {}),
+    ...(t.queEntregas ? { queEntregas: htmlATexto(t.queEntregas) } : {}),
+  }
+}
+
 function ok(text) {
   return { content: [{ type: 'text', text }] }
 }
@@ -421,7 +454,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título).',
+      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. También incluye "descripcion" (y, si viene de una plantilla, "queHacer"/"necesitasAntes"/"queEntregas") cuando alguien escribió detalle ahí — antes ver_proyecto solo mostraba el título y ese detalle era invisible por MCP; se omiten los campos vacíos para no inflar la respuesta. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título).',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         incluirCompletadas: z.boolean().optional().describe('Solo aplica a proyectos "finito". Si es true, agrega "tareasCompletadas" con las tareas del equipo ya completadas (id, fase, título, responsable, completadaPor, completadaEn). No cambia ningún otro listado — el propósito principal de esta tool sigue siendo mostrar qué falta.'),
@@ -448,7 +481,7 @@ function buildServer(usuario) {
         resumen.tarjetas = p.tareas
           .filter((t) => !t.esCliente && t.estado !== 'omitida')
           .sort((a, b) => a.orden - b.orden)
-          .map((t) => ({ id: t.id, estado: t.estado, titulo: t.titulo }))
+          .map((t) => ({ id: t.id, estado: t.estado, titulo: t.titulo, ...detalleTarea(t) }))
       } else {
         const fase = getFaseActual(p)
         const fases = p.proyecto?.fases || []
@@ -468,18 +501,18 @@ function buildServer(usuario) {
           resumen.tareasCompletadas = p.tareas
             .filter((t) => !t.esCliente && t.estado === 'completada')
             .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
-            .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable, completadaPor: t.completadaPor, completadaEn: t.completadaEn }))
+            .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable, completadaPor: t.completadaPor, completadaEn: t.completadaEn, ...detalleTarea(t) }))
         }
       }
 
       resumen.tareasEnProceso = p.tareas
         .filter((t) => !t.esCliente && t.estado === 'en_proceso')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable, ...detalleTarea(t) }))
       resumen.tareasPendientesEquipo = p.tareas
         .filter((t) => !t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, responsable: t.responsable, ...detalleTarea(t) }))
       resumen.tareasPendientesCliente = p.tareas
         .filter((t) => t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
