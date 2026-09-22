@@ -1206,7 +1206,11 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
       </div>
 
       {modalAbierto && (
-        <div onClick={(e) => e.stopPropagation()}>
+        // El modal queda anidado dentro de la fila arrastrable (FilaArrastrable, drag and drop
+        // de dnd-kit) — sin este stopPropagation, cualquier pointerdown adentro (ej. arrastrar
+        // el mouse para seleccionar texto de la descripción) burbujea hasta los listeners de
+        // arrastre de la fila y dnd-kit se queda con el gesto en vez de dejar seleccionar texto.
+        <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
           <ModalDetalleTarea
             titulo={editando ? 'Editar tarea' : t.titulo}
             badges={editando ? null : badges}
