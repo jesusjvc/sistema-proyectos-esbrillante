@@ -21,7 +21,7 @@ import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
 import { useEventosProyecto } from '../hooks/useEventos'
-import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../lib/permisos'
+import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import KanbanBoard from '../components/KanbanBoard'
 import TablaTareasContinuas from '../components/TablaTareasContinuas'
@@ -274,7 +274,6 @@ export default function DetalleProyecto() {
     tareas: proyecto.tareas.filter((t) => t.fase === f.numero).sort((a, b) => a.orden - b.orden),
   }))
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
-  const miembrosProyecto = miembrosDelEquipo(proyecto.equipo, miembros)
   const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
   const tareasCliente = proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden)
   const preguntasPendientes = tareasCliente.filter((t) => t.estado !== 'completada' && t.estado !== 'omitida').length
@@ -427,7 +426,6 @@ export default function DetalleProyecto() {
                   equipo={proyecto.equipo}
                   miembrosPorId={miembrosPorId}
                   miembros={miembros}
-                  miembrosProyecto={miembrosProyecto}
                   todasLasTareas={proyecto.tareas}
                   onCompletar={() => marcarCompleta(t.id)}
                   onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
@@ -458,7 +456,6 @@ export default function DetalleProyecto() {
                       equipo={proyecto.equipo}
                       miembrosPorId={miembrosPorId}
                       miembros={miembros}
-                      miembrosProyecto={miembrosProyecto}
                       todasLasTareas={proyecto.tareas}
                       onCompletar={() => marcarCompleta(t.id)}
                       onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
@@ -483,7 +480,7 @@ export default function DetalleProyecto() {
           solicitudes={proyecto.solicitudes || []}
           esContinuo={esContinuo}
           fases={fases}
-          miembrosProyecto={miembrosProyecto}
+          miembros={miembros}
           onAprobar={handleAprobarSolicitud}
           onRechazar={handleRechazarSolicitud}
           onCrearTicket={handleCrearTicket}
@@ -524,7 +521,7 @@ export default function DetalleProyecto() {
               avatares={avatares}
               equipo={proyecto.equipo}
               miembrosPorId={miembrosPorId}
-              miembros={miembrosProyecto}
+              miembros={miembros}
               onMover={handleMoverTarea}
               onActualizar={handleGuardarEdicion}
               onAccionMasiva={handleAccionMasivaTareas}
@@ -539,7 +536,7 @@ export default function DetalleProyecto() {
               avatares={avatares}
               equipo={proyecto.equipo}
               miembrosPorId={miembrosPorId}
-              miembros={miembrosProyecto}
+              miembros={miembros}
               onMover={handleMoverTarea}
               onEditar={(t) => setModalEditar(t)}
               onEliminar={(t) => handleEliminarTarea(t.id)}
@@ -622,7 +619,6 @@ export default function DetalleProyecto() {
                                 equipo={proyecto.equipo}
                                 miembrosPorId={miembrosPorId}
                                 miembros={miembros}
-                                miembrosProyecto={miembrosProyecto}
                                 todasLasTareas={proyecto.tareas}
                                 onCompletar={() => marcarCompleta(t.id)}
                                 onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
@@ -666,7 +662,7 @@ export default function DetalleProyecto() {
       {modalEditar && (
         <ModalEditarTarea
           tarea={modalEditar}
-          miembrosProyecto={miembrosProyecto}
+          miembros={miembros}
           todasLasTareas={proyecto.tareas}
           onGuardar={(cambios) => handleGuardarEdicion(modalEditar.id, cambios)}
           onCerrar={() => setModalEditar(null)}
@@ -677,7 +673,7 @@ export default function DetalleProyecto() {
       {modalNueva !== null && (
         <ModalNuevaTarea
           contexto={modalNueva}
-          miembrosProyecto={miembrosProyecto}
+          miembros={miembros}
           todasLasTareas={proyecto.tareas}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
@@ -1001,7 +997,7 @@ function FilaArrastrable({ id, children }) {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], miembrosProyecto = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin }) {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState(null)
@@ -1236,12 +1232,12 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
                   <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                    <optgroup label="Rol">
+                    <optgroup label="General">
                       {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
                     </optgroup>
-                    {miembrosProyecto.length > 0 && (
+                    {miembros.length > 0 && (
                       <optgroup label="Persona específica">
-                        {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                        {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                       </optgroup>
                     )}
                   </select>
@@ -1373,18 +1369,19 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   )
 }
 
+// Los roles de equipo (copy/diseñador/programador/redes) se dejaron de usar aquí — asignar a
+// una persona específica de la lista completa de abajo los reemplaza. Estos sentinels sí se
+// conservan porque no son "roles de proyecto.equipo", tienen su propia lógica en
+// tareaLeCorresponde (server/src/lib/permisos.js): admin=solo admins, karla=solo QA,
+// equipo=sin responsable puntual (le aparece a todo el equipo del proyecto).
 const RESPONSABLES = [
+  { valor: 'equipo', label: 'Sin asignar en particular' },
   { valor: 'admin', label: 'Admin' },
-  { valor: 'equipo', label: 'Equipo (cualquiera)' },
-  { valor: 'copy', label: 'Copy' },
-  { valor: 'disenador', label: 'Diseñador' },
-  { valor: 'programador', label: 'Programador' },
-  { valor: 'redes', label: 'Redes' },
   { valor: 'karla', label: 'Karla (QA)' },
   { valor: 'cliente', label: 'Cliente' },
 ]
 
-function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], onGuardar, onCerrar }) {
+function ModalEditarTarea({ tarea, miembros = [], todasLasTareas = [], onGuardar, onCerrar }) {
   const [form, setForm] = useState({
     titulo: tarea.titulo,
     descripcion: tarea.esCliente ? '' : (tarea.descripcion || ''),
@@ -1423,12 +1420,12 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-              <optgroup label="Rol">
+              <optgroup label="General">
                 {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
               </optgroup>
-              {miembrosProyecto.length > 0 && (
+              {miembros.length > 0 && (
                 <optgroup label="Persona específica">
-                  {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                  {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                 </optgroup>
               )}
             </select>
@@ -1516,7 +1513,7 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
 
 // Checklist para elegir de qué tareas depende otra: mientras no estén todas
 // completadas, la tarea queda bloqueada (oculta al cliente si es tarea suya).
-function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [], onGuardar, onCerrar }) {
+function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuardar, onCerrar }) {
   const esContinuo = typeof contexto === 'string'
   const [form, setForm] = useState({
     titulo: '',
@@ -1596,12 +1593,12 @@ function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [],
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
                 <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                  <optgroup label="Rol">
+                  <optgroup label="General">
                     {RESPONSABLES.filter(r => r.valor !== 'cliente').map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
                   </optgroup>
-                  {miembrosProyecto.length > 0 && (
+                  {miembros.length > 0 && (
                     <optgroup label="Persona específica">
-                      {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                      {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                     </optgroup>
                   )}
                 </select>

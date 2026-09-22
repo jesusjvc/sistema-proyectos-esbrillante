@@ -3,8 +3,8 @@ import prisma from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { tareaLeCorresponde, usuarioParticipaEnProyecto } from '../lib/permisos.js'
-import { crearTareaCustom, activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
+import { tareaLeCorresponde } from '../lib/permisos.js'
+import { crearTareaCustom, activarTareasClienteDisponibles, asegurarResponsableValido } from '../lib/tareaHelpers.js'
 import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
@@ -13,7 +13,6 @@ router.use('/:tareaId/comentarios', comentariosRouter)
 
 const ESTADOS_TABLERO = ['pendiente', 'en_proceso', 'revision', 'completada']
 const PRIORIDADES = ['urgente', 'normal', 'cuando_se_pueda']
-const RESPONSABLES_ESPECIALES = ['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin', 'cliente']
 
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
@@ -59,9 +58,7 @@ router.post('/masivo', requireAuth, async (req, res) => {
     }
     if (tipo === 'estado' && !ESTADOS_TABLERO.includes(valor)) return res.status(400).json({ error: 'Estado inválido' })
     if (tipo === 'prioridad' && !PRIORIDADES.includes(valor)) return res.status(400).json({ error: 'Prioridad inválida' })
-    if (tipo === 'responsable' && !usuarioParticipaEnProyecto(p.equipo, valor)) {
-      return res.status(400).json({ error: 'El responsable debe participar en el proyecto' })
-    }
+    if (tipo === 'responsable') await asegurarResponsableValido(p, valor)
     if (tipo === 'eliminar' && seleccionadas.some((tarea) => !tarea.custom)) {
       return res.status(400).json({ error: 'Solo se pueden eliminar tareas personalizadas' })
     }
@@ -373,9 +370,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
       }
     }
 
-    if (data.responsable && !RESPONSABLES_ESPECIALES.includes(data.responsable) && !usuarioParticipaEnProyecto(p.equipo, data.responsable)) {
-      return res.status(400).json({ error: 'El responsable debe participar en el proyecto' })
-    }
+    if (data.responsable) await asegurarResponsableValido(p, data.responsable)
 
     if (data.dependencias) {
       const idsProyecto = new Set(p.tareas.map((t) => t.id))

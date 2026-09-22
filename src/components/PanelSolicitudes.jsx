@@ -3,12 +3,10 @@ import { KANBAN_COLUMNAS } from '../data/kanban'
 import { formatFechaHora } from '../data/storage'
 import { AlertCircle, CheckCircle2, XCircle, Clock, X, Paperclip } from 'lucide-react'
 
+// Los roles de equipo (copy/diseñador/programador/redes) se dejaron de usar aquí — asignar a
+// una persona específica de la lista completa la reemplaza. Ver la misma nota en DetalleProyecto.jsx.
 const RESPONSABLES = [
-  { valor: 'equipo', label: 'Equipo (cualquiera)' },
-  { valor: 'copy', label: 'Copy' },
-  { valor: 'disenador', label: 'Diseñador' },
-  { valor: 'programador', label: 'Programador' },
-  { valor: 'redes', label: 'Redes' },
+  { valor: 'equipo', label: 'Sin asignar en particular' },
   { valor: 'karla', label: 'Karla (QA)' },
   { valor: 'admin', label: 'Admin' },
 ]
@@ -26,7 +24,7 @@ const inputCls = 'w-full border border-slate-200 dark:border-ink-500 rounded-lg 
  * DetalleProyecto, usado tanto por admin como por equipo — ambos pueden aprobar
  * (crea una Tarea real) o rechazar (con motivo).
  */
-export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miembrosProyecto = [], onAprobar, onRechazar, onCrearTicket }) {
+export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miembros = [], onAprobar, onRechazar, onCrearTicket }) {
   const [modalAprobar, setModalAprobar] = useState(null)
   const [modalRechazar, setModalRechazar] = useState(null)
   const [modalNuevoTicket, setModalNuevoTicket] = useState(false)
@@ -132,7 +130,7 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
           solicitud={modalAprobar}
           esContinuo={esContinuo}
           fases={fases}
-          miembrosProyecto={miembrosProyecto}
+          miembros={miembros}
           onGuardar={async (datos) => { await onAprobar(modalAprobar.id, datos); setModalAprobar(null) }}
           onCerrar={() => setModalAprobar(null)}
         />
@@ -150,7 +148,7 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
         <ModalNuevoTicket
           esContinuo={esContinuo}
           fases={fases}
-          miembrosProyecto={miembrosProyecto}
+          miembros={miembros}
           onGuardar={async (datos) => { await onCrearTicket(datos); setModalNuevoTicket(false) }}
           onCerrar={() => setModalNuevoTicket(false)}
         />
@@ -159,7 +157,7 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
   )
 }
 
-function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto, onGuardar, onCerrar }) {
+function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembros = [], onGuardar, onCerrar }) {
   const [form, setForm] = useState({
     fase: fases?.[0]?.numero || 1,
     columna: 'todo',
@@ -218,12 +216,12 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto,
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-              <optgroup label="Rol">
+              <optgroup label="General">
                 {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
               </optgroup>
-              {miembrosProyecto.length > 0 && (
+              {miembros.length > 0 && (
                 <optgroup label="Persona específica">
-                  {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                  {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                 </optgroup>
               )}
             </select>
@@ -261,7 +259,7 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto,
 // Registrar un ticket que llegó por fuera del portal (WhatsApp, teléfono, o
 // lo detectó el propio equipo) — a diferencia de una solicitud del cliente,
 // este se aprueba de una vez, no queda pendiente (plan-foco.md 4.5).
-function ModalNuevoTicket({ esContinuo, fases, miembrosProyecto, onGuardar, onCerrar }) {
+function ModalNuevoTicket({ esContinuo, fases, miembros = [], onGuardar, onCerrar }) {
   const [form, setForm] = useState({
     titulo: '',
     descripcion: '',
@@ -376,12 +374,12 @@ function ModalNuevoTicket({ esContinuo, fases, miembrosProyecto, onGuardar, onCe
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
               <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                <optgroup label="Rol">
+                <optgroup label="General">
                   {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
                 </optgroup>
-                {miembrosProyecto.length > 0 && (
+                {miembros.length > 0 && (
                   <optgroup label="Persona específica">
-                    {miembrosProyecto.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                    {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                   </optgroup>
                 )}
               </select>

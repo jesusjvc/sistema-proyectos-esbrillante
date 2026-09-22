@@ -13,6 +13,12 @@ export const ROLES_EQUIPO = ['copy', 'disenador', 'programador', 'redes', 'admin
 // persona específica del equipo, asignada directamente a la tarea.
 const ROLES_RESPONSABLE = ['equipo', 'copy', 'disenador', 'programador', 'redes']
 
+// Superset de ROLES_RESPONSABLE con los valores especiales que no son roles de
+// proyecto.equipo pero tampoco un userId (karla/admin/cliente — sentinels con su
+// propia lógica en tareaLeCorresponde). Usado para distinguir "esto es un valor
+// especial" de "esto es el id de una persona concreta" al validar `responsable`.
+export const RESPONSABLES_ESPECIALES = ['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin', 'cliente']
+
 // Normaliza el valor de un rol de equipo a un array de userIds — acepta el
 // shape legado (un solo userId como string, de antes de permitir varias
 // personas por rol) y el shape actual (array). EQUIPO_NO_APLICA se trata
@@ -58,7 +64,19 @@ export async function validarYNormalizarEquipo(prisma, equipo) {
 
 export function usuarioParticipaEnProyecto(equipo, userId) {
   if (!equipo || !userId) return false
+  if (Array.isArray(equipo.miembros) && equipo.miembros.includes(userId)) return true
   return ROLES_EQUIPO.some((rol) => idsDeRol(equipo, rol).includes(userId))
+}
+
+// Devuelve `equipo` con userId agregado al bucket genérico `equipo.miembros` si aún no
+// participa del proyecto por ningún rol (o ya está en `miembros`, entonces regresa el mismo
+// objeto sin tocar). No requiere que quien asigna una tarea a alguien primero lo agregue a mano
+// al equipo del proyecto — queda agregado solo. Función pura: quien llama debe persistir el
+// resultado (prisma.proyecto.update) si el objeto cambió.
+export function conMiembroAgregado(equipo, userId) {
+  if (usuarioParticipaEnProyecto(equipo, userId)) return equipo
+  const miembros = Array.isArray(equipo?.miembros) ? equipo.miembros : []
+  return { ...(equipo || {}), miembros: [...miembros, userId] }
 }
 
 // user: req.user del JWT — { id, rol: 'ADMIN'|'EQUIPO', esKarla }
