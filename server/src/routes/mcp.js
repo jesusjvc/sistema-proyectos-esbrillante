@@ -16,7 +16,8 @@ import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion } from '../lib/notificaciones.js'
-import { activarTareasClienteDisponibles, aprobarSolicitud } from '../lib/tareaHelpers.js'
+import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea } from '../lib/tareaHelpers.js'
+import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { importarClienteCrm, normBusqueda, dominioDesde, crmConfigurado } from '../lib/clientesCrm.js'
 import { listarCustomers, buscarContacts, terminoSeguro } from '../lib/perfexClient.js'
 
@@ -78,6 +79,14 @@ async function getProyecto(slug) {
 
 async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
+}
+
+// Mismo helper que server/src/routes/tareas.js — avisa a quienes les toca la
+// tarea de una acción hecha desde una tool MCP. actor es `usuario` (req.user
+// o IDENTIDAD_MCP_COMPARTIDA); crearNotificacion ya excluye al actor.
+async function notificarDestinatarios(p, tarea, actor, tipo, mensaje) {
+  const destinatarioIds = await destinatariosDeTarea(tarea, p.equipo)
+  await crearNotificacion({ destinatarioIds, tipo, mensaje, actor, proyecto: p, tarea })
 }
 
 // Valida que los IDs de dependencias existan en el proyecto y no se autorreferencien.
@@ -707,6 +716,7 @@ function buildServer(usuario) {
         data: { estado: 'en_proceso', asignadoA: usuario.nombre },
       })
       await logEntry(p.id, usuario.nombre, 'Tarea en proceso', tarea.titulo)
+      await notificarDestinatarios(p, tarea, usuario, 'tarea_estado_cambiado', `${usuario.nombre} marcó "${tarea.titulo}" en proceso`)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" marcada en proceso.`)
@@ -743,6 +753,7 @@ function buildServer(usuario) {
       })
       await logEntry(p.id, usuario.nombre, 'Tarea completada', respuesta ? `${tarea.titulo} — Respuesta: ${respuesta}` : tarea.titulo)
       await activarTareasClienteDisponibles(p.id)
+      await notificarDestinatarios(p, tarea, usuario, 'tarea_completada', `${usuario.nombre} completó "${tarea.titulo}"`)
       emitirCambio(p.id)
 
       return ok(`Tarea "${tarea.titulo}" marcada como completada.${respuesta ? ' Respuesta registrada en el log.' : ''}`)
@@ -775,6 +786,7 @@ function buildServer(usuario) {
         data: { estado: 'revision', completadaPor: null, completadaEn: null },
       })
       await logEntry(p.id, usuario.nombre, 'Tarjeta movida', `${tarea.titulo} → Revisión`)
+      await notificarDestinatarios(p, tarea, usuario, 'tarea_estado_cambiado', `${usuario.nombre} movió "${tarea.titulo}" a Revisión`)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" movida a Revisión.`)
@@ -845,9 +857,12 @@ function buildServer(usuario) {
 
       if (!Object.keys(data).length) return fail('No se especificó ningún campo para editar.')
 
-      await prisma.tarea.update({ where: { id: tareaId }, data })
+      const tareaActualizada = await prisma.tarea.update({ where: { id: tareaId }, data })
       await logEntry(p.id, usuario.nombre, 'Tarea editada', tarea.titulo)
       await activarTareasClienteDisponibles(p.id)
+      if (data.responsable && data.responsable !== tarea.responsable) {
+        await notificarDestinatarios(p, tareaActualizada, usuario, 'tarea_reasignada', `${usuario.nombre} te asignó "${tarea.titulo}"`)
+      }
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" actualizada.`)
@@ -874,6 +889,7 @@ function buildServer(usuario) {
 
       await prisma.tarea.update({ where: { id: tareaId }, data: { estado: 'omitida' } })
       await logEntry(p.id, usuario.nombre, 'Tarea cancelada', motivo ? `${tarea.titulo} — ${motivo}` : tarea.titulo)
+      await notificarDestinatarios(p, tarea, usuario, 'tarea_estado_cambiado', `${usuario.nombre} canceló "${tarea.titulo}"`)
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" cancelada.`)
@@ -1073,7 +1089,27 @@ function buildServer(usuario) {
         notificarMencion(p, tarea, usuario.nombre, mensaje, usuariosMencionados).catch((err) => {
           process.stderr.write(`[mcp] Error notificando mención: ${String(err)}\n`)
         })
+        await crearNotificacion({
+          destinatarioIds: usuariosMencionados.map((u) => u.id),
+          tipo: 'tarea_mencion',
+          mensaje: `${usuario.nombre} te mencionó en "${tarea.titulo}"`,
+          actor: usuario,
+          proyecto: p,
+          tarea,
+          comentarioId: comentario.id,
+        })
       }
+      const destinatariosComentario = (await destinatariosDeTarea(tarea, p.equipo))
+        .filter((id) => !usuariosMencionados.some((u) => u.id === id))
+      await crearNotificacion({
+        destinatarioIds: destinatariosComentario,
+        tipo: 'tarea_comentario',
+        mensaje: `${usuario.nombre} comentó en "${tarea.titulo}"`,
+        actor: usuario,
+        proyecto: p,
+        tarea,
+        comentarioId: comentario.id,
+      })
       emitirCambio(p.id)
 
       const aviso = mencionar?.length && !usuariosMencionados.length

@@ -8,6 +8,7 @@ import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaN
 import { FASES } from '../../data/paquetes'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { miembrosDelEquipo } from '../../lib/permisos'
+import { normalizarTexto } from '../../lib/texto'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../../lib/areas'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, Bell, MessageCircle, Search, X } from 'lucide-react'
@@ -62,12 +63,12 @@ export default function AdminDashboard() {
     cargar()
   }
 
-  const q = busqueda.trim().toLowerCase()
+  const q = normalizarTexto(busqueda)
   const objetivoArea = filtroArea === 'todas' ? null : filtroArea === 'mia' ? user?.area : filtroArea
   const filtrados = proyectos
     .filter((p) => filtro === 'todos' || p.status === filtro)
     .filter((p) => !objetivoArea || !p.areas?.length || p.areas.includes(objetivoArea))
-    .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q) || p.proyecto.paquete.toLowerCase().includes(q))
+    .filter((p) => !q || normalizarTexto(p.cliente.nombreComercial).includes(q) || normalizarTexto(p.proyecto.paquete).includes(q))
 
   const counts = {
     activo: proyectos.filter((p) => p.status === 'activo').length,

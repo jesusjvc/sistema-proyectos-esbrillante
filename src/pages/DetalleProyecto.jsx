@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import SelectorProyecto from '../components/SelectorProyecto'
@@ -37,11 +37,12 @@ import SelectorDependencias from '../components/SelectorDependencias'
 import ModalDetalleTarea from '../components/ModalDetalleTarea'
 import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import IconGoogleDrive from '../components/IconGoogleDrive'
+import { normalizarTexto } from '../lib/texto'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
-  AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3,
+  AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3, Search,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -51,6 +52,7 @@ export default function DetalleProyecto() {
   const [proyecto, setProyecto] = useState(null)
   const [faseAbierta, setFaseAbierta] = useState(null)
   const [faseOcultarCompletadas, setFaseOcultarCompletadas] = useState({})
+  const [buscarTarea, setBuscarTarea] = useState('')
   const [tab, setTab] = useState('tareas')
   const [vistaContinuo, setVistaContinuo] = useState('tabla')
   const [copiado, setCopiado] = useState(false)
@@ -273,6 +275,15 @@ export default function DetalleProyecto() {
     ...f,
     tareas: proyecto.tareas.filter((t) => t.fase === f.numero).sort((a, b) => a.orden - b.orden),
   }))
+  // Fases completas al fondo, dando prioridad visual a lo pendiente — dentro
+  // de cada grupo se conserva el orden por número (sort estable). "Completa"
+  // usa el mismo criterio que ya pinta el ícono en verde más abajo.
+  const tareasPorFaseOrdenado = [...tareasPorFase].sort((a, b) => {
+    const aCompleta = a.tareas.length > 0 && a.tareas.every((t) => t.estado === 'completada' || t.estado === 'omitida')
+    const bCompleta = b.tareas.length > 0 && b.tareas.every((t) => t.estado === 'completada' || t.estado === 'omitida')
+    return (aCompleta ? 1 : 0) - (bCompleta ? 1 : 0)
+  })
+  const qBuscarTarea = normalizarTexto(buscarTarea)
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
   const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
   const tareasCliente = proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden)
@@ -549,17 +560,43 @@ export default function DetalleProyecto() {
 
       {tab === 'tareas' && !esContinuo && (
         <div className="space-y-3">
-          {tareasPorFase.map((fase) => {
+          <div className="relative max-w-sm">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-ink-400" />
+            <input
+              type="text"
+              value={buscarTarea}
+              onChange={(e) => setBuscarTarea(e.target.value)}
+              placeholder="Buscar una tarea (incluye completadas)..."
+              className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 dark:border-ink-500 rounded-lg bg-white dark:bg-ink-800 text-slate-800 dark:text-ink-100 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-ink-400"
+            />
+            {buscarTarea && (
+              <button onClick={() => setBuscarTarea('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-200">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {tareasPorFaseOrdenado.map((fase, i) => {
             const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
             const total = fase.tareas.length
-            const abierta = faseAbierta === fase.numero || fase.numero === faseActual
-            const ocultarCompletadas = faseOcultarCompletadas[fase.numero] !== false
+            const faseCompleta = total > 0 && completadas === total
+            const faseAnterior = tareasPorFaseOrdenado[i - 1]
+            const inicioDeCompletas = faseCompleta && faseAnterior && !(faseAnterior.tareas.length > 0 && faseAnterior.tareas.every((t) => t.estado === 'completada' || t.estado === 'omitida'))
+            const tareasConMatch = qBuscarTarea ? fase.tareas.filter((t) => normalizarTexto(t.titulo).includes(qBuscarTarea)) : []
+            const tieneMatch = tareasConMatch.length > 0
+            const abierta = tieneMatch || faseAbierta === fase.numero || fase.numero === faseActual
+            const ocultarCompletadas = tieneMatch ? false : (faseOcultarCompletadas[fase.numero] !== false)
             const tareasVisibles = ocultarCompletadas
               ? fase.tareas.filter((t) => t.estado !== 'completada' && t.estado !== 'omitida')
               : fase.tareas
 
             return (
-              <div key={fase.numero} className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
+              <div key={fase.numero}>
+                {inicioDeCompletas && (
+                  <div className="pt-2 pb-1 px-1 text-xs font-semibold text-slate-400 dark:text-ink-400 uppercase tracking-wide">
+                    Fases completadas
+                  </div>
+                )}
+                <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 overflow-hidden">
                 <div
                   role="button"
                   tabIndex={0}
@@ -628,6 +665,7 @@ export default function DetalleProyecto() {
                                 onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                                 onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                                 esAdmin={true}
+                                resaltada={tieneMatch && normalizarTexto(t.titulo).includes(qBuscarTarea)}
                               />
                             )
                           }}
@@ -652,6 +690,7 @@ export default function DetalleProyecto() {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             )
           })}
@@ -997,8 +1036,15 @@ function FilaArrastrable({ id, children }) {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin, resaltada = false }) {
   const [modalAbierto, setModalAbierto] = useState(false)
+  const filaRef = useRef(null)
+
+  // Viene del buscador de tareas (arriba, en el render de fases) — hace scroll
+  // hasta la tarjeta encontrada en cuanto aparece resaltada, sin abrir su modal.
+  useEffect(() => {
+    if (resaltada) filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [resaltada])
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
@@ -1083,8 +1129,9 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
   return (
     <div
+      ref={filaRef}
       onClick={() => abrirModal(false)}
-      className={`px-5 py-3.5 border-b border-slate-50 dark:border-ink-500 last:border-0 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-ink-900/50 transition-colors ${bgMap[estado]}`}
+      className={`px-5 py-3.5 border-b border-slate-50 dark:border-ink-500 last:border-0 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-ink-900/50 transition-colors ${bgMap[estado]} ${resaltada ? 'ring-2 ring-inset ring-brand-400 dark:ring-brand-500' : ''}`}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{iconMap[estado]}</div>

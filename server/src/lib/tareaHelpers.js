@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import prisma from './prisma.js'
 import { ordenAlFinal } from './orden.js'
 import { estadoDeColumna } from './kanban.js'
-import { RESPONSABLES_ESPECIALES, conMiembroAgregado } from './permisos.js'
+import { RESPONSABLES_ESPECIALES, ROLES_RESPONSABLE, ROLES_EQUIPO, conMiembroAgregado, idsDeRol } from './permisos.js'
 
 // Valida `responsable` cuando es una persona específica (no uno de los valores especiales de
 // RESPONSABLES_ESPECIALES) y, si aún no participa del proyecto, la agrega al bucket genérico
@@ -22,6 +22,30 @@ export async function asegurarResponsableValido(p, responsable) {
     await prisma.proyecto.update({ where: { id: p.id }, data: { equipo: nuevoEquipo } })
     p.equipo = nuevoEquipo
   }
+}
+
+// Devuelve los userIds de las personas a quienes "les toca" esta tarea — mismo criterio que
+// tareaLeCorresponde (permisos.js) pero enumerando a TODOS los que calificarían, no respondiendo
+// sí/no por una sola persona. Usado para decidir a quién avisar cuando alguien MÁS actúa sobre
+// la tarea (la completa, reasigna, comenta).
+export async function destinatariosDeTarea(tarea, equipo) {
+  const { responsable } = tarea
+  if (responsable === 'cliente') return []
+  if (responsable === 'karla') {
+    return (await prisma.user.findMany({ where: { esKarla: true, activo: true }, select: { id: true } })).map((u) => u.id)
+  }
+  if (responsable === 'admin') {
+    return (await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } })).map((u) => u.id)
+  }
+  if (!ROLES_RESPONSABLE.includes(responsable)) return [responsable] // asignación directa a una persona
+  if (responsable === 'equipo') {
+    const ids = new Set([
+      ...(Array.isArray(equipo?.miembros) ? equipo.miembros : []),
+      ...ROLES_EQUIPO.flatMap((rol) => idsDeRol(equipo, rol)),
+    ])
+    return [...ids]
+  }
+  return idsDeRol(equipo, responsable) // copy | disenador | programador | redes
 }
 
 // Crea una tarea "custom" (agregada manualmente, no parte de la plantilla del

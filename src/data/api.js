@@ -76,6 +76,12 @@ export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${
 export const listarComentarios = (slug, tareaId) => req('GET', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`)
 export const crearComentario = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`, data)
 
+// ─── Notificaciones ────────────────────────────────────────────────────────
+export const listarNotificaciones = (params = {}) => req('GET', `/api/notificaciones?${new URLSearchParams(params)}`)
+export const contarNoLeidas = () => req('GET', '/api/notificaciones/no-leidas')
+export const marcarNotificacionLeida = (id) => req('POST', `/api/notificaciones/${id}/leida`)
+export const marcarTodasLeidas = () => req('POST', '/api/notificaciones/marcar-todas-leidas')
+
 // ─── Solicitudes ───────────────────────────────────────────────────────────
 export const aprobarSolicitud = (slug, id, data) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/aprobar`, data)
 export const rechazarSolicitud = (slug, id, motivo) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/rechazar`, { motivo })

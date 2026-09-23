@@ -3,6 +3,8 @@ import prisma from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { notificarMencion } from '../lib/notificaciones.js'
+import { crearNotificacion } from '../lib/notificacionesHelper.js'
+import { destinatariosDeTarea } from '../lib/tareaHelpers.js'
 
 const router = Router({ mergeParams: true })
 
@@ -52,12 +54,32 @@ router.post('/', requireAuth, async (req, res) => {
     if (mencionados.length) {
       const usuarios = await prisma.user.findMany({
         where: { id: { in: mencionados }, activo: true },
-        select: { email: true, nombre: true, rol: true },
+        select: { id: true, email: true, nombre: true, rol: true },
       })
       notificarMencion(p, tarea, req.user.nombre, texto, usuarios).catch((err) => {
         console.error('Error notificando mención:', err)
       })
+      await crearNotificacion({
+        destinatarioIds: usuarios.map((u) => u.id),
+        tipo: 'tarea_mencion',
+        mensaje: `${req.user.nombre} te mencionó en "${tarea.titulo}"`,
+        actor: req.user,
+        proyecto: p,
+        tarea,
+        comentarioId: comentario.id,
+      })
     }
+
+    const destinatariosComentario = (await destinatariosDeTarea(tarea, p.equipo)).filter((id) => !mencionados.includes(id))
+    await crearNotificacion({
+      destinatarioIds: destinatariosComentario,
+      tipo: 'tarea_comentario',
+      mensaje: `${req.user.nombre} comentó en "${tarea.titulo}"`,
+      actor: req.user,
+      proyecto: p,
+      tarea,
+      comentarioId: comentario.id,
+    })
 
     emitirCambio(p.id)
     res.status(201).json(comentario)

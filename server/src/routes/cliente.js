@@ -6,6 +6,7 @@ import { requireClienteToken, requireClienteAcceso } from '../middleware/auth.js
 import { obtenerOCrearCarpetaProyecto, subirArchivo, driveConfigurado } from '../lib/drive.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { enviarEmail } from '../lib/email.js'
+import { enviarGoogleChat } from '../lib/googleChat.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
@@ -175,6 +176,7 @@ async function notificarAdminsRespuestaCliente(proyecto, tarea, { respuestaTexto
     texto,
     html,
   })))
+  enviarGoogleChat(`💬 ${nombreCliente} respondió — ${tarea.titulo}\n${texto}`)
 }
 
 async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
@@ -205,6 +207,7 @@ async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
     texto,
     html,
   })))
+  enviarGoogleChat(`📝 Nueva solicitud de ${nombreCliente} — ${solicitud.titulo}\n${texto}`)
 }
 
 function proyectoPublico(p) {

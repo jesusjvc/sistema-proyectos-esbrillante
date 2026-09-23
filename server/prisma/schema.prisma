@@ -29,6 +29,7 @@ model User {
   habilidades String[] @default([])
 
   apiKeys ApiKey[]
+  notificaciones Notificacion[]
 
   creadoEn DateTime @default(now())
 
@@ -382,4 +383,41 @@ model LogEntry {
   detalle  String   @default("")
 
   @@map("log_entries")
+}
+
+// Notificación in-app (campanita) para avisar a alguien del equipo que una
+// tarea que le toca tuvo actividad (la completó/reasignó/comentó otra
+// persona) o que lo mencionaron. Snapshot de texto en vez de relaciones
+// duras hacia Tarea/Comentario/Proyecto — esas sí se pueden borrar, y un
+// onDelete:Cascade ahí borraría el historial de notificaciones de todo el
+// equipo, mientras que SetNull dejaría registros sin contexto. Solo la
+// relación hacia User (destinatario) es dura: los usuarios no se borran,
+// solo se desactivan (campo `activo`).
+model Notificacion {
+  id             String @id @default(cuid())
+  destinatarioId String
+  destinatario   User   @relation(fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  // String libre a propósito (no enum): agregar un tipo nuevo después no
+  // debe requerir migración — 'tarea_completada' | 'tarea_reasignada' |
+  // 'tarea_comentario' | 'tarea_mencion' | 'tarea_estado_cambiado'
+  tipo    String
+  mensaje String // texto ya armado en el servidor, listo para pintar tal cual
+
+  actorId     String?
+  actorNombre String?
+
+  proyectoId   String?
+  proyectoSlug String?
+  tareaId      String?
+  tareaTitulo  String?
+  comentarioId String?
+
+  leida    Boolean   @default(false)
+  leidaEn  DateTime?
+  creadaEn DateTime  @default(now())
+
+  @@index([destinatarioId, leida])
+  @@index([creadaEn])
+  @@map("notificaciones")
 }

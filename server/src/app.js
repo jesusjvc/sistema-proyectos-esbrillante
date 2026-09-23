@@ -12,6 +12,7 @@ import clientesRouter from './routes/clientes.js'
 import incidenciasRouter from './routes/incidencias.js'
 import mcpRouter from './routes/mcp.js'
 import eventosRouter from './routes/eventos.js'
+import notificacionesRouter from './routes/notificaciones.js'
 import oauthRouter from './routes/oauth.js'
 import wellKnownRouter from './routes/wellKnown.js'
 import prototiposRouter from './routes/prototipos.js'
@@ -50,6 +51,7 @@ app.use('/api/clientes', clientesRouter)
 app.use('/api/incidencias', incidenciasRouter)
 app.use('/mcp', mcpRouter)
 app.use('/api/eventos', eventosRouter)
+app.use('/api/notificaciones', notificacionesRouter)
 app.use('/oauth', oauthRouter)
 app.use('/.well-known', wellKnownRouter)
 

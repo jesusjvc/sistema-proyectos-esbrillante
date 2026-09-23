@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Search, Check } from 'lucide-react'
 import { getProyectos } from '../data/api'
 import { statusBadge, statusLabel } from '../data/storage'
+import { normalizarTexto } from '../lib/texto'
 
 // Selector rápido de proyecto en el header de DetalleProyecto — evita tener
 // que volver al listado para cambiar de proyecto (inspirado en el selector
@@ -62,10 +63,10 @@ export default function SelectorProyecto({ proyectoActual, base }) {
     if (slug !== proyectoActual.slug) navigate(`${base}/proyecto/${slug}`)
   }
 
-  const q = busqueda.trim().toLowerCase()
+  const q = normalizarTexto(busqueda)
   const lista = (proyectos || [])
     .filter((p) => p.status !== 'cancelado')
-    .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q))
+    .filter((p) => !q || normalizarTexto(p.cliente.nombreComercial).includes(q))
     .sort((a, b) => a.cliente.nombreComercial.localeCompare(b.cliente.nombreComercial))
 
   return (

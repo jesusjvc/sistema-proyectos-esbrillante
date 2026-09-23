@@ -11,7 +11,7 @@ export const ROLES_EQUIPO = ['copy', 'disenador', 'programador', 'redes', 'admin
 // Valores de `responsable` que son roles (se resuelven contra proyecto.equipo
 // o son especiales). Cualquier otro valor se trata como el userId de una
 // persona específica del equipo, asignada directamente a la tarea.
-const ROLES_RESPONSABLE = ['equipo', 'copy', 'disenador', 'programador', 'redes']
+export const ROLES_RESPONSABLE = ['equipo', 'copy', 'disenador', 'programador', 'redes']
 
 // Superset de ROLES_RESPONSABLE con los valores especiales que no son roles de
 // proyecto.equipo pero tampoco un userId (karla/admin/cliente — sentinels con su

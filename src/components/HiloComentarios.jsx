@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import { formatFechaHora } from '../data/storage'
+import { normalizarTexto } from '../lib/texto'
 
 // Resalta cualquier "@NombreCompleto" que coincida con un miembro conocido — solo estético.
 function resaltarMenciones(texto, nombres) {
@@ -21,7 +22,7 @@ export default function HiloComentarios({ comentarios = [], miembrosPorId = {}, 
 
   const nombresConocidos = Object.values(miembrosPorId)
   const opcionesPicker = picker
-    ? Object.entries(miembrosPorId).filter(([, nombre]) => nombre.toLowerCase().includes(picker.query.toLowerCase()))
+    ? Object.entries(miembrosPorId).filter(([, nombre]) => normalizarTexto(nombre).includes(normalizarTexto(picker.query)))
     : []
 
   function handleChange(e) {
