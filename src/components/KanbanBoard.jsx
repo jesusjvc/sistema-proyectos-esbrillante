@@ -33,6 +33,9 @@ function agrupar(tareas) {
 export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onComentar, onAsignar, readOnly = false, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [columnas, setColumnas] = useState(() => agrupar(tareas))
   const [activeId, setActiveId] = useState(null)
+  // La columna Done colapsa por defecto (las completadas estorban); se
+  // expande sola cuando una tarjeta se suelta en ella para que se vea.
+  const [doneExpandida, setDoneExpandida] = useState(false)
 
   useEffect(() => {
     if (activeId) return
@@ -88,6 +91,7 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
     const anterior = listaFinal[posicion - 1]
     const siguiente = listaFinal[posicion + 1]
     const estadoDestino = KANBAN_COLUMNAS.find((c) => c.columna === destinoCol).estado
+    if (destinoCol === 'done') setDoneExpandida(true)
 
     await onMover(active.id, {
       estado: estadoDestino,
@@ -112,6 +116,8 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
             key={c.columna}
             columna={c}
             tareas={columnas[c.columna] || []}
+            colapsada={c.columna === 'done' && !doneExpandida}
+            onAlternarColapso={c.columna === 'done' ? () => setDoneExpandida((v) => !v) : null}
             readOnly={readOnly}
             onEditar={onEditar}
             onEliminar={onEliminar}
@@ -131,7 +137,7 @@ export default function KanbanBoard({ tareas, onMover, onEditar, onEliminar, onC
   )
 }
 
-function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, onAsignar, avatares, equipo, miembrosPorId, miembros }) {
+function Columna({ columna, tareas, colapsada = false, onAlternarColapso, readOnly, onEditar, onEliminar, onComentar, onAsignar, avatares, equipo, miembrosPorId, miembros }) {
   const iconMap = { todo: <Circle size={13} />, doing: <PlayCircle size={13} />, revision: <Eye size={13} />, done: <CheckCircle2 size={13} /> }
   const colorMap = {
     todo: 'text-slate-500 dark:text-ink-300',
@@ -146,12 +152,29 @@ function Columna({ columna, tareas, readOnly, onEditar, onEliminar, onComentar, 
         {iconMap[columna.columna]}
         {columna.label}
         <span className="ml-auto text-xs font-normal text-slate-400 dark:text-ink-400">{tareas.length}</span>
+        {onAlternarColapso && tareas.length > 0 && (
+          <button
+            onClick={onAlternarColapso}
+            className="text-xs font-normal text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-200 transition-colors"
+            title={colapsada ? 'Mostrar completadas' : 'Ocultar completadas'}
+          >
+            {colapsada ? 'Mostrar' : 'Ocultar'}
+          </button>
+        )}
       </div>
-      <SortableContext items={tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={(colapsada ? [] : tareas).map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <DroppableArea id={columna.columna}>
-          {tareas.map((t) => (
+          {!colapsada && tareas.map((t) => (
             <TareaCard key={t.id} tarea={t} readOnly={readOnly} onEditar={onEditar} onEliminar={onEliminar} onComentar={onComentar} onAsignar={onAsignar} avatares={avatares} equipo={equipo} miembrosPorId={miembrosPorId} miembros={miembros} />
           ))}
+          {colapsada && tareas.length > 0 && (
+            <button
+              onClick={onAlternarColapso}
+              className="w-full rounded-lg border border-dashed border-emerald-300 dark:border-emerald-700 py-3 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors"
+            >
+              {tareas.length} completada{tareas.length === 1 ? '' : 's'} — Mostrar
+            </button>
+          )}
         </DroppableArea>
       </SortableContext>
     </div>

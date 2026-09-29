@@ -422,7 +422,7 @@ export default function DetalleProyecto() {
               <div className="text-xs text-slate-500 dark:text-ink-300 leading-relaxed">
                 {KANBAN_COLUMNAS.map((c) => (
                   <span key={c.columna} className="ml-2 whitespace-nowrap">
-                    <span className={`font-bold text-sm ${KANBAN_COUNT_COLOR[c.columna]}`}>{columnasCount[c.columna]}</span>{' '}
+                    <span className="font-bold text-sm text-slate-800 dark:text-ink-100">{columnasCount[c.columna]}</span>{' '}
                     <span className="text-slate-400 dark:text-ink-400">{c.columna === 'revision' ? 'Rev' : c.label}</span>
                   </span>
                 ))}

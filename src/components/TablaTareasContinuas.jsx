@@ -506,7 +506,11 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
   const [direccion, setDireccion] = useState('asc')
   const [ordenLocal, setOrdenLocal] = useState(() => listaFlujo(tareas))
   const [seleccionadas, setSeleccionadas] = useState([])
-  const baseVisibles = ordenLocal
+  // Las completadas se ocultan por defecto (igual que en proyectos finitos);
+  // el toggle de la barra superior las trae de vuelta.
+  const [mostrarCompletadas, setMostrarCompletadas] = useState(false)
+  const completadasCount = ordenLocal.filter((tarea) => tarea.estado === 'completada').length
+  const baseVisibles = mostrarCompletadas ? ordenLocal : ordenLocal.filter((tarea) => tarea.estado !== 'completada')
   const estadoOrden = Object.fromEntries(KANBAN_COLUMNAS.map((columna, index) => [columna.estado, index]))
   const visibles = [...baseVisibles].sort((a, b) => {
     if (orden === 'flujo') return 0
@@ -531,6 +535,16 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
     setOrdenLocal(nuevaLista)
     setSeleccionadas((actuales) => actuales.filter((id) => nuevaLista.some((tarea) => tarea.id === id)))
   }, [tareas])
+
+  function alternarCompletadas() {
+    setMostrarCompletadas((visible) => {
+      if (visible) {
+        const completadasIds = new Set(ordenLocal.filter((tarea) => tarea.estado === 'completada').map((tarea) => tarea.id))
+        setSeleccionadas((actuales) => actuales.filter((id) => !completadasIds.has(id)))
+      }
+      return !visible
+    })
+  }
 
   function ordenarPor(campo) {
     if (orden === campo) setDireccion((actual) => actual === 'asc' ? 'desc' : 'asc')
@@ -631,7 +645,20 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
   }
 
   if (!visibles.length) {
-    return <div className="bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-xl p-10 text-center text-sm text-slate-500 dark:text-ink-300">Aún no hay tareas en este proyecto.</div>
+    return (
+      <div className="bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-xl p-10 text-center text-sm text-slate-500 dark:text-ink-300">
+        {completadasCount ? (
+          <>
+            Todas las tareas están completadas —{' '}
+            <button onClick={() => setMostrarCompletadas(true)} className="font-medium text-brand-800 hover:underline dark:text-brand-300">
+              Mostrar {completadasCount}
+            </button>
+          </>
+        ) : (
+          'Aún no hay tareas en este proyecto.'
+        )}
+      </div>
+    )
   }
 
   return (
@@ -642,6 +669,14 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
           <span className="inline-flex items-center gap-1.5"><GripVertical size={14} aria-hidden="true" /> Arrastra para ordenar; usa Estado para cambiar de columna</span>
         ) : (
           <><span>El orden manual está pausado mientras ordenas por una columna.</span><button onClick={() => { setOrden('flujo'); setDireccion('asc') }} className="shrink-0 rounded-md px-2 py-1 font-medium text-brand-800 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-brand-300 dark:hover:bg-brand-500/10">Volver al orden manual</button></>
+        )}
+        {completadasCount > 0 && (
+          <button
+            onClick={alternarCompletadas}
+            className={`shrink-0 rounded-full px-2.5 py-1 font-medium transition-colors ${mostrarCompletadas ? 'bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300' : 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'}`}
+          >
+            {mostrarCompletadas ? 'Ocultar completadas' : `Mostrar completadas (${completadasCount})`}
+          </button>
         )}
       </div>
 
