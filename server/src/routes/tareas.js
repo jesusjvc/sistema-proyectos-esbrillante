@@ -3,9 +3,10 @@ import prisma from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { tareaLeCorresponde, usuarioParticipaEnProyecto } from '../lib/permisos.js'
-import { crearTareaCustom, activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
+import { tareaLeCorresponde } from '../lib/permisos.js'
+import { crearTareaCustom, activarTareasClienteDisponibles, asegurarResponsableValido, destinatariosDeTarea } from '../lib/tareaHelpers.js'
 import { notificarAsignacion } from '../lib/notificaciones.js'
+import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
@@ -14,7 +15,6 @@ router.use('/:tareaId/comentarios', comentariosRouter)
 
 const ESTADOS_TABLERO = ['pendiente', 'en_proceso', 'revision', 'completada']
 const PRIORIDADES = ['urgente', 'normal', 'cuando_se_pueda']
-const RESPONSABLES_ESPECIALES = ['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin', 'cliente']
 
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
@@ -25,6 +25,13 @@ async function getProyecto(slug) {
 
 async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
+}
+
+// Avisa a quienes les toca la tarea (según destinatariosDeTarea) de una acción que
+// alguien más acaba de hacer sobre ella. crearNotificacion ya excluye al actor.
+async function notificarDestinatarios(p, tarea, actor, tipo, mensaje) {
+  const destinatarioIds = await destinatariosDeTarea(tarea, p.equipo)
+  await crearNotificacion({ destinatarioIds, tipo, mensaje, actor, proyecto: p, tarea })
 }
 
 function normalizarFechaLimite(valor) {
@@ -60,9 +67,7 @@ router.post('/masivo', requireAuth, async (req, res) => {
     }
     if (tipo === 'estado' && !ESTADOS_TABLERO.includes(valor)) return res.status(400).json({ error: 'Estado inválido' })
     if (tipo === 'prioridad' && !PRIORIDADES.includes(valor)) return res.status(400).json({ error: 'Prioridad inválida' })
-    if (tipo === 'responsable' && !usuarioParticipaEnProyecto(p.equipo, valor)) {
-      return res.status(400).json({ error: 'El responsable debe participar en el proyecto' })
-    }
+    if (tipo === 'responsable') await asegurarResponsableValido(p, valor)
     if (tipo === 'eliminar' && seleccionadas.some((tarea) => !tarea.custom)) {
       return res.status(400).json({ error: 'Solo se pueden eliminar tareas personalizadas' })
     }
@@ -112,6 +117,25 @@ router.post('/masivo', requireAuth, async (req, res) => {
         },
       })
     })
+
+    if (tipo === 'estado') {
+      const columnaLabel = { pendiente: 'Todo', en_proceso: 'Doing', revision: 'Revisión', completada: 'Done' }[valor]
+      const cambiaron = seleccionadas.filter((tarea) => tarea.estado !== valor)
+      const titulosPorDestinatario = new Map()
+      for (const tarea of cambiaron) {
+        const destinatarioIds = await destinatariosDeTarea(tarea, p.equipo)
+        for (const id of destinatarioIds) {
+          if (!titulosPorDestinatario.has(id)) titulosPorDestinatario.set(id, [])
+          titulosPorDestinatario.get(id).push(tarea.titulo)
+        }
+      }
+      const tipoNotif = valor === 'completada' ? 'tarea_completada' : 'tarea_estado_cambiado'
+      await Promise.all([...titulosPorDestinatario.entries()].map(([destinatarioId, titulos]) => {
+        const lista = titulos.length > 3 ? `${titulos.slice(0, 3).join(', ')} y ${titulos.length - 3} más` : titulos.join(', ')
+        const mensaje = `${usuario} movió ${titulos.length} de tus tareas a ${columnaLabel}: ${lista}`
+        return crearNotificacion({ destinatarioIds: [destinatarioId], tipo: tipoNotif, mensaje, actor: req.user, proyecto: p })
+      }))
+    }
 
     emitirCambio(p.id)
 
@@ -195,6 +219,7 @@ router.post('/:tareaId/completar', requireAuth, async (req, res) => {
     })
     await logEntry(p.id, usuario, 'Tarea completada', tarea.titulo)
     await activarTareasClienteDisponibles(p.id)
+    await notificarDestinatarios(p, tarea, req.user, 'tarea_completada', `${usuario} completó "${tarea.titulo}"`)
 
     emitirCambio(p.id)
     res.json({ ok: true })
@@ -221,6 +246,7 @@ router.post('/:tareaId/reabrir', requireAuth, async (req, res) => {
       data: { estado: 'pendiente', completadaPor: null, completadaEn: null, asignadoA: null },
     })
     await logEntry(p.id, usuario, 'Tarea reabierta', tarea.titulo)
+    await notificarDestinatarios(p, tarea, req.user, 'tarea_estado_cambiado', `${usuario} reabrió "${tarea.titulo}"`)
 
     emitirCambio(p.id)
     res.json({ ok: true })
@@ -244,6 +270,7 @@ router.post('/:tareaId/omitir', requireAuth, async (req, res) => {
 
     await prisma.tarea.update({ where: { id: tareaId }, data: { estado: 'omitida' } })
     await logEntry(p.id, usuario, 'Tarea omitida', tarea.titulo)
+    await notificarDestinatarios(p, tarea, req.user, 'tarea_estado_cambiado', `${usuario} omitió "${tarea.titulo}"`)
 
     emitirCambio(p.id)
     res.json({ ok: true })
@@ -303,6 +330,10 @@ router.post('/:tareaId/mover', requireAuth, async (req, res) => {
     const columnaLabel = { pendiente: 'Todo', en_proceso: 'Doing', revision: 'Revisión', completada: 'Done' }[estado]
     await logEntry(p.id, usuario, 'Tarjeta movida', `${tarea.titulo} → ${columnaLabel}`)
     if (data.estado === 'completada') await activarTareasClienteDisponibles(p.id)
+    if (tarea.estado !== estado) {
+      const tipo = estado === 'completada' ? 'tarea_completada' : 'tarea_estado_cambiado'
+      await notificarDestinatarios(p, tarea, req.user, tipo, `${usuario} movió "${tarea.titulo}" a ${columnaLabel}`)
+    }
 
     emitirCambio(p.id)
     res.json({ ok: true })
@@ -381,9 +412,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
       }
     }
 
-    if (data.responsable && !RESPONSABLES_ESPECIALES.includes(data.responsable) && !usuarioParticipaEnProyecto(p.equipo, data.responsable)) {
-      return res.status(400).json({ error: 'El responsable debe participar en el proyecto' })
-    }
+    if (data.responsable) await asegurarResponsableValido(p, data.responsable)
 
     if (data.dependencias) {
       const idsProyecto = new Set(p.tareas.map((t) => t.id))
@@ -396,6 +425,9 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
     const tarea = await prisma.tarea.update({ where: { id: tareaId }, data })
     await logEntry(p.id, usuario, 'Tarea editada', tarea.titulo)
     await activarTareasClienteDisponibles(p.id)
+    if (data.responsable && data.responsable !== tareaActual.responsable) {
+      await notificarDestinatarios(p, tarea, req.user, 'tarea_reasignada', `${usuario} te asignó "${tarea.titulo}"`)
+    }
 
     // Si la edición cambió el responsable, avisa por correo a quien la
     // recibió (no hace nada si quedó "equipo"/"cliente" o si el destinatario

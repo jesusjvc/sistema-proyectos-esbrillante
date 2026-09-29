@@ -6,6 +6,7 @@ import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, ChevronRi
 import logo from '../assets/logo-foco-dark.svg'
 import icono from '../assets/icon-foco.svg'
 import AvatarUploader from './AvatarUploader'
+import NotificacionesBell from './NotificacionesBell'
 
 const SIDEBAR_COLAPSADO_KEY = 'sidebarColapsado'
 
@@ -129,7 +130,10 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
             {badge}
             <h1 className="text-lg font-semibold text-slate-800 dark:text-ink-100 truncate">{titulo}</h1>
           </div>
-          {acciones && <div className="flex items-center gap-2 shrink-0 ml-auto">{acciones}</div>}
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            {acciones}
+            <NotificacionesBell />
+          </div>
         </header>
         <main className="flex-1 p-6 overflow-y-auto min-h-0">{children}</main>
       </div>

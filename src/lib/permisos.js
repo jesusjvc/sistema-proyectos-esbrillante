@@ -22,6 +22,7 @@ export function idsDeRol(equipo, rol) {
 
 export function usuarioParticipaEnProyecto(equipo, userId) {
   if (!equipo || !userId) return false
+  if (Array.isArray(equipo.miembros) && equipo.miembros.includes(userId)) return true
   return ROLES_EQUIPO.some((rol) => idsDeRol(equipo, rol).includes(userId))
 }
 
@@ -87,5 +88,6 @@ export function infoResponsable(tarea, equipo, miembrosPorId = {}) {
 // selectores de "Responsable" limitados a quien ya participa en el proyecto.
 export function miembrosDelEquipo(equipo, miembros) {
   const ids = new Set(ROLES_EQUIPO.flatMap((rol) => idsDeRol(equipo, rol)))
+  if (Array.isArray(equipo?.miembros)) equipo.miembros.forEach((id) => ids.add(id))
   return miembros.filter((m) => ids.has(m.id))
 }

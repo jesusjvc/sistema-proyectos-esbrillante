@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getProyectos } from '../../data/api'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { usuarioParticipaEnProyecto } from '../../lib/permisos'
+import { normalizarTexto } from '../../lib/texto'
 import { Search, X, ChevronRight } from 'lucide-react'
 
 export default function Proyectos() {
@@ -25,11 +26,11 @@ export default function Proyectos() {
   useEffect(() => { cargar() }, [])
   useEventosGlobal(true, cargar)
 
-  const q = busqueda.trim().toLowerCase()
+  const q = normalizarTexto(busqueda)
   const misProyectos = proyectos
     .filter((p) => p.status !== 'cancelado')
     .filter((p) => usuarioParticipaEnProyecto(p.equipo, user?.id))
-    .filter((p) => !q || p.cliente.nombreComercial.toLowerCase().includes(q) || p.proyecto.paquete.toLowerCase().includes(q))
+    .filter((p) => !q || normalizarTexto(p.cliente.nombreComercial).includes(q) || normalizarTexto(p.proyecto.paquete).includes(q))
 
   return (
     <Layout titulo="Proyectos">

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { verificarToken } from '../lib/jwt.js'
 import { requireAuth } from '../middleware/auth.js'
-import { suscribirse } from '../lib/eventos.js'
+import { suscribirse, suscribirseNotificaciones } from '../lib/eventos.js'
 
 const router = Router()
 
@@ -46,6 +46,16 @@ router.get('/proyecto/:slug', async (req, res) => {
   const keepAlive = abrirStream(res)
   const cancelar = suscribirse((evento) => {
     if (evento.proyectoId === p.id) res.write(`data: ${JSON.stringify(evento)}\n\n`)
+  })
+  req.on('close', () => { clearInterval(keepAlive); cancelar() })
+})
+
+// GET /api/eventos/notificaciones — un stream por usuario, filtrado en el servidor (ver
+// eventos.js sobre por qué es un canal aparte del de 'cambio').
+router.get('/notificaciones', requireAuth, (req, res) => {
+  const keepAlive = abrirStream(res)
+  const cancelar = suscribirseNotificaciones(({ destinatarioId, notificacion }) => {
+    if (destinatarioId === req.user.id) res.write(`data: ${JSON.stringify(notificacion)}\n\n`)
   })
   req.on('close', () => { clearInterval(keepAlive); cancelar() })
 })

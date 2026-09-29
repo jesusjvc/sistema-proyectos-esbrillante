@@ -4,6 +4,7 @@ import { FechaRapida, PopoverRapido, PrioridadRapida, SelectorFecha } from '../c
 import { useAuth } from '../context/AuthContext'
 import { useEventosGlobal } from '../hooks/useEventos'
 import { formatFecha } from '../data/storage'
+import { normalizarTexto } from '../lib/texto'
 import {
   actualizarIncidencia, actualizarIncidenciasMasivo, buscarClientesCrm, crearIncidencia, crearSitio,
   getCliente, getClientes, getIncidencias, getMiembros,
@@ -555,15 +556,14 @@ function BuscadorCliente({ clientes, value, onSelect, onImportado }) {
   const ultimaBusquedaRef = useRef('')
 
   const seleccionado = clientes.find((cliente) => cliente.id === value) || null
-  const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const q = query.trim()
-  const nq = norm(q)
+  const nq = normalizarTexto(q)
   const digitos = q.replace(/\D/g, '')
 
   const locales = !nq ? clientes : clientes.filter((cliente) =>
-    norm(cliente.nombreComercial).includes(nq)
-    || norm(cliente.correo).includes(nq)
-    || norm(cliente.whatsapp).includes(nq)
+    normalizarTexto(cliente.nombreComercial).includes(nq)
+    || normalizarTexto(cliente.correo).includes(nq)
+    || normalizarTexto(cliente.whatsapp).includes(nq)
     || (digitos.length >= 4 && String(cliente.whatsapp || '').replace(/\D/g, '').includes(digitos)),
   )
   // Del CRM solo se muestran los que aún no están en Foco (los ya vinculados

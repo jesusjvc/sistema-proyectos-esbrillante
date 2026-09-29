@@ -9,6 +9,7 @@ import {
 } from '../lib/pagesMcpClient.js'
 import prisma from '../lib/prisma.js'
 import { enviarEmail } from '../lib/email.js'
+import { enviarGoogleChat } from '../lib/googleChat.js'
 
 const router = Router()
 
@@ -133,6 +134,7 @@ async function notificarRevisionTerminada(slug, { nombrePrototipo, urlPrototipo,
     texto,
     html,
   })))
+  enviarGoogleChat(`📝 Revisión terminada — ${nombrePrototipo}\n${texto}`)
 }
 
 export default router

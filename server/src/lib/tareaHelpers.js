@@ -2,6 +2,51 @@ import { randomUUID } from 'crypto'
 import prisma from './prisma.js'
 import { ordenAlFinal } from './orden.js'
 import { estadoDeColumna } from './kanban.js'
+import { RESPONSABLES_ESPECIALES, ROLES_RESPONSABLE, ROLES_EQUIPO, conMiembroAgregado, idsDeRol } from './permisos.js'
+
+// Valida `responsable` cuando es una persona específica (no uno de los valores especiales de
+// RESPONSABLES_ESPECIALES) y, si aún no participa del proyecto, la agrega al bucket genérico
+// equipo.miembros — así se puede asignar una tarea a cualquiera del equipo de la empresa sin
+// tener que agregarla a mano primero al equipo del proyecto (queda agregada sola). Muta
+// `p.equipo` en memoria además de persistir, para que el resto del request vea el cambio.
+export async function asegurarResponsableValido(p, responsable) {
+  if (!responsable || RESPONSABLES_ESPECIALES.includes(responsable)) return
+  const usuario = await prisma.user.findFirst({ where: { id: responsable, activo: true }, select: { id: true } })
+  if (!usuario) {
+    const err = new Error('El responsable no es un usuario válido')
+    err.status = 400
+    throw err
+  }
+  const nuevoEquipo = conMiembroAgregado(p.equipo, responsable)
+  if (nuevoEquipo !== p.equipo) {
+    await prisma.proyecto.update({ where: { id: p.id }, data: { equipo: nuevoEquipo } })
+    p.equipo = nuevoEquipo
+  }
+}
+
+// Devuelve los userIds de las personas a quienes "les toca" esta tarea — mismo criterio que
+// tareaLeCorresponde (permisos.js) pero enumerando a TODOS los que calificarían, no respondiendo
+// sí/no por una sola persona. Usado para decidir a quién avisar cuando alguien MÁS actúa sobre
+// la tarea (la completa, reasigna, comenta).
+export async function destinatariosDeTarea(tarea, equipo) {
+  const { responsable } = tarea
+  if (responsable === 'cliente') return []
+  if (responsable === 'karla') {
+    return (await prisma.user.findMany({ where: { esKarla: true, activo: true }, select: { id: true } })).map((u) => u.id)
+  }
+  if (responsable === 'admin') {
+    return (await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } })).map((u) => u.id)
+  }
+  if (!ROLES_RESPONSABLE.includes(responsable)) return [responsable] // asignación directa a una persona
+  if (responsable === 'equipo') {
+    const ids = new Set([
+      ...(Array.isArray(equipo?.miembros) ? equipo.miembros : []),
+      ...ROLES_EQUIPO.flatMap((rol) => idsDeRol(equipo, rol)),
+    ])
+    return [...ids]
+  }
+  return idsDeRol(equipo, responsable) // copy | disenador | programador | redes
+}
 
 // Crea una tarea "custom" (agregada manualmente, no parte de la plantilla del
 // paquete) para un proyecto. Compartido entre POST /tareas (alta directa) y
@@ -28,6 +73,9 @@ export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, 
   const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
   const disponibleDeInicio = esCliente && (dependencias || []).every((d) => completadasIds.has(d))
 
+  const responsableFinal = esCliente ? 'cliente' : (responsable || 'equipo')
+  await asegurarResponsableValido(p, responsableFinal)
+
   return prisma.tarea.create({
     data: {
       id: randomUUID(),
@@ -37,7 +85,7 @@ export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, 
       titulo,
       descripcion: descripcion || '',
       instruccionesCliente: instruccionesCliente || '',
-      responsable: esCliente ? 'cliente' : (responsable || 'equipo'),
+      responsable: responsableFinal,
       esCliente: esCliente || false,
       plazoHoras: plazoHoras ? Number(plazoHoras) : null,
       dependencias: dependencias || [],
