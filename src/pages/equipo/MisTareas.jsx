@@ -165,10 +165,12 @@ export default function MisTareas() {
   const totalSinAsignar = sinAsignarPorProyecto.reduce((n, { tareas }) => n + tareas.length, 0)
 
   // Conteo de tareas por miembro para el selector del admin — cuántas hay en
-  // la bandeja de cada persona (asignadas + bloqueadas + en proceso).
+  // la bandeja de cada persona (asignadas + bloqueadas + en proceso). El
+  // propio admin NO aparece como chip: su bandeja ya está en "Mías", y lo
+  // listáramos aparte su usuario aparecería dos veces.
   const conteoPorMiembro = new Map(
     miembros
-      .filter((m) => m.activo)
+      .filter((m) => m.activo && m.id !== user?.id)
       .map((m) => {
         const b = bandejaDe(m)
         return [m.id, b.asignadas.length + b.bloqueadas.length + b.enProceso.length]

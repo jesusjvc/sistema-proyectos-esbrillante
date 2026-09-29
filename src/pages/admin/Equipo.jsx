@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import { getMiembros, crearMiembro, editarMiembro, eliminarMiembro } from '../../data/api'
+import { archivoAAvatarDataUrl } from '../../lib/image'
 import { AREAS, AREA_LABEL } from '../../lib/areas'
-import { Plus, Pencil, Trash2, Check, X, Shield, Star } from 'lucide-react'
+import { Plus, Pencil, Trash2, Check, X, Shield, Star, Camera, Loader2 } from 'lucide-react'
 
 const FORM_VACIO = { nombre: '', email: '', password: '', rol: 'EQUIPO', esKarla: false, area: '', habilidadesTexto: '' }
 
@@ -56,6 +57,19 @@ export default function Equipo() {
     await eliminarMiembro(id)
     setBorrandoId(null)
     cargar()
+  }
+
+  // Foto de perfil de cualquier miembro — igual flujo que la propia
+  // (recorte cuadrado + compresión en el navegador) pero vía editarMiembro.
+  async function handleAvatar(id, file) {
+    if (!file) return
+    try {
+      const dataUrl = await archivoAAvatarDataUrl(file)
+      await editarMiembro(id, { avatarUrl: dataUrl })
+      cargar()
+    } catch (err) {
+      setError(err.message || 'No se pudo subir la foto')
+    }
   }
 
   async function handleAgregar() {
@@ -171,7 +185,11 @@ export default function Equipo() {
                   </div>
                 ) : (
                   <>
-                    <Avatar nombre={m.nombre} avatarUrl={m.avatarUrl} size={32} />
+                    <AvatarMiembro
+                      nombre={m.nombre}
+                      avatarUrl={m.avatarUrl}
+                      onArchivo={(file) => handleAvatar(m.id, file)}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-slate-800 text-sm">{m.nombre}</div>
                       <div className="text-xs text-slate-400">{m.email}</div>
@@ -252,5 +270,40 @@ export default function Equipo() {
         </div>
       </div>
     </Layout>
+  )
+}
+
+// Avatar con botón de cámara para cambiar la foto del miembro (clic en la
+// cámara o directamente sobre el avatar).
+function AvatarMiembro({ nombre, avatarUrl, onArchivo }) {
+  const inputRef = useRef(null)
+  const [subiendo, setSubiendo] = useState(false)
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setSubiendo(true)
+    try {
+      await onArchivo(file)
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  return (
+    <div className="relative inline-block shrink-0">
+      <button onClick={() => inputRef.current?.click()} title="Cambiar foto de perfil" className="block rounded-full">
+        <Avatar nombre={nombre} avatarUrl={avatarUrl} size={32} />
+      </button>
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={subiendo}
+        className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand-500 hover:bg-brand-600 text-slate-900 rounded-full flex items-center justify-center border-2 border-white dark:border-ink-800 transition-colors"
+      >
+        {subiendo ? <Loader2 size={9} className="animate-spin" /> : <Camera size={9} />}
+      </button>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
   )
 }
