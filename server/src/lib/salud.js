@@ -5,6 +5,8 @@
 // frontend solo la muestra.
 
 import { idsDeRol } from './permisos.js'
+import { calcularAvance } from './avance.js'
+import { contarPorColumna } from './kanban.js'
 
 const HORA_MS = 3600_000
 const DIA_MS = 24 * HORA_MS
@@ -75,12 +77,48 @@ function formatoAtraso(ms) {
   return `${dias} ${plural(dias, 'día', 'días')}`
 }
 
+function armar({ nivel, motivos, ultimaActividad, diasSinActividad, tareasEquipoSinFecha, tareasEquipoSinResponsable, resumen }) {
+  return { nivel, motivos, ultimaActividad, diasSinActividad, tareasEquipoSinFecha, tareasEquipoSinResponsable, resumen }
+}
+
 export function calcularSalud(proyecto, { ahora = Date.now() } = {}) {
   if (proyecto.status !== 'activo') {
     return { nivel: null, motivos: [], ultimaActividad: null, diasSinActividad: null, tareasEquipoSinFecha: 0, tareasEquipoSinResponsable: 0, resumen: '' }
   }
 
   const tareas = proyecto.tareas || []
+
+  // Proyecto "completo": terminó sus actividades y sigue abierto esperando
+  // cierre (VoBo del cliente, pago final, trámite de dominio...). Va antes
+  // que atraso/estancado porque no queda nada pendiente que pudiera atrasar:
+  // finitos al 100% de avance; continuos con TODO en Done (y al menos una
+  // tarjeta, para no marcar servicios recién abiertos y vacíos).
+  if (proyecto.tipo === 'continuo') {
+    const c = contarPorColumna(proyecto)
+    if ((c.todo + c.doing + c.revision) === 0 && c.done > 0) {
+      const ultima = ultimaActividad(proyecto)
+      return armar({
+        nivel: 'completo',
+        motivos: [],
+        ultimaActividad: ultima === null ? null : new Date(ultima).toISOString(),
+        diasSinActividad: ultima === null ? null : Math.floor((ahora - ultima) / DIA_MS),
+        tareasEquipoSinFecha: 0,
+        tareasEquipoSinResponsable: 0,
+        resumen: 'Completo — todas las tarjetas están en Done, esperando cierre',
+      })
+    }
+  } else if (calcularAvance(proyecto) === 100) {
+    const ultima = ultimaActividad(proyecto)
+    return armar({
+      nivel: 'completo',
+      motivos: [],
+      ultimaActividad: ultima === null ? null : new Date(ultima).toISOString(),
+      diasSinActividad: ultima === null ? null : Math.floor((ahora - ultima) / DIA_MS),
+      tareasEquipoSinFecha: 0,
+      tareasEquipoSinResponsable: 0,
+      resumen: 'Completo — 100% de actividades, esperando cierre',
+    })
+  }
 
   const vencidasCliente = tareas.filter((t) => tareaClienteVencida(t, ahora))
   const idsVencidas = new Set(vencidasCliente.map((t) => t.id))
@@ -164,7 +202,7 @@ export function calcularSalud(proyecto, { ahora = Date.now() } = {}) {
   else if (esperandoCliente.length) resumen = `En curso — esperando al cliente: ${listarTitulos(esperandoCliente)}`
   else resumen = 'En curso, sin obstáculos'
 
-  return {
+  return armar({
     nivel,
     motivos,
     ultimaActividad: ultima === null ? null : new Date(ultima).toISOString(),
@@ -172,5 +210,5 @@ export function calcularSalud(proyecto, { ahora = Date.now() } = {}) {
     tareasEquipoSinFecha,
     tareasEquipoSinResponsable: sinResponsable.length,
     resumen,
-  }
+  })
 }

@@ -8,6 +8,7 @@ import { emitirCambio } from '../lib/eventos.js'
 import { enviarEmail } from '../lib/email.js'
 import { enviarGoogleChat } from '../lib/googleChat.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
+import { extraerDominio } from '../lib/modulosCliente.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
@@ -82,6 +83,26 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
     }
 
     const tarea = await prisma.tarea.update({ where: { id: tareaId }, data })
+
+    // Efectos de los módulos de solicitud estructurada:
+    // - dominio: registra el dominio en la Info clave del proyecto (si no
+    //   había uno) extrayéndolo de la respuesta libre del cliente.
+    // - vobo: la respuesta queda como aceptación formal en el log.
+    if (tarea.modulo === 'dominio' && respuestaTexto) {
+      const dominio = extraerDominio(respuestaTexto)
+      if (dominio && !p.proyecto?.infoClave?.dominio) {
+        const infoClave = { ...(p.proyecto?.infoClave || {}), dominio }
+        await prisma.proyecto.update({ where: { id: p.id }, data: { proyecto: { ...p.proyecto, infoClave } } })
+        p.proyecto = { ...p.proyecto, infoClave }
+        await prisma.logEntry.create({
+          data: { proyectoId: p.id, usuario: 'Sistema', accion: 'Dominio registrado', detalle: `${dominio} — desde la solicitud "${tarea.titulo}"` },
+        })
+      }
+    } else if (tarea.modulo === 'vobo') {
+      await prisma.logEntry.create({
+        data: { proyectoId: p.id, usuario: 'Sistema', accion: 'VoBo del proyecto recibido', detalle: respuestaTexto ? `El cliente respondió: ${respuestaTexto.slice(0, 120)}` : 'El cliente dio VoBo sin comentarios' },
+      })
+    }
 
     const partesDetalle = [tarea.titulo]
     if (respuestaTexto) partesDetalle.push(`Respuesta: ${respuestaTexto}`)

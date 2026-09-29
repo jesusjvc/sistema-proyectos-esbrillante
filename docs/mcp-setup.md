@@ -111,16 +111,17 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
 | `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente, respuestas recientes, solicitudes y el objeto `salud` completo |
 | `registrar_actividad(slug, titulo, descripcion?, fase?, completada?, antesDeTareaId?, despuesDeTareaId?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
-| `solicitar_al_cliente(slug, titulo, instrucciones, plazoHoras?, fase?, antesDeTareaId?, despuesDeTareaId?)` | Pedirle algo al cliente — aparece de inmediato en su portal |
+| `solicitar_al_cliente(slug, titulo, instrucciones?, modulo?, plazoHoras?, fase?, antesDeTareaId?, despuesDeTareaId?, dependeDeTareaIds?, pedirArchivos?)` | Pedirle algo al cliente — aparece de inmediato en su portal. Con `modulo` la solicitud se vuelve estructurada: `dominio` (al responder queda en la Info clave), `recursos` (subcarpeta de Drive lista para subir) o `vobo` (aceptación formal) |
 | `iniciar_actividad(slug, tareaId)` | Marcar una tarea como "en proceso" de verdad — que alguien la está trabajando ahora, no solo que está disponible. Úsala solo cuando realmente empieces algo, no para todo lo que esté disponible en paralelo (ver nota abajo). |
 | `completar_actividad(slug, tareaId, respuesta?)` | Marcar como lista una tarea ya existente (del equipo o del cliente). Si estás cerrando una solicitud al cliente porque respondió por otro canal, pasa `respuesta` para dejarlo registrado. |
 | `editar_actividad(slug, tareaId, titulo?, descripcion?, instrucciones?, plazoHoras?, fechaLimite?, responsable?, prioridad?, dependeDeTareaIds?, antesDeTareaId?, despuesDeTareaId?)` | Corregir/reposicionar una tarea ya creada (equipo o cliente) sin tener que cancelarla y volver a crearla |
 | `cancelar_actividad(slug, tareaId, motivo?)` | Cancelar una actividad o solicitud que ya no aplica — queda omitida, no se borra |
 | `actualizar_fase(slug, numero, fechaEstimada?, requierePago?, pagoConfirmado?)` | Ajustar la fecha estimada o el estado de pago de una fase — útil en proyectos con pagos parciales por fase, donde una sola "fecha de entrega" no refleja la realidad |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
+| `nota_status(slug, texto)` | Nota en el hilo de "Status" del proyecto (tab Status, visible al equipo) — la bitácora de qué ha pasado y por qué sigue atorado |
 | `listar_plantillas` | Checklists base por paquete (fases, tareas, dependencias) — consultar antes de crear un proyecto de un paquete conocido |
 | `cambiar_tipo_proyecto(slug, tipo)` | Convertir un proyecto entre `finito` (fases) y `continuo` (tablero Kanban) |
-| `editar_proyecto(slug, descripcion?, fechaEstimadaEntrega?)` | Actualizar la descripción libre o la fecha estimada de entrega |
+| `editar_proyecto(slug, descripcion?, fechaEstimadaEntrega?, infoClave?)` | Actualizar la descripción, la fecha estimada o la info clave (dominio, grupoWhatsapp, extras) |
 | `mover_a_revision(slug, tareaId)` | (Solo continuos) mover una tarjeta del Kanban a la columna Revisión |
 | `crear_solicitud_interna(slug, titulo, ...)` | Registrar un ticket llegado por fuera del portal (WhatsApp, teléfono, detectado por el equipo) en la cola de un proyecto continuo |
 | `comentar_actividad(slug, tareaId, mensaje, mencionar?)` | Comentario interno sobre una tarea (nunca visible al cliente); con `mencionar` notifica por correo |

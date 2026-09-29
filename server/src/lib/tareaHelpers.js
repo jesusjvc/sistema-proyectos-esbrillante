@@ -52,7 +52,7 @@ export async function destinatariosDeTarea(tarea, equipo) {
 // paquete) para un proyecto. Compartido entre POST /tareas (alta directa) y
 // la aprobación de una Solicitud del cliente (server/src/routes/solicitudes.js).
 // No escribe LogEntry — cada caller registra el log con su propio texto.
-export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite }) {
+export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite, modulo }) {
   const esContinuo = p.tipo === 'continuo'
   const faseFinal = esContinuo ? 1 : (fase || 1)
   const estadoFinal = esContinuo && !esCliente ? (estadoDeColumna(columna) || 'pendiente') : 'pendiente'
@@ -87,6 +87,9 @@ export async function crearTareaCustom(p, { fase, columna, titulo, descripcion, 
       instruccionesCliente: instruccionesCliente || '',
       responsable: responsableFinal,
       esCliente: esCliente || false,
+      // Módulo de solicitud estructurada ('dominio'|'recursos'|'vobo') —
+      // solo aplica a tareas esCliente.
+      modulo: esCliente ? (modulo || null) : null,
       plazoHoras: plazoHoras ? Number(plazoHoras) : null,
       dependencias: dependencias || [],
       custom: true,

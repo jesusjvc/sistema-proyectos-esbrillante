@@ -9,6 +9,7 @@ import { FASES } from '../../data/paquetes'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { miembrosDelEquipo } from '../../lib/permisos'
 import { normalizarTexto } from '../../lib/texto'
+import MedidorCircular from '../../components/MedidorCircular'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../../lib/areas'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, ChevronDown, Bell, MessageCircle, Search, X, LayoutList, LayoutGrid, CalendarDays, UserX } from 'lucide-react'
@@ -35,6 +36,9 @@ const SALUD_CONFIG = {
   atrasado: { label: 'Atrasado', icon: AlertCircle, chip: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300', borde: 'border-red-300 dark:border-red-800 ring-1 ring-red-200 dark:ring-red-900/40' },
   estancado: { label: 'Estancado', icon: Clock, chip: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300', borde: 'border-amber-300 dark:border-amber-700' },
   avanza: { label: 'En curso', icon: CheckCircle2, chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300', borde: null },
+  // Terminó sus actividades y sigue abierto esperando cierre (VoBo, pago
+  // final, dominio...) — se separa del listado con borde verde.
+  completo: { label: 'Completo', icon: CheckCircle2, chip: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300', borde: 'border-emerald-400 dark:border-emerald-700 ring-1 ring-emerald-200 dark:ring-emerald-900/40' },
 }
 
 const MOTIVO_ESTILO = {
@@ -46,8 +50,8 @@ const MOTIVO_ESTILO = {
   equipo_sin_responsable: { Icono: UserX, color: 'text-amber-600 dark:text-amber-400' },
 }
 
-// Atrasados primero, luego estancados, luego el resto por nombre de cliente.
-const PRIORIDAD_SALUD = { atrasado: 0, estancado: 1, avanza: 2 }
+// Atrasados primero, luego estancados; los completos van al final del todo.
+const PRIORIDAD_SALUD = { atrasado: 0, estancado: 1, avanza: 2, completo: 3 }
 function ordenSalud(a, b) {
   const pa = PRIORIDAD_SALUD[a.salud?.nivel] ?? 3
   const pb = PRIORIDAD_SALUD[b.salud?.nivel] ?? 3
@@ -114,12 +118,15 @@ export default function AdminDashboard() {
   const saludCounts = {
     atrasado: proyectos.filter((p) => p.salud?.nivel === 'atrasado').length,
     estancado: proyectos.filter((p) => p.salud?.nivel === 'estancado').length,
+    completo: proyectos.filter((p) => p.salud?.nivel === 'completo').length,
   }
 
-  // Vista de lista: finitos primero, continuos después; atrasados arriba.
+  // Vista de lista: finitos primero, continuos después; atrasados arriba y
+  // los completos aparte al fondo, esperando cierre.
   const visibles = filtroSalud === 'todos' ? filtrados : filtrados.filter((p) => p.salud?.nivel === filtroSalud)
-  const finitos = visibles.filter((p) => p.tipo === 'finito').sort(ordenSalud)
-  const continuos = visibles.filter((p) => p.tipo === 'continuo').sort(ordenSalud)
+  const finitos = visibles.filter((p) => p.tipo === 'finito' && p.salud?.nivel !== 'completo').sort(ordenSalud)
+  const continuos = visibles.filter((p) => p.tipo === 'continuo' && p.salud?.nivel !== 'completo').sort(ordenSalud)
+  const completos = visibles.filter((p) => p.salud?.nivel === 'completo').sort(ordenSalud)
 
   return (
     <Layout titulo="Proyectos">
@@ -243,6 +250,7 @@ export default function AdminDashboard() {
           ['atrasado', `Atrasados (${saludCounts.atrasado})`],
           ['estancado', `Estancados (${saludCounts.estancado})`],
           ['avanza', 'En curso'],
+          ['completo', `Completos (${saludCounts.completo})`],
         ].map(([valor, label]) => (
           <button
             key={valor}
@@ -279,6 +287,7 @@ export default function AdminDashboard() {
           {[
             ['Finitos', finitos],
             ['Continuos', continuos],
+            ['Completos — esperando cierre', completos],
           ].map(([titulo, lista]) => lista.length > 0 && (
             <section key={titulo}>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-400 mb-2 px-1">
@@ -389,6 +398,12 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
   const faseActual = getFaseActual(p)
   const faseNombre = FASES.find((f) => f.numero === faseActual)?.nombre || ''
   const columnasCount = esContinuo ? contarPorColumna(p) : null
+  // % para el medidor: finito = avance por fases; continuo = Done sobre el
+  // total de tarjetas (sin omitidas).
+  const totalSinOmitir = p.tareas.filter((t) => t.estado !== 'omitida').length
+  const avancePorcentaje = esContinuo
+    ? (totalSinOmitir ? (columnasCount.done / totalSinOmitir) * 100 : 0)
+    : avance
   const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.activo
   const salud = p.salud
   const saludCfg = SALUD_CONFIG[salud?.nivel]
@@ -417,9 +432,10 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
           </div>
         </div>
 
-        <div className="w-44 shrink-0 hidden sm:block">
+        <div className="flex items-center gap-2.5 w-48 shrink-0 hidden sm:flex">
+          <MedidorCircular porcentaje={avancePorcentaje} tamano={42} nivel={salud?.nivel} />
           {esContinuo ? (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               {KANBAN_COLUMNAS.map((c) => (
                 <span key={c.columna} className="text-xs whitespace-nowrap">
                   <span className={`font-bold ${KANBAN_COUNT_COLOR[c.columna]}`}>{columnasCount[c.columna]}</span>
@@ -428,15 +444,9 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
               ))}
             </div>
           ) : (
-            <div>
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-ink-300 mb-1">
-                <span className="truncate">Fase {faseActual} — {faseNombre}</span>
-                <span className="font-semibold text-slate-700 dark:text-ink-100 ml-1.5 shrink-0">{avance}%</span>
-              </div>
-              <div className="h-1.5 bg-slate-100 dark:bg-ink-700 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${avance}%` }} />
-              </div>
-            </div>
+            <span className="text-[11px] text-slate-500 dark:text-ink-300 leading-tight min-w-0">
+              <span className="block truncate">Fase {faseActual} — {faseNombre}</span>
+            </span>
           )}
         </div>
 
@@ -551,6 +561,10 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
   const tareasVencidas = contarTareasVencidasCliente(p)
   const nivelSalud = p.salud?.nivel
   const SaludIcono = nivelSalud ? SALUD_CONFIG[nivelSalud].icon : null
+  // % para el medidor — misma regla que en la fila.
+  const totalSinOmitir = p.tareas.filter((t) => t.estado !== 'omitida').length
+  const doneCount = columnasCount?.done ?? 0
+  const avancePorcentaje = esContinuo ? (totalSinOmitir ? (doneCount / totalSinOmitir) * 100 : 0) : avance
 
   const tareasDisponibles = p.tareas.filter((t) => {
     if (t.estado === 'completada' || t.estado === 'omitida') return false
@@ -574,7 +588,7 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
         <AlertCircle size={11} /> {tareasVencidas} atrasada{tareasVencidas > 1 ? 's' : ''}
       </Chip>
     ),
-    (nivelSalud === 'atrasado' || nivelSalud === 'estancado') && (
+    (nivelSalud === 'atrasado' || nivelSalud === 'estancado' || nivelSalud === 'completo') && (
       <Chip key="salud" className={SALUD_CONFIG[nivelSalud].chip}>
         <SaludIcono size={11} /> {SALUD_CONFIG[nivelSalud].label}
       </Chip>
@@ -597,6 +611,8 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
           ? 'border-red-300 dark:border-red-800 ring-1 ring-red-200 dark:ring-red-900/40'
           : nivelSalud === 'estancado'
           ? 'border-amber-300 dark:border-amber-700'
+          : nivelSalud === 'completo'
+          ? SALUD_CONFIG.completo.borde
           : respuestaNueva
           ? 'border-brand-300 dark:border-brand-700 ring-1 ring-brand-200 dark:ring-brand-900/30'
           : 'border-slate-200 dark:border-ink-500 hover:border-slate-300 dark:hover:border-ink-400'
@@ -637,7 +653,17 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
         </div>
       ) : (
         <>
-          {esContinuo ? <KanbanMini counts={columnasCount} /> : <ProgressBar avance={avance} faseActual={faseActual} faseNombre={faseNombre} />}
+          {esContinuo ? (
+            <div className="flex items-center gap-3">
+              <MedidorCircular porcentaje={avancePorcentaje} tamano={52} nivel={nivelSalud} />
+              <div className="flex-1 min-w-0"><KanbanMini counts={columnasCount} /></div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <MedidorCircular porcentaje={avancePorcentaje} tamano={52} nivel={nivelSalud} />
+              <div className="flex-1 min-w-0"><ProgressBar avance={avance} faseActual={faseActual} faseNombre={faseNombre} /></div>
+            </div>
+          )}
 
           <div className="mt-auto pt-3.5 border-t border-slate-100 dark:border-ink-500 flex items-center justify-between gap-2">
             <span className="flex items-center gap-1 text-sm font-semibold text-slate-800 dark:text-ink-100 shrink-0">

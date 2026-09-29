@@ -7,6 +7,8 @@ import { tareaLeCorresponde } from '../lib/permisos.js'
 import { crearTareaCustom, activarTareasClienteDisponibles, asegurarResponsableValido, destinatariosDeTarea } from '../lib/tareaHelpers.js'
 import { notificarAsignacion } from '../lib/notificaciones.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
+import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
+import { obtenerOCrearCarpetaRecursos, driveConfigurado } from '../lib/drive.js'
 import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
@@ -390,7 +392,7 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
   const campos = ['titulo', 'descripcion', 'queHacer', 'necesitasAntes', 'plantillaMensaje',
     'queEntregas', 'responsable', 'instruccionesCliente', 'plazoHoras',
     'esRutaCritica', 'soloKarlaOAdmin', 'esCliente', 'dependencias', 'avisosDesactivados',
-    'prioridad', 'fechaLimite']
+    'prioridad', 'fechaLimite', 'modulo']
 
   try {
     const p = await getProyecto(slug)
@@ -454,9 +456,36 @@ router.post('/', requireAuth, async (req, res) => {
     const p = await getProyecto(slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite } = req.body
+    const { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite, modulo } = req.body
+    const moduloValido = esCliente && MODULOS_CLIENTE[modulo] ? modulo : null
 
-    const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite })
+    // Solicitud estructurada: si el equipo no escribió instrucciones a mano,
+    // la plantilla del módulo las genera.
+    let instrucciones = instruccionesCliente
+    if (moduloValido && !instrucciones?.trim()) {
+      instrucciones = MODULOS_CLIENTE[moduloValido].plantilla({ conDrive: false, urlDrive: null })
+    }
+
+    const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente: instrucciones, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite, modulo: moduloValido })
+
+    // Módulo "recursos": prepara la subcarpeta de Drive y adjunta el enlace
+    // en la tarea — el portal del cliente muestra el botón de subida.
+    if (moduloValido === 'recursos') {
+      const conDrive = driveConfigurado()
+      const urlDrive = conDrive ? await obtenerOCrearCarpetaRecursos(p) : null
+      if (urlDrive) {
+        await prisma.tarea.update({
+          where: { id: nueva.id },
+          data: {
+            driveFolderUrl: urlDrive,
+            instruccionesCliente: MODULOS_CLIENTE.recursos.plantilla({ conDrive: true, urlDrive }),
+          },
+        })
+        nueva.driveFolderUrl = urlDrive
+        nueva.instruccionesCliente = MODULOS_CLIENTE.recursos.plantilla({ conDrive: true, urlDrive })
+      }
+    }
+
     await logEntry(p.id, usuario, 'Tarea agregada', nueva.titulo)
 
     if (!nueva.esCliente && nueva.responsable !== 'equipo') {

@@ -9,6 +9,7 @@ import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
+import notasRouter from './notas.js'
 
 const router = Router()
 
@@ -21,6 +22,7 @@ function areasValidas(areas) {
 
 router.use('/:slug/tareas', tareasRouter)
 router.use('/:slug/solicitudes', solicitudesRouter)
+router.use('/:slug/notas', notasRouter)
 
 const INCLUDE = {
   tareas: { include: { comentarios: { orderBy: { creadoEn: 'asc' } } } },
@@ -326,6 +328,40 @@ router.put('/:slug/etiquetas', requireAdmin, async (req, res) => {
     await prisma.proyecto.update({ where: { id: p.id }, data: { etiquetas: normalizadas.slice(0, 10) } })
     emitirCambio(p.id)
     res.json({ ok: true, etiquetas: normalizadas.slice(0, 10) })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// PUT /api/proyectos/:slug/info-clave
+// Información estructurada del proyecto: dominio, grupo de WhatsApp y extras
+// libres [{etiqueta, valor}] (redes del cliente, hosting, etc.). Vive dentro
+// del Json `proyecto.proyecto` — sin migración, merge de solo estas claves.
+router.put('/:slug/info-clave', requireAuth, async (req, res) => {
+  const { dominio, grupoWhatsapp, extras } = req.body
+  if (extras !== undefined && (!Array.isArray(extras) || !extras.every((e) => e && typeof e.etiqueta === 'string' && typeof e.valor === 'string'))) {
+    return res.status(400).json({ error: 'extras debe ser una lista de {etiqueta, valor}' })
+  }
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const infoClave = { ...(p.proyecto?.infoClave || {}) }
+    if (dominio !== undefined) infoClave.dominio = (dominio || '').trim().slice(0, 200) || null
+    if (grupoWhatsapp !== undefined) infoClave.grupoWhatsapp = (grupoWhatsapp || '').trim().slice(0, 200) || null
+    if (extras !== undefined) {
+      infoClave.extras = extras
+        .map((e) => ({ etiqueta: e.etiqueta.trim().slice(0, 80), valor: e.valor.trim().slice(0, 500) }))
+        .filter((e) => e.etiqueta && e.valor)
+        .slice(0, 20)
+    }
+
+    const proyectoJson = { ...p.proyecto, infoClave }
+    await prisma.proyecto.update({ where: { id: p.id }, data: { proyecto: proyectoJson } })
+    emitirCambio(p.id)
+    res.json({ ok: true, infoClave })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })

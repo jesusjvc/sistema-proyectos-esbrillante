@@ -9,6 +9,7 @@ import {
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, crearSolicitudInterna, actualizarDescripcion, actualizarFechaEntrega, crearCarpetaDriveProyecto,
+  getNotas, agregarNota, actualizarInfoClave,
   crearComentario, regenerarPasswordCliente, actualizarAreasProyecto,
 } from '../data/api'
 import {
@@ -16,12 +17,14 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora, statusBadge, statusLabel } from '../data/storage'
+import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora, statusBadge, statusLabel, contarPendientesCliente } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
 import { useEventosProyecto } from '../hooks/useEventos'
 import useEscape from '../hooks/useEscape'
+import MedidorCircular from '../components/MedidorCircular'
+import { MODULOS_CLIENTE } from '../data/modulosCliente'
 import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import KanbanBoard from '../components/KanbanBoard'
@@ -43,7 +46,7 @@ import { normalizarTexto } from '../lib/texto'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
-  FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle,
+  FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle, Globe,
   AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3, Search,
 } from 'lucide-react'
 
@@ -56,6 +59,7 @@ export default function DetalleProyecto() {
   const [faseOcultarCompletadas, setFaseOcultarCompletadas] = useState({})
   const [buscarTarea, setBuscarTarea] = useState('')
   const [tab, setTab] = useState('tareas')
+  const [notas, setNotas] = useState([])
   const [vistaContinuo, setVistaContinuo] = useState('tabla')
   const [copiado, setCopiado] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
@@ -79,6 +83,18 @@ export default function DetalleProyecto() {
       setAvatares(Object.fromEntries(ms.map((m) => [m.nombre, m.avatarUrl])))
     }).catch(() => {})
   }, [id])
+
+  // El tab Status carga sus notas aparte (no van en el payload del listado).
+  useEffect(() => {
+    if (tab !== 'status' || !proyecto) return
+    getNotas(proyecto.slug).then((ns) => setNotas([...ns].reverse())).catch(() => {})
+  }, [tab, proyecto?.id])
+
+  async function handleEnviarNota(texto, mencionados) {
+    await agregarNota(proyecto.slug, { texto, mencionados })
+    const ns = await getNotas(proyecto.slug)
+    setNotas([...ns].reverse())
+  }
 
   const miembrosPorId = Object.fromEntries(miembros.map((m) => [m.id, m.nombre]))
 
@@ -287,6 +303,10 @@ export default function DetalleProyecto() {
   })
   const qBuscarTarea = normalizarTexto(buscarTarea)
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
+  const totalSinOmitir = proyecto.tareas.filter((t) => t.estado !== 'omitida').length
+  const avancePorcentajeContinuo = esContinuo && totalSinOmitir
+    ? (columnasCount.done / totalSinOmitir) * 100
+    : 0
   const solicitudesPendientes = (proyecto.solicitudes || []).filter((s) => s.estado === 'pendiente').length
   const tareasCliente = proyecto.tareas.filter((t) => t.esCliente).sort((a, b) => a.orden - b.orden)
   const preguntasPendientes = tareasCliente.filter((t) => t.estado !== 'completada' && t.estado !== 'omitida').length
@@ -359,23 +379,22 @@ export default function DetalleProyecto() {
         />
 
         {esContinuo ? (
-          <div className="mt-4 flex items-center gap-3 flex-wrap">
-            {KANBAN_COLUMNAS.map((c) => (
-              <div key={c.columna} className="text-sm text-slate-500 dark:text-ink-300">
-                <span className="font-bold text-slate-800 dark:text-ink-100">{columnasCount[c.columna]}</span> {c.label}
-              </div>
-            ))}
+          <div className="mt-4 flex items-center gap-4">
+            <MedidorCircular porcentaje={avancePorcentajeContinuo} tamano={56} nivel={proyecto.salud?.nivel} />
+            <div className="flex items-center gap-3 flex-wrap">
+              {KANBAN_COLUMNAS.map((c) => (
+                <div key={c.columna} className="text-sm text-slate-500 dark:text-ink-300">
+                  <span className="font-bold text-slate-800 dark:text-ink-100">{columnasCount[c.columna]}</span> {c.label}
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
-          /* Barra de progreso */
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-sm mb-1.5">
-              <span className="text-slate-600 dark:text-ink-300 font-medium">Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}</span>
-              <span className="font-bold text-slate-800 dark:text-ink-100">{avance}%</span>
-            </div>
-            <div className="h-2.5 bg-slate-100 dark:bg-ink-700 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
-            </div>
+          <div className="mt-4 flex items-center gap-4">
+            <MedidorCircular porcentaje={avance} tamano={56} nivel={proyecto.salud?.nivel} />
+            <span className="text-sm text-slate-600 dark:text-ink-300 font-medium">
+              Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}
+            </span>
           </div>
         )}
 
@@ -421,7 +440,7 @@ export default function DetalleProyecto() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-ink-500 mb-5">
-        {[['tareas', 'Tareas'], ['preguntas', 'Preguntas al Cliente'], ['solicitudes', 'Solicitudes'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
+        {[['tareas', 'Tareas'], ['preguntas', 'Solicitudes al cliente'], ['solicitudes', 'Cambios del cliente'], ['status', 'Status'], ['prototipos', 'Prototipos'], ['info', 'Info del proyecto'], ['log', 'Historial']].map(([t, l]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -517,6 +536,53 @@ export default function DetalleProyecto() {
           onRechazar={handleRechazarSolicitud}
           onCrearTicket={handleCrearTicket}
         />
+      )}
+
+      {/* ─── Tab: Status (resumen automático + notas del equipo) ─── */}
+      {tab === 'status' && (
+        <div className="space-y-5">
+          <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5">
+            <div className="flex items-start gap-4 flex-wrap">
+              <MedidorCircular porcentaje={esContinuo ? avancePorcentajeContinuo : avance} tamano={72} nivel={proyecto.salud?.nivel} />
+              <div className="flex-1 min-w-56 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusSaludChip nivel={proyecto.salud?.nivel} />
+                  <span className="text-xs text-slate-400 dark:text-ink-400">
+                    {proyecto.salud?.diasSinActividad != null
+                      ? (proyecto.salud.diasSinActividad === 0 ? 'Actividad hoy' : `Sin actividad hace ${proyecto.salud.diasSinActividad} día${proyecto.salud.diasSinActividad === 1 ? '' : 's'}`)
+                      : ''}
+                  </span>
+                </div>
+                {(proyecto.salud?.motivos?.length || 0) > 0 ? (
+                  <ul className="space-y-1">
+                    {proyecto.salud.motivos.map((m) => (
+                      <li key={m.tipo} className="text-sm text-slate-600 dark:text-ink-300">• {m.detalle}</li>
+                    ))}
+                  </ul>
+                ) : proyecto.salud?.nivel === 'completo' ? (
+                  <p className="text-sm text-slate-600 dark:text-ink-300">Sin actividades pendientes — solo falta el cierre con el cliente (VoBo, pago final o trámites).</p>
+                ) : (
+                  <p className="text-sm text-slate-500 dark:text-ink-400">Sin obstáculos: el equipo puede seguir avanzando.</p>
+                )}
+                <p className="text-xs text-slate-400 dark:text-ink-400">
+                  {contarPendientesCliente(proyecto) > 0
+                    ? `${contarPendientesCliente(proyecto)} solicitud(es) esperando respuesta del cliente.`
+                    : 'Nada pendiente del cliente.'}
+                  {esContinuo ? '' : ` Fase ${faseActual} — ${fases.find(f => f.numero === faseActual)?.nombre || ''}`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-ink-300 uppercase tracking-wide mb-3">Notas del equipo <span className="font-normal normal-case text-slate-400 dark:text-ink-400">(interno — el cliente no las ve)</span></h3>
+            <HiloComentarios
+              comentarios={notas}
+              miembrosPorId={miembrosPorId}
+              onEnviar={handleEnviarNota}
+            />
+          </div>
+        </div>
       )}
 
       {/* ─── Tab: Tareas ─── */}
@@ -764,6 +830,13 @@ export default function DetalleProyecto() {
       {/* ─── Tab: Info ─── */}
       {tab === 'info' && (
         <div className="grid grid-cols-2 gap-5">
+          <InfoCard titulo="Información clave" icono={<Globe size={14} />} fullWidth>
+            <InfoClaveEditor
+              infoClave={proyecto.proyecto?.infoClave || { dominio: null, grupoWhatsapp: null, extras: [] }}
+              onGuardar={async (infoClave) => { await actualizarInfoClave(proyecto.slug, infoClave); await refresh() }}
+            />
+          </InfoCard>
+
           <InfoCard titulo="Área del proyecto" icono={<Tag size={14} />}>
             {editandoAreas ? (
               <EditorAreas areasIniciales={proyecto.areas || []} onGuardar={handleGuardarAreas} onCancelar={() => setEditandoAreas(false)} />
@@ -1591,6 +1664,7 @@ function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuard
     instruccionesCliente: '',
     responsable: 'equipo',
     esCliente: false,
+    modulo: '',
     plazoHoras: '',
     columna: esContinuo ? contexto : 'todo',
     dependencias: [],
@@ -1609,6 +1683,7 @@ function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuard
       instruccionesCliente: form.instruccionesCliente,
       responsable: form.esCliente ? 'cliente' : form.responsable,
       esCliente: form.esCliente,
+      modulo: form.esCliente ? (form.modulo || null) : null,
       plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null,
       dependencias: form.dependencias,
       prioridad: form.prioridad || null,
@@ -1639,9 +1714,33 @@ function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuard
           )}
 
           <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
+            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked, modulo: '' })} className="accent-brand-500" />
             Es una tarea del cliente
           </label>
+
+          {form.esCliente && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Módulo de solicitud</label>
+              <select
+                value={form.modulo}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  const modulo = valor ? MODULOS_CLIENTE[valor] : null
+                  setForm({
+                    ...form,
+                    modulo: valor,
+                    instruccionesCliente: modulo ? modulo.plantilla() : form.instruccionesCliente,
+                    titulo: form.titulo || (modulo ? modulo.generica : ''),
+                  })
+                }}
+                className={inputCls}
+              >
+                <option value="">Sin módulo — instrucciones libres</option>
+                {Object.entries(MODULOS_CLIENTE).map(([valor, m]) => <option key={valor} value={valor}>{m.label}</option>)}
+              </select>
+              {form.modulo && <p className="text-xs text-slate-400 dark:text-ink-400 mt-1">{MODULOS_CLIENTE[form.modulo].ayuda}</p>}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -2058,6 +2157,105 @@ function TextoFormateado({ texto }) {
           {linea}
         </div>
       ))}
+    </div>
+  )
+}
+
+// Chip del nivel de salud para el resumen del tab Status.
+function StatusSaludChip({ nivel }) {
+  const config = {
+    completo: { label: 'Completo', clase: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' },
+    atrasado: { label: 'Atrasado', clase: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' },
+    estancado: { label: 'Estancado', clase: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
+    avanza: { label: 'En curso', clase: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' },
+  }[nivel]
+  if (!config) return <span className="text-xs text-slate-400 dark:text-ink-400">Sin clasificar (proyecto no activo)</span>
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${config.clase}`}>{config.label}</span>
+}
+
+// Información clave del proyecto: dominio, grupo de WhatsApp y extras libres
+// ({etiqueta, valor}) para lo que surja (hosting, redes del cliente...).
+// Todos en el proyecto pueden editar; vive en proyecto.proyecto.infoClave.
+function InfoClaveEditor({ infoClave, onGuardar }) {
+  const [editando, setEditando] = useState(false)
+  const [form, setForm] = useState(infoClave)
+
+  function iniciar() {
+    setForm({
+      dominio: infoClave.dominio || '',
+      grupoWhatsapp: infoClave.grupoWhatsapp || '',
+      extras: (infoClave.extras || []).map((e) => ({ ...e })),
+    })
+    setEditando(true)
+  }
+
+  async function guardar() {
+    await onGuardar({
+      dominio: form.dominio?.trim() || null,
+      grupoWhatsapp: form.grupoWhatsapp?.trim() || null,
+      extras: (form.extras || []).filter((e) => e.etiqueta.trim() && e.valor.trim()),
+    })
+    setEditando(false)
+  }
+
+  if (editando) {
+    return (
+      <div className="space-y-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.dominio || ''} onChange={(e) => setForm({ ...form, dominio: e.target.value })} placeholder="Dominio (midominio.com)" className={inputCls} />
+          <input value={form.grupoWhatsapp || ''} onChange={(e) => setForm({ ...form, grupoWhatsapp: e.target.value })} placeholder="Grupo de WhatsApp" className={inputCls} />
+        </div>
+        {(form.extras || []).map((extra, i) => (
+          <div key={i} className="flex gap-2">
+            <input value={extra.etiqueta} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Hosting)" className={inputCls + ' w-40 shrink-0'} />
+            <input value={extra.valor} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, valor: e.target.value } : x) })} placeholder="Valor" className={inputCls} />
+            <button onClick={() => setForm({ ...form, extras: form.extras.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+          </div>
+        ))}
+        <button
+          onClick={() => setForm({ ...form, extras: [...(form.extras || []), { etiqueta: '', valor: '' }] })}
+          className="text-xs text-brand-700 dark:text-brand-400 hover:underline"
+        >
+          + Agregar dato
+        </button>
+        <div className="flex gap-2 pt-1">
+          <button onClick={guardar} className="text-xs font-medium bg-brand-500 hover:bg-brand-600 text-slate-900 px-2.5 py-1.5 rounded-md transition-colors">Guardar</button>
+          <button onClick={() => setEditando(false)} className="text-xs text-slate-500 dark:text-ink-300 px-2.5 py-1.5 rounded-md transition-colors">Cancelar</button>
+        </div>
+      </div>
+    )
+  }
+
+  const tieneAlgo = infoClave.dominio || infoClave.grupoWhatsapp || (infoClave.extras || []).length
+  return (
+    <div>
+      {tieneAlgo ? (
+        <dl className="space-y-1.5">
+          {infoClave.dominio && (
+            <div className="flex items-center gap-2 text-sm">
+              <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0">Dominio</dt>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate">{infoClave.dominio}</dd>
+            </div>
+          )}
+          {infoClave.grupoWhatsapp && (
+            <div className="flex items-center gap-2 text-sm">
+              <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0">Grupo WhatsApp</dt>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate">{infoClave.grupoWhatsapp}</dd>
+            </div>
+          )}
+          {(infoClave.extras || []).map((e) => (
+            <div key={e.etiqueta} className="flex items-center gap-2 text-sm">
+              <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0 truncate">{e.etiqueta}</dt>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 min-w-0">{e.valor}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="text-sm text-slate-400 dark:text-ink-400">Sin información clave registrada — dominio, grupo de WhatsApp y otros datos del proyecto.</p>
+      )}
+      <button onClick={iniciar} className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium mt-2">
+        {tieneAlgo ? 'Editar' : 'Agregar información'}
+      </button>
     </div>
   )
 }

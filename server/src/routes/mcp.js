@@ -14,7 +14,8 @@ import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
+import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, driveConfigurado } from '../lib/drive.js'
+import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea } from '../lib/tareaHelpers.js'
@@ -80,6 +81,8 @@ async function getProyecto(slug) {
       tareas: { include: { comentarios: { orderBy: { creadoEn: 'desc' }, take: 1 } } },
       log: { orderBy: { fecha: 'desc' }, take: 1 },
       solicitudes: { orderBy: { creadaEn: 'desc' } },
+      // Últimas notas de status (tab "Status" del panel) para ver_proyecto.
+      notas: { orderBy: { creadoEn: 'desc' }, take: 10 },
     },
   })
 }
@@ -440,17 +443,22 @@ function buildServer(usuario) {
   server.registerTool(
     'editar_proyecto',
     {
-      title: 'Editar descripción o fecha de entrega del proyecto',
-      description: 'Actualiza la descripción libre del proyecto y/o su fecha estimada de entrega. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
+      title: 'Editar descripción, info clave o fecha de entrega del proyecto',
+      description: 'Actualiza la descripción libre del proyecto, su información clave y/o su fecha estimada de entrega. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). infoClave reemplaza por completo la info clave (dominio, grupoWhatsapp, extras) — lee ver_proyecto primero y manda el objeto completo. fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         descripcion: z.string().optional().describe('Nueva descripción del proyecto'),
         fechaEstimadaEntrega: z.string().optional().describe('Nueva fecha estimada de entrega, formato YYYY-MM-DD. Solo aplica a proyectos "finito".'),
+        infoClave: z.object({
+          dominio: z.string().nullable().optional().describe('Dominio del proyecto (ej. midominio.com)'),
+          grupoWhatsapp: z.string().nullable().optional().describe('Nombre del grupo de WhatsApp del proyecto'),
+          extras: z.array(z.object({ etiqueta: z.string(), valor: z.string() })).optional().describe('Datos libres adicionales (ej. "Redes sociales del cliente", "Hosting")'),
+        }).optional().describe('Información clave del proyecto — reemplaza el objeto completo'),
       },
     },
-    async ({ slug, descripcion, fechaEstimadaEntrega }) => {
-      if (descripcion === undefined && fechaEstimadaEntrega === undefined) {
-        return fail('Manda al menos descripcion o fechaEstimadaEntrega.')
+    async ({ slug, descripcion, fechaEstimadaEntrega, infoClave }) => {
+      if (descripcion === undefined && fechaEstimadaEntrega === undefined && infoClave === undefined) {
+        return fail('Manda al menos descripcion, fechaEstimadaEntrega o infoClave.')
       }
 
       const p = await getProyecto(slug)
@@ -462,13 +470,20 @@ function buildServer(usuario) {
       const cambios = {}
       if (descripcion !== undefined) cambios.descripcion = descripcion
       if (fechaEstimadaEntrega !== undefined) cambios.fechaEstimadaEntrega = fechaEstimadaEntrega
+      if (infoClave !== undefined) {
+        cambios.infoClave = {
+          dominio: infoClave.dominio ?? p.proyecto?.infoClave?.dominio ?? null,
+          grupoWhatsapp: infoClave.grupoWhatsapp ?? p.proyecto?.infoClave?.grupoWhatsapp ?? null,
+          extras: infoClave.extras ?? p.proyecto?.infoClave?.extras ?? [],
+        }
+      }
 
       await prisma.proyecto.update({
         where: { id: p.id },
         data: { proyecto: { ...p.proyecto, ...cambios } },
       })
 
-      const detalle = Object.keys(cambios).map((c) => c === 'descripcion' ? 'descripción' : `entrega → ${fechaEstimadaEntrega}`).join(', ')
+      const detalle = Object.keys(cambios).map((c) => c === 'descripcion' ? 'descripción' : c === 'infoClave' ? 'info clave' : `entrega → ${fechaEstimadaEntrega}`).join(', ')
       await logEntry(p.id, usuario.nombre, 'Proyecto editado', detalle)
       emitirCambio(p.id)
 
@@ -542,7 +557,10 @@ function buildServer(usuario) {
       resumen.tareasPendientesCliente = p.tareas
         .filter((t) => t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, ...(t.modulo ? { modulo: t.modulo } : {}), instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras }))
+      // Notas de status recientes (tab "Status") + info clave del proyecto.
+      resumen.notasStatus = (p.notas || []).map((n) => ({ autor: n.autor, texto: n.texto, creadoEn: n.creadoEn }))
+      resumen.infoClave = p.proyecto?.infoClave || null
       resumen.respuestasClienteRecientes = p.tareas
         .filter((t) => t.esCliente && t.estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl))
         .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
@@ -630,6 +648,34 @@ function buildServer(usuario) {
   )
 
   server.registerTool(
+    'nota_status',
+    {
+      title: 'Agregar nota de status',
+      description: 'Agrega una nota al hilo de "Status" del proyecto — la bitácora del equipo de qué ha pasado y por qué sigue atorado (ej. "ya no quedan actividades, falta que el cliente haga pruebas finales", "el cliente pidió mover el VoBo a la próxima semana"). Interno del equipo: nunca se muestra al cliente. Las notas aparecen en el panel (tab Status) y en ver_proyecto (notasStatus). Para datos estructurados (dominio, grupo de WhatsApp, redes del cliente) usa editar_proyecto con infoClave en vez de una nota.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        texto: z.string().describe('Contenido de la nota (máx. 5000 caracteres)'),
+      },
+    },
+    async ({ slug, texto }) => {
+      const limpio = texto?.trim()
+      if (!limpio) return fail('La nota no puede estar vacía.')
+      if (limpio.length > 5000) return fail('La nota no puede exceder 5000 caracteres.')
+
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const nota = await prisma.notaProyecto.create({
+        data: { proyectoId: p.id, autor: usuario.nombre, autorId: usuario.id, texto: limpio },
+      })
+      await logEntry(p.id, usuario.nombre, 'Nota de status', limpio.slice(0, 80))
+      emitirCambio(p.id)
+
+      return ok(`Nota de status agregada a ${p.cliente?.nombreComercial || slug} (${new Date(nota.creadoEn).toISOString()}).`)
+    },
+  )
+
+  server.registerTool(
     'registrar_actividad',
     {
       title: 'Registrar actividad',
@@ -705,11 +751,12 @@ function buildServer(usuario) {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero (ej. "revisa este prototipo" solo tiene sentido una vez diseñado), usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) (fotos, logo, documentos, materiales), usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto y aparezca directo en su tarjeta. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
+      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). MÓDULOS: con el parámetro modulo la solicitud se vuelve estructurada — "dominio" (pide los datos para registrar el dominio; al responder el cliente, el dominio queda registrado en la Info clave del proyecto), "recursos" (pide fotos/logo/textos y crea la subcarpeta "Recursos" en el Drive del proyecto, adjuntando el enlace en la tarjeta para que suba ahí) y "vobo" (aceptación formal del proyecto; su respuesta queda registrada como VoBo). Con modulo puedes omitir instrucciones y se usa la plantilla del módulo. Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero, usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) SIN módulo, usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
-        instrucciones: z.string().describe('Instrucciones claras para el cliente sobre qué debe hacer. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en su portal; si se manda texto plano se preservan los saltos de línea igual.'),
+        instrucciones: z.string().optional().describe('Instrucciones claras para el cliente. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en su portal. Si se omite y se pasa modulo, se usa la plantilla del módulo.'),
+        modulo: z.enum(['dominio', 'recursos', 'vobo']).optional().describe('Convierte la solicitud en estructurada: dominio (datos para registrar/conectar el dominio, al responder queda en Info clave), recursos (fotos/logo/textos con subcarpeta de Drive lista para subir) o vobo (aceptación formal del proyecto).'),
         plazoHoras: z.number().int().optional().describe('Plazo sugerido en horas'),
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo".'),
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta solicitud'),
@@ -718,12 +765,19 @@ function buildServer(usuario) {
         pedirArchivos: z.boolean().optional().describe('True si se le va a pedir al cliente subir archivo(s) (fotos, logo, documentos, materiales). Crea o reutiliza la carpeta de Drive del proyecto y adjunta el link directo en la tarjeta de la solicitud.'),
       },
     },
-    async ({ slug, titulo, instrucciones, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds, pedirArchivos }) => {
+    async ({ slug, titulo, instrucciones, modulo, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds, pedirArchivos }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
       const errorDeps = validarDependencias(p, dependeDeTareaIds)
       if (errorDeps) return fail(errorDeps)
+
+      const moduloValido = modulo && MODULOS_CLIENTE[modulo] ? modulo : null
+      if (modulo && !moduloValido) return fail(`Módulo inválido: "${modulo}". Valores: dominio, recursos, vobo.`)
+      let instruccionesFinal = instrucciones?.trim() || null
+      if (!instruccionesFinal && !moduloValido) {
+        return fail('Falta "instrucciones": describe qué necesita el cliente, o pasa un modulo (dominio, recursos, vobo) para usar su plantilla.')
+      }
 
       const esContinuo = p.tipo === 'continuo'
       const posicion = esContinuo
@@ -733,7 +787,12 @@ function buildServer(usuario) {
 
       let driveFolderUrl = null
       let avisoDrive = ''
-      if (pedirArchivos) {
+      if (moduloValido === 'recursos') {
+        // Subcarpeta "Recursos" — el portal muestra el botón de subida cuando
+        // la tarea tiene driveFolderUrl.
+        driveFolderUrl = await obtenerOCrearCarpetaRecursos(p)
+        if (!driveFolderUrl) avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
+      } else if (pedirArchivos) {
         if (driveConfigurado()) {
           const carpetaId = await obtenerOCrearCarpetaProyecto(p)
           if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
@@ -741,6 +800,10 @@ function buildServer(usuario) {
         } else {
           avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
         }
+      }
+
+      if (!instruccionesFinal) {
+        instruccionesFinal = MODULOS_CLIENTE[moduloValido].plantilla({ conDrive: !!driveFolderUrl, urlDrive: driveFolderUrl })
       }
 
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
@@ -756,7 +819,8 @@ function buildServer(usuario) {
           titulo,
           responsable: 'cliente',
           esCliente: true,
-          instruccionesCliente: instrucciones,
+          instruccionesCliente: instruccionesFinal,
+          modulo: moduloValido,
           plazoHoras: plazoHoras ?? null,
           dependencias: dependeDeTareaIds || [],
           custom: true,
@@ -769,7 +833,7 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       const nota = dependeDeTareaIds?.length ? ' (queda oculta para el cliente hasta completar sus dependencias)' : ''
-      return ok(`Se creó la solicitud "${titulo}" para el cliente${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive} id: "${id}"`)
+      return ok(`Se creó la solicitud "${titulo}" para el cliente${moduloValido ? ` con el módulo ${moduloValido}` : ''}${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive} id: "${id}"`)
     },
   )
 

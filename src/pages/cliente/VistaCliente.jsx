@@ -6,6 +6,7 @@ import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
+import MedidorCircular from '../../components/MedidorCircular'
 import { CheckCircle2, Clock, ChevronDown, ChevronUp, AlertCircle, Calendar, Users, Info, ExternalLink, FolderOpen, Lock, Paperclip, X, Sun, Moon, MessageSquarePlus, XCircle, Eye } from 'lucide-react'
 import logo from '../../assets/logo-foco-dark.svg'
 
@@ -198,7 +199,7 @@ export default function VistaCliente() {
                 {esContinuo ? 'Servicio continuo' : completado ? 'Proyecto entregado' : `Etapa ${faseActual} de ${fases.length} — ${faseActualNombre}`}
               </div>
             </div>
-            {!esContinuo && <div className="text-3xl font-bold text-brand-600 dark:text-brand-400">{avance}%</div>}
+            {!esContinuo && <MedidorCircular porcentaje={avance} tamano={64} grosor={6} />}
           </div>
           {!esContinuo && (
             <>

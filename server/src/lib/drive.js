@@ -1,4 +1,5 @@
 import { JWT } from 'google-auth-library'
+import prisma from './prisma.js'
 
 let authClient = null
 
@@ -44,6 +45,26 @@ export async function obtenerOCrearCarpetaProyecto(proyecto) {
     token,
   )
   return carpeta.id
+}
+
+// Devuelve el URL de la subcarpeta "Recursos" del proyecto, creándola dentro
+// de la carpeta de respuestas la primera vez (la usan las solicitudes del
+// módulo "recursos"). Null si Drive no está configurado o falla — la tarea
+// sigue siendo válida, solo sin botón de subida.
+export async function obtenerOCrearCarpetaRecursos(proyecto) {
+  if (!driveConfigurado()) return null
+  try {
+    if (proyecto.driveRecursosId) return `https://drive.google.com/drive/folders/${proyecto.driveRecursosId}`
+
+    const raiz = await obtenerOCrearCarpetaProyecto(proyecto)
+    const token = await getToken()
+    const subcarpeta = await crearCarpeta('Recursos', raiz, token)
+    await prisma.proyecto.update({ where: { id: proyecto.id }, data: { driveRecursosId: subcarpeta.id } })
+    return `https://drive.google.com/drive/folders/${subcarpeta.id}`
+  } catch (err) {
+    console.error('No se pudo crear la carpeta de Recursos:', err?.message || err)
+    return null
+  }
 }
 
 // Sube un archivo (buffer en memoria, viene de multer) a una carpeta de Drive.

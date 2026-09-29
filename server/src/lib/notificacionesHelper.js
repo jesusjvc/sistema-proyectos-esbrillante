@@ -26,9 +26,17 @@ export async function crearNotificacion({ destinatarioIds, tipo, mensaje, actor,
     comentarioId: comentarioId ?? null,
   }
 
-  const creadas = await Promise.all(
-    ids.map((destinatarioId) => prisma.notificacion.create({ data: { ...base, destinatarioId } })),
-  )
+  // Si un userId quedó obsoleto (miembro eliminado cuya id sigue en el
+  // equipo de un proyecto viejo, datos de prueba...), la FK falla con P2003
+  // — no debe tumbar la operación que la originó: esa notificación se descarta.
+  const creadas = (await Promise.all(
+    ids.map((destinatarioId) =>
+      prisma.notificacion.create({ data: { ...base, destinatarioId } }).catch((err) => {
+        if (err?.code === 'P2003') return null
+        throw err
+      }),
+    ),
+  )).filter(Boolean)
 
   creadas.forEach((n) => emitirNotificacion(n.destinatarioId, n))
 

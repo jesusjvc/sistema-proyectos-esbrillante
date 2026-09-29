@@ -78,6 +78,9 @@ model Proyecto {
   equipo              Json
   linksCliente        Json     @default("{}")
   driveRespuestasId   String?
+  // Subcarpeta "Recursos" dentro de la carpeta del proyecto — la crean las
+  // solicitudes del módulo "recursos" (fotos, logo, textos del cliente).
+  driveRecursosId     String?
   vistoAdminEn        DateTime?
   tiempos             Json     @default("{}")
   passwordCliente     String
@@ -91,10 +94,29 @@ model Proyecto {
   tareas      Tarea[]
   log         LogEntry[]
   solicitudes Solicitud[]
+  notas       NotaProyecto[]
 
   creadoEn DateTime @default(now())
 
   @@map("proyectos")
+}
+
+// Notas de estatus del proyecto — el hilo del tab "Status" (equipo interno,
+// nunca visible al cliente). A diferencia de Comentario, no está atado a una
+// tarea: es la bitácora general de "qué ha pasado y por qué sigue atorado".
+model NotaProyecto {
+  id        String @id @default(cuid())
+  proyectoId String
+  proyecto  Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  autor     String
+  autorId   String?
+  texto     String
+  mencionados String[] @default([])
+
+  creadoEn DateTime @default(now())
+
+  @@index([proyectoId, creadoEn])
+  @@map("notas_proyecto")
 }
 
 // Cliente real (persona/negocio), independiente de cuántos Proyecto tenga.
@@ -240,6 +262,10 @@ model Tarea {
 
   esCliente            Boolean @default(false)
   instruccionesCliente String  @default("")
+  // Módulo de solicitud estructurada al cliente: 'dominio' | 'recursos' |
+  // 'vobo'. Solo tiene sentido en tareas esCliente — define la plantilla de
+  // instrucciones y efectos al completarse (p. ej. dominio → infoClave).
+  modulo               String?
   plazoHoras           Int?
   esRutaCritica        Boolean @default(false)
   soloAdmin            Boolean @default(false)
