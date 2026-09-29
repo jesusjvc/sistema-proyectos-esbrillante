@@ -611,7 +611,7 @@ function buildServer(usuario) {
       })
 
       const clasificados = proyectos.map((p) => ({ p, salud: calcularSalud(p) }))
-      const conteos = { atrasado: 0, estancado: 0, avanza: 0 }
+      const conteos = { atrasado: 0, estancado: 0, avanza: 0, completo: 0 }
       const otros = {}
       for (const { p, salud } of clasificados) {
         if (salud.nivel) conteos[salud.nivel]++
