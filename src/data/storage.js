@@ -295,6 +295,17 @@ export function cerrarProyecto(proyectoId, usuario) {
 
 // ─── Cálculo de tiempos ────────────────────────────────────────────────────
 
+// Horas → duración legible: menos de un día se queda en horas; a partir de
+// ahí domina el número de días (339.2 h se lee "14 días 3 h", no "339.2h").
+export function formatoDuracion(horas) {
+  const h = Number(horas) || 0
+  if (h < 24) return `${Math.round(h)} h`
+  const dias = Math.floor(h / 24)
+  const resto = Math.floor(h % 24)
+  const etiquetaDias = `${dias} ${dias === 1 ? 'día' : 'días'}`
+  return resto ? `${etiquetaDias} ${resto} h` : etiquetaDias
+}
+
 export function calcularTiempos(proyecto) {
   const { tiempos } = proyecto
   if (!tiempos.inicio) return { totalHoras: 0, pausaHoras: 0, activoHoras: 0 }

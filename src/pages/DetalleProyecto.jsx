@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { calcularAvance, getFaseActual, calcularTiempos, formatFecha, formatFechaHora, statusBadge, statusLabel, contarPendientesCliente } from '../data/storage'
+import { calcularAvance, getFaseActual, calcularTiempos, formatoDuracion, formatFecha, formatFechaHora, statusBadge, statusLabel, contarPendientesCliente } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
@@ -481,11 +481,11 @@ export default function DetalleProyecto() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-ink-500">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">Tiempo activo</div>
-            <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5">{tiempos.activoHoras}h</div>
+            <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5" title={`${tiempos.activoHoras} h`}>{formatoDuracion(tiempos.activoHoras)}</div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">En pausa</div>
-            <div className="font-semibold text-amber-600 dark:text-amber-400 mt-0.5">{tiempos.pausaHoras}h</div>
+            <div className="font-semibold text-amber-600 dark:text-amber-400 mt-0.5" title={`${tiempos.pausaHoras} h`}>{formatoDuracion(tiempos.pausaHoras)}</div>
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">Última actividad</div>
