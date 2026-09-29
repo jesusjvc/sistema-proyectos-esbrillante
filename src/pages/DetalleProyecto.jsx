@@ -9,7 +9,7 @@ import {
   editarTarea, agregarTarea, eliminarTarea, actualizarLinks, marcarVisto,
   cambiarTipoProyecto, eliminarProyecto, getMiembros, actualizarEquipoProyecto,
   aprobarSolicitud, rechazarSolicitud, crearSolicitudInterna, actualizarDescripcion, actualizarFechaEntrega, crearCarpetaDriveProyecto,
-  getNotas, agregarNota, actualizarInfoClave,
+  getNotas, agregarNota, actualizarInfoClave, agregarFase, eliminarFase,
   crearComentario, regenerarPasswordCliente, actualizarAreasProyecto,
 } from '../data/api'
 import {
@@ -60,6 +60,10 @@ export default function DetalleProyecto() {
   const [buscarTarea, setBuscarTarea] = useState('')
   const [tab, setTab] = useState('tareas')
   const [notas, setNotas] = useState([])
+  const [faseNuevaVisible, setFaseNuevaVisible] = useState(false)
+  const [nombreFaseNueva, setNombreFaseNueva] = useState('')
+  const [agregandoFase, setAgregandoFase] = useState(false)
+  const [faseEliminando, setFaseEliminando] = useState(null)
   const [vistaContinuo, setVistaContinuo] = useState('tabla')
   const [copiado, setCopiado] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
@@ -97,6 +101,27 @@ export default function DetalleProyecto() {
   }
 
   const miembrosPorId = Object.fromEntries(miembros.map((m) => [m.id, m.nombre]))
+
+  async function handleAgregarFase() {
+    const nombre = nombreFaseNueva.trim()
+    if (!nombre) return
+    setAgregandoFase(true)
+    try {
+      const resp = await agregarFase(proyecto.slug, nombre)
+      setFaseNuevaVisible(false)
+      setNombreFaseNueva('')
+      await refresh()
+      setFaseAbierta(resp.numero)
+    } finally {
+      setAgregandoFase(false)
+    }
+  }
+
+  async function handleEliminarFase(numero) {
+    await eliminarFase(proyecto.slug, numero)
+    setFaseEliminando(null)
+    await refresh()
+  }
 
   async function handleGuardarAreas(areas) {
     await actualizarAreasProyecto(proyecto.slug, areas)
@@ -708,6 +733,23 @@ export default function DetalleProyecto() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {esAdminRol && total === 0 && (
+                      faseEliminando === fase.numero ? (
+                        <span className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-xs text-slate-500 dark:text-ink-300">¿Eliminar?</span>
+                          <button onClick={() => handleEliminarFase(fase.numero)} className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-md transition-colors">Sí, eliminar</button>
+                          <button onClick={() => setFaseEliminando(null)} className="text-xs text-slate-400 hover:text-slate-600 px-1">No</button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setFaseEliminando(fase.numero) }}
+                          className="p-1.5 text-slate-300 dark:text-ink-400 hover:text-red-500 rounded-lg transition-colors"
+                          title="Eliminar fase (solo si está vacía)"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )
+                    )}
                     {completadas > 0 && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setFaseOcultarCompletadas((prev) => ({ ...prev, [fase.numero]: !ocultarCompletadas })) }}
@@ -781,6 +823,37 @@ export default function DetalleProyecto() {
               </div>
             )
           })}
+          {esAdminRol && (
+            faseNuevaVisible ? (
+              <div className="bg-white dark:bg-ink-800 rounded-xl border border-dashed border-brand-300 dark:border-brand-600 p-4 flex items-center gap-2">
+                <input
+                  value={nombreFaseNueva}
+                  onChange={(e) => setNombreFaseNueva(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAgregarFase()}
+                  placeholder="Nombre de la nueva fase (ej. Migración de contenido)..."
+                  className="flex-1 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2 text-sm bg-white dark:bg-ink-800 text-slate-800 dark:text-ink-100 outline-none focus:ring-2 focus:ring-brand-400"
+                  autoFocus
+                />
+                <button
+                  onClick={handleAgregarFase}
+                  disabled={!nombreFaseNueva.trim() || agregandoFase}
+                  className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
+                >
+                  Agregar
+                </button>
+                <button onClick={() => { setFaseNuevaVisible(false); setNombreFaseNueva('') }} className="px-3 py-2 text-sm text-slate-500 dark:text-ink-300 hover:text-slate-700 dark:hover:text-ink-100 transition-colors">
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setFaseNuevaVisible(true)}
+                className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 font-medium transition-colors px-1"
+              >
+                <Plus size={14} /> Agregar fase al final
+              </button>
+            )
+          )}
         </div>
       )}
 

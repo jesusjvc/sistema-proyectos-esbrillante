@@ -76,6 +76,8 @@ export const agregarTarea = (slug, data) => req('POST', `/api/proyectos/${slug}/
 export const getNotas = (slug) => req('GET', `/api/proyectos/${slug}/notas`)
 export const agregarNota = (slug, data) => req('POST', `/api/proyectos/${slug}/notas`, data)
 export const actualizarInfoClave = (slug, infoClave) => req('PUT', `/api/proyectos/${slug}/info-clave`, infoClave)
+export const agregarFase = (slug, nombre) => req('POST', `/api/proyectos/${slug}/fases`, { nombre })
+export const eliminarFase = (slug, numero) => req('DELETE', `/api/proyectos/${slug}/fases/${numero}`)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
 export const listarComentarios = (slug, tareaId) => req('GET', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`)
 export const crearComentario = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`, data)

@@ -334,6 +334,79 @@ router.put('/:slug/etiquetas', requireAdmin, async (req, res) => {
   }
 })
 
+// POST /api/proyectos/:slug/fases — agrega una fase al final (solo finitos).
+// La estructura de fases nace con la plantilla del proyecto; esto permite
+// extenderla después (ej. agregar una fase de "Migración" que no estaba prevista).
+router.post('/:slug/fases', requireAuth, async (req, res) => {
+  const nombre = typeof req.body?.nombre === 'string' ? req.body.nombre.trim().slice(0, 80) : ''
+  if (!nombre) return res.status(400).json({ error: 'Falta el nombre de la fase' })
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (p.tipo === 'continuo') return res.status(400).json({ error: 'Los proyectos continuos no usan fases' })
+
+    const fases = [...(p.proyecto?.fases || [])]
+    const numero = fases.length ? Math.max(...fases.map((f) => f.numero)) + 1 : 1
+    fases.push({ numero, nombre })
+
+    await prisma.proyecto.update({ where: { id: p.id }, data: { proyecto: { ...p.proyecto, fases } } })
+    await logEntry(p.id, req.user.nombre, 'Fase agregada', `Fase ${numero} — ${nombre}`)
+    emitirCambio(p.id)
+    res.json({ ok: true, fases, numero })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// DELETE /api/proyectos/:slug/fases/:numero — elimina una fase SOLO si no
+// tiene tareas (ni completadas ni omitidas: ninguna tarea puede apuntar a un
+// número de fase que deje de existir). Las fases posteriores se renumberan —
+// y sus tareas con ellas — para que la secuencia 1..N se mantenga intacta
+// (getFaseActual y el portal del cliente la asumen).
+router.delete('/:slug/fases/:numero', requireAuth, async (req, res) => {
+  const numero = Number(req.params.numero)
+  if (!Number.isInteger(numero) || numero < 1) return res.status(400).json({ error: 'Número de fase inválido' })
+
+  try {
+    const p = await prisma.proyecto.findFirst({
+      where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] },
+      include: { tareas: { select: { id: true, fase: true } } },
+    })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (p.tipo === 'continuo') return res.status(400).json({ error: 'Los proyectos continuos no usan fases' })
+
+    const fases = p.proyecto?.fases || []
+    const idx = fases.findIndex((f) => f.numero === numero)
+    if (idx === -1) return res.status(404).json({ error: `El proyecto no tiene una fase número ${numero}` })
+    if (fases.length <= 1) return res.status(400).json({ error: 'No se puede eliminar la única fase del proyecto' })
+
+    const enLaFase = p.tareas.filter((t) => t.fase === numero)
+    if (enLaFase.length) {
+      return res.status(400).json({ error: `La fase "${fases[idx].nombre}" tiene ${enLaFase.length} tarea${enLaFase.length === 1 ? '' : 's'} — muévelas a otra fase o elimínalas antes de eliminar la fase` })
+    }
+
+    // Renumerar preservando todo lo demás (fechas estimadas, pagos) de cada
+    // fase: las entradas posteriores bajan una posición junto con sus tareas.
+    const fasesFinal = fases.filter((_, i) => i !== idx).map((f, i) => ({ ...f, numero: i + 1 }))
+
+    await prisma.$transaction(async (tx) => {
+      for (let fs = numero + 1; fs <= fases.length; fs++) {
+        await tx.tarea.updateMany({ where: { proyectoId: p.id, fase: fs }, data: { fase: fs - 1 } })
+      }
+      await tx.proyecto.update({ where: { id: p.id }, data: { proyecto: { ...p.proyecto, fases: fasesFinal } } })
+    })
+
+    await logEntry(p.id, req.user.nombre, 'Fase eliminada', `Fase ${numero} — ${fases[idx].nombre} (fases posteriores renumeradas)`)
+    emitirCambio(p.id)
+    res.json({ ok: true, fases: fasesFinal })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // PUT /api/proyectos/:slug/info-clave
 // Información estructurada del proyecto: dominio, grupo de WhatsApp y extras
 // libres [{etiqueta, valor}] (redes del cliente, hosting, etc.). Vive dentro
