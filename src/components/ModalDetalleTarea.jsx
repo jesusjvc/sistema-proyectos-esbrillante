@@ -1,9 +1,11 @@
 import { X } from 'lucide-react'
+import useEscape from '../hooks/useEscape'
 
-// Shell reutilizado por TareaRow (DetalleProyecto.jsx) y TareaCard (KanbanBoard.jsx)
-// para mostrar el detalle y los comentarios de una tarea en un modal, estilo Trello,
-// en lugar de expandirlos dentro de la fila/tarjeta.
+// Shell reutilizado por TareaRow (DetalleProyecto.jsx), TareaCard (KanbanBoard.jsx)
+// y la bandeja MisTareas para mostrar el detalle y los comentarios de una tarea
+// en un modal, estilo Trello, en lugar de expandirlos dentro de la fila/tarjeta.
 export default function ModalDetalleTarea({ titulo, badges, accionesHeader, onCerrar, children }) {
+  useEscape(onCerrar)
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
       <div

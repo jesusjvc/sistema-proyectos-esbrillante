@@ -21,6 +21,7 @@ import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
 import { useEventosProyecto } from '../hooks/useEventos'
+import useEscape from '../hooks/useEscape'
 import { EQUIPO_NO_APLICA, infoResponsable, miembrosDelEquipo } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import KanbanBoard from '../components/KanbanBoard'
@@ -29,6 +30,7 @@ import Avatar from '../components/Avatar'
 import PrototiposPanel from '../components/PrototiposPanel'
 import PanelSolicitudes from '../components/PanelSolicitudes'
 import DescripcionProyecto from '../components/DescripcionProyecto'
+import EtiquetasProyecto from '../components/EtiquetasProyecto'
 import FechaEntregaProyecto from '../components/FechaEntregaProyecto'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import TextoEnriquecido from '../components/TextoEnriquecido'
@@ -333,6 +335,12 @@ export default function DetalleProyecto() {
             Cambiar a {esContinuo ? 'finito' : 'continuo'}
           </button>
         </div>
+        <EtiquetasProyecto
+          slug={proyecto.slug}
+          etiquetas={proyecto.etiquetas}
+          editable={esAdminRol}
+          onGuardado={refresh}
+        />
         <p className="text-sm text-slate-500 dark:text-ink-300 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
 
         <DescripcionProyecto
@@ -362,7 +370,7 @@ export default function DetalleProyecto() {
         )}
 
         {/* Métricas de tiempo */}
-        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-ink-500">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-ink-500">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">Tiempo activo</div>
             <div className="font-semibold text-slate-800 dark:text-ink-100 mt-0.5">{tiempos.activoHoras}h</div>
@@ -370,6 +378,19 @@ export default function DetalleProyecto() {
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">En pausa</div>
             <div className="font-semibold text-amber-600 dark:text-amber-400 mt-0.5">{tiempos.pausaHoras}h</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">Última actividad</div>
+            {proyecto.salud?.ultimaActividad ? (
+              <div
+                className={`font-semibold mt-0.5 ${proyecto.salud.diasSinActividad >= 7 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-ink-100'}`}
+                title={formatFechaHora(proyecto.salud.ultimaActividad)}
+              >
+                {proyecto.salud.diasSinActividad === 0 ? 'Hoy' : `Hace ${proyecto.salud.diasSinActividad} día${proyecto.salud.diasSinActividad === 1 ? '' : 's'}`}
+              </div>
+            ) : (
+              <div className="font-semibold text-slate-400 dark:text-ink-400 mt-0.5">Sin registro</div>
+            )}
           </div>
           <div>
             <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-ink-400 font-medium">{esContinuo ? 'Servicio' : 'Entrega estimada'}</div>
@@ -1381,6 +1402,7 @@ const RESPONSABLES = [
 ]
 
 function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], onGuardar, onCerrar }) {
+  useEscape(onCerrar)
   const [form, setForm] = useState({
     titulo: tarea.titulo,
     descripcion: tarea.esCliente ? '' : (tarea.descripcion || ''),
@@ -1513,6 +1535,7 @@ function ModalEditarTarea({ tarea, miembrosProyecto = [], todasLasTareas = [], o
 // Checklist para elegir de qué tareas depende otra: mientras no estén todas
 // completadas, la tarea queda bloqueada (oculta al cliente si es tarea suya).
 function ModalNuevaTarea({ contexto, miembrosProyecto = [], todasLasTareas = [], onGuardar, onCerrar }) {
+  useEscape(onCerrar)
   const esContinuo = typeof contexto === 'string'
   const [form, setForm] = useState({
     titulo: '',
@@ -1855,6 +1878,7 @@ function LinksClienteEditor({ links, onGuardar }) {
 }
 
 function ModalEliminarProyecto({ nombre, onConfirmar, onCerrar }) {
+  useEscape(onCerrar)
   const [texto, setTexto] = useState('')
   const [eliminando, setEliminando] = useState(false)
   const confirmado = texto.trim() === nombre
@@ -1911,6 +1935,7 @@ function ModalEliminarProyecto({ nombre, onConfirmar, onCerrar }) {
 }
 
 function ModalLink({ tareaId, linkTipo, titulo, valorActual, onCompletar, onCerrar }) {
+  useEscape(onCerrar)
   const [url, setUrl] = useState(valorActual)
   const info = LINK_LABELS[linkTipo] || { label: 'Link', placeholder: 'https://' }
 

@@ -83,6 +83,9 @@ model Proyecto {
   // Una o varias áreas (web | diseno_grafico | redes_sociales) — un proyecto
   // integral tiene varias. Vacío = visible en cualquier filtro de área.
   areas               String[] @default([])
+  // Etiquetas libres de tipo de servicio (Tienda online, Landing page, SEO,
+  // Google Ads...) — pueden ser varias y las define el admin en el detalle.
+  etiquetas           String[] @default([])
 
   tareas      Tarea[]
   log         LogEntry[]

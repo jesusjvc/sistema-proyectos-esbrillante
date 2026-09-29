@@ -6,6 +6,7 @@ import { generarPasswordSimple } from '../lib/passwords.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { validarYNormalizarEquipo } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
+import { calcularSalud } from '../lib/salud.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 
@@ -45,7 +46,7 @@ router.get('/', requireAuth, async (req, res) => {
       orderBy: { creadoEn: 'desc' },
       include: INCLUDE,
     })
-    res.json(proyectos)
+    res.json(proyectos.map((p) => ({ ...p, salud: calcularSalud(p) })))
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
@@ -57,7 +58,7 @@ router.get('/:slug', requireAuth, async (req, res) => {
   try {
     const p = await getProyecto(req.params.slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
-    res.json(p)
+    res.json({ ...p, salud: calcularSalud(p) })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
@@ -292,6 +293,39 @@ router.put('/:slug/areas', requireAuth, async (req, res) => {
     await prisma.proyecto.update({ where: { id: p.id }, data: { areas } })
     emitirCambio(p.id)
     res.json({ ok: true, areas })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// PUT /api/proyectos/:slug/etiquetas
+router.put('/:slug/etiquetas', requireAdmin, async (req, res) => {
+  const { etiquetas } = req.body
+  if (!Array.isArray(etiquetas) || !etiquetas.every((e) => typeof e === 'string')) {
+    return res.status(400).json({ error: 'etiquetas debe ser un arreglo de textos' })
+  }
+
+  // Trim, sin vacíos, sin duplicados (comparando sin importar mayúsculas)
+  // y con un tope razonable de longitud y cantidad.
+  const normalizadas = []
+  const vistas = new Set()
+  for (const e of etiquetas) {
+    const valor = e.trim().slice(0, 40)
+    if (!valor) continue
+    const clave = valor.toLowerCase()
+    if (vistas.has(clave)) continue
+    vistas.add(clave)
+    normalizadas.push(valor)
+  }
+
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    await prisma.proyecto.update({ where: { id: p.id }, data: { etiquetas: normalizadas.slice(0, 10) } })
+    emitirCambio(p.id)
+    res.json({ ok: true, etiquetas: normalizadas.slice(0, 10) })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })

@@ -1,23 +1,57 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
+import Avatar from '../../components/Avatar'
+import SelectorResponsableRapido from '../../components/SelectorResponsableRapido'
+import ModalDetalleTarea from '../../components/ModalDetalleTarea'
+import { PrioridadRapida, FechaRapida } from '../../components/TablaTareasContinuas'
 import { useAuth } from '../../context/AuthContext'
-import { getProyectos, iniciarTarea, completarTarea } from '../../data/api'
-import { formatFechaHora, formatFecha } from '../../data/storage'
+import { getProyectos, getMiembros, iniciarTarea, completarTarea, editarTarea } from '../../data/api'
+import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
-import { tareaLeCorresponde, tareaAsignadaDirectamente, RESPONSABLE_LABEL } from '../../lib/permisos'
+import { tareaLeCorresponde, tareaAsignadaDirectamente, miembrosDelEquipo, idsDeRol, RESPONSABLE_LABEL } from '../../lib/permisos'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
-import { CheckCircle2, ChevronRight, PlayCircle, Lock, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle2, ChevronRight, PlayCircle, Lock, ChevronDown, ChevronUp, UserX } from 'lucide-react'
+
+// Roles que se resuelven contra el equipo del proyecto — una tarea con uno de
+// estos roles y NADIE cubriéndolo en el proyecto está igual "al aire" que una
+// con responsable "equipo".
+const ROLES_CON_PERSONA = ['copy', 'disenador', 'programador', 'redes']
+
+// Urgente primero, luego por fecha límite más próxima (sin fecha al final).
+const ORDEN_PRIORIDAD = { urgente: 0, normal: 1, cuando_se_pueda: 2 }
+function porPrioridad(a, b) {
+  const pa = ORDEN_PRIORIDAD[a.prioridad] ?? 1
+  const pb = ORDEN_PRIORIDAD[b.prioridad] ?? 1
+  if (pa !== pb) return pa - pb
+  if (a.fechaLimite && b.fechaLimite) return new Date(a.fechaLimite) - new Date(b.fechaLimite)
+  if (a.fechaLimite) return -1
+  if (b.fechaLimite) return 1
+  return 0
+}
 
 export default function MisTareas() {
   const { user } = useAuth()
   const [proyectos, setProyectos] = useState([])
+  const [miembros, setMiembros] = useState([])
   const [cargando, setCargando] = useState(true)
   const [mostrarBloqueadas, setMostrarBloqueadas] = useState(false)
+  const [mostrarRecientes, setMostrarRecientes] = useState(false)
+  // 'mias' (default) | 'sinasignar' | userId de un miembro — el selector de
+  // miembro solo lo ve el admin, que así puede revisar la bandeja de cada
+  // persona del equipo.
+  const [objetivo, setObjetivo] = useState('mias')
+  // Tarea abierta en el modal-detalle: se guarda solo su identidad
+  // (proyectoSlug + id) y el contenido se resuelve contra las bandejas en
+  // cada render, así el modal siempre muestra la versión fresca (y se cierra
+  // solo si la tarea desaparece, p. ej. al completarla).
+  const [tareaAbierta, setTareaAbierta] = useState(null)
 
   async function cargar() {
     try {
-      setProyectos(await getProyectos())
+      const [ps, ms] = await Promise.all([getProyectos(), getMiembros()])
+      setProyectos(ps)
+      setMiembros(ms)
     } finally {
       setCargando(false)
     }
@@ -36,33 +70,66 @@ export default function MisTareas() {
     cargar()
   }
 
+  // Asignación rápida desde la bandeja "Sin responsable" — pasa por la misma
+  // ruta de editar tarea, así que también dispara el correo de aviso.
+  async function handleAsignar(slug, tareaId, userId) {
+    await editarTarea(slug, tareaId, { responsable: userId })
+    cargar()
+  }
+
+  // Ajustes en línea (prioridad, fecha límite) — el server valida que la
+  // tarea le corresponda a quien la edita: cada usuario ajusta lo suyo, el
+  // admin lo de cualquiera. Devuelve true/false para que el popover se cierre
+  // solo cuando el cambio realmente se guardó.
+  async function actualizarTareaRapida(slug, tareaId, cambios) {
+    try {
+      await editarTarea(slug, tareaId, cambios)
+      cargar()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const esAdmin = user?.rol === 'admin' || user?.rol === 'ADMIN'
   const base = esAdmin ? '/admin' : '/equipo'
 
-  const tareasAsignadas = []
-  const tareasDisponibles = []
-  const tareasBloqueadas = []
-  const tareasEnProceso = []
-  proyectos
-    .filter((p) => p.status === 'activo' || p.status === 'en_pausa')
-    .forEach((p) => {
+  const miembroActivo = miembros.find((m) => m.id === objetivo) || null
+  const viendoOtro = objetivo !== 'mias'
+  const usuarioObjetivo = objetivo === 'mias' ? user : miembroActivo
+  const nombreObjetivo = objetivo === 'mias' ? user?.nombre : miembroActivo?.nombre
+
+  const proyectosTrabajo = proyectos.filter((p) => p.status === 'activo' || p.status === 'en_pausa')
+
+  // Bandeja de un usuario cualquiera (yo, o el miembro que el admin esté
+  // revisando): en proceso, asignadas y bloqueadas por dependencias. Las
+  // tareas con responsable "equipo" NO aparecen — son "al aire" hasta que
+  // alguien las reciba; el admin las ve y asigna desde "Sin asignar".
+  function bandejaDe(usuarioObjetivo) {
+    const asignadas = []
+    const bloqueadas = []
+    const enProceso = []
+    if (!usuarioObjetivo) return { asignadas, bloqueadas, enProceso }
+
+    const esAdminObjetivo = usuarioObjetivo.rol === 'admin' || usuarioObjetivo.rol === 'ADMIN'
+    proyectosTrabajo.forEach((p) => {
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
       const titulosPorId = new Map(p.tareas.map((t) => [t.id, t.titulo]))
       p.tareas.forEach((t) => {
         if (t.estado === 'completada' || t.estado === 'omitida' || t.esCliente) return
-        if (t.soloKarlaOAdmin && !user?.esKarla && !esAdmin) return
+        if (t.soloKarlaOAdmin && !usuarioObjetivo.esKarla && !esAdminObjetivo) return
         // Un admin ve solo lo que tiene asignado a su persona directamente — no
         // "todo" (tareaLeCorresponde da acceso total a cualquier admin porque esa
         // función sirve para autorizar operaciones, no para armar esta bandeja).
-        if (esAdmin ? !tareaAsignadaDirectamente(t, user.id) : !tareaLeCorresponde(t, p.equipo, user)) return
+        if (esAdminObjetivo ? !tareaAsignadaDirectamente(t, usuarioObjetivo.id) : !tareaLeCorresponde(t, p.equipo, usuarioObjetivo)) return
 
         if (t.estado === 'en_proceso') {
-          if (t.asignadoA === user?.nombre) tareasEnProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
+          if (t.asignadoA === usuarioObjetivo.nombre) enProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
           return
         }
         const pendientes = t.dependencias.filter((d) => !completadasIds.has(d))
         if (pendientes.length) {
-          tareasBloqueadas.push({
+          bloqueadas.push({
             ...t,
             proyectoSlug: p.slug,
             proyectoNombre: p.cliente.nombreComercial,
@@ -70,203 +137,448 @@ export default function MisTareas() {
           })
           return
         }
-        // "equipo" genérico es de verdad "para cualquiera" — cualquier otro
-        // responsable (un rol puntual como copy/disenador, o una persona
-        // asignada directamente) ya es tuyo específicamente, aunque todavía
-        // no le hayas dado clic a "Empezar".
-        const item = { ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial }
-        if (t.responsable === 'equipo') tareasDisponibles.push(item)
-        else tareasAsignadas.push(item)
+        // Cualquier responsable que no sea "equipo" (un rol puntual como
+        // copy/disenador, o una persona asignada directamente) ya es tuyo
+        // específicamente, aunque todavía no le hayas dado clic a "Empezar".
+        if (t.responsable !== 'equipo') {
+          asignadas.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
+        }
       })
     })
-
-  // Urgente primero, luego por fecha límite más próxima (sin fecha al final).
-  const ordenPrioridad = { urgente: 0, normal: 1, cuando_se_pueda: 2 }
-  function porPrioridad(a, b) {
-    const pa = ordenPrioridad[a.prioridad] ?? 1
-    const pb = ordenPrioridad[b.prioridad] ?? 1
-    if (pa !== pb) return pa - pb
-    if (a.fechaLimite && b.fechaLimite) return new Date(a.fechaLimite) - new Date(b.fechaLimite)
-    if (a.fechaLimite) return -1
-    if (b.fechaLimite) return 1
-    return 0
+    asignadas.sort(porPrioridad)
+    return { asignadas, bloqueadas, enProceso }
   }
-  tareasAsignadas.sort(porPrioridad)
-  tareasDisponibles.sort(porPrioridad)
 
-  const tareasRecientes = proyectos
-    .filter((p) => p.status !== 'cancelado')
-    .flatMap((p) =>
-      p.tareas
-        .filter((t) => t.estado === 'completada' && t.completadaPor === user?.nombre)
-        .map((t) => ({ ...t, proyectoNombre: p.cliente.nombreComercial }))
-    )
-    .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
-    .slice(0, 10)
+  const { asignadas: tareasAsignadas, bloqueadas: tareasBloqueadas, enProceso: tareasEnProceso } = bandejaDe(usuarioObjetivo)
+
+  // Tareas "al aire" agrupadas por proyecto: sin responsable específico, o con
+  // un rol que nadie cubre en ese proyecto. El admin las puede asignar directo
+  // desde aquí con el selector rápido.
+  const sinAsignarPorProyecto = proyectosTrabajo
+    .map((p) => ({
+      proyecto: p,
+      tareas: p.tareas.filter((t) =>
+        !t.esCliente && ['pendiente', 'en_proceso', 'revision'].includes(t.estado)
+        && (t.responsable === 'equipo' || (ROLES_CON_PERSONA.includes(t.responsable) && idsDeRol(p.equipo, t.responsable).length === 0))),
+    }))
+    .filter(({ tareas }) => tareas.length > 0)
+  const totalSinAsignar = sinAsignarPorProyecto.reduce((n, { tareas }) => n + tareas.length, 0)
+
+  // Conteo de tareas por miembro para el selector del admin — cuántas hay en
+  // la bandeja de cada persona (asignadas + bloqueadas + en proceso).
+  const conteoPorMiembro = new Map(
+    miembros
+      .filter((m) => m.activo)
+      .map((m) => {
+        const b = bandejaDe(m)
+        return [m.id, b.asignadas.length + b.bloqueadas.length + b.enProceso.length]
+      }),
+  )
+  const miembrosVisibles = miembros
+    .filter((m) => m.activo && (conteoPorMiembro.get(m.id) || 0) > 0)
+    .sort((a, b) => (conteoPorMiembro.get(b.id) || 0) - (conteoPorMiembro.get(a.id) || 0))
+
+  const tareasRecientes = usuarioObjetivo
+    ? proyectos
+        .filter((p) => p.status !== 'cancelado')
+        .flatMap((p) =>
+          p.tareas
+            .filter((t) => t.estado === 'completada' && t.completadaPor === usuarioObjetivo.nombre)
+            .map((t) => ({ ...t, proyectoNombre: p.cliente.nombreComercial }))
+        )
+        .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
+        .slice(0, 10)
+    : []
+
+  const titulo = objetivo === 'mias'
+    ? `Hola, ${user?.nombre}`
+    : objetivo === 'sinasignar'
+    ? 'Tareas sin responsable'
+    : `Tareas de ${miembroActivo?.nombre || ''}`
+
+  const tareaModal = tareaAbierta
+    ? [...tareasEnProceso, ...tareasAsignadas, ...tareasBloqueadas]
+        .find((t) => t.proyectoSlug === tareaAbierta.proyectoSlug && t.id === tareaAbierta.id) || null
+    : null
+  useEffect(() => {
+    if (tareaAbierta && !tareaModal) setTareaAbierta(null)
+  }, [tareaAbierta, tareaModal])
 
   return (
-    <Layout titulo={`Hola, ${user?.nombre}`}>
+    <Layout titulo={titulo}>
       <div className="max-w-2xl space-y-6">
-        {tareasEnProceso.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold text-brand-700 uppercase tracking-wide mb-3">
-              En proceso ({tareasEnProceso.length})
-            </h2>
-            <div className="bg-white rounded-xl border border-brand-200 divide-y divide-brand-50">
-              {tareasEnProceso.map((t) => (
-                <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-brand-50/50">
-                  <PlayCircle size={14} className="text-brand-600 mt-1 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
-                      <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
-                    </div>
-                    <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
-                      Ver <ChevronRight size={13} />
-                    </Link>
-                    <button
-                      onClick={() => handleCompletar(t.proyectoSlug, t.id)}
-                      className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      <CheckCircle2 size={14} /> Listo
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            Asignadas a ti ({cargando ? '…' : tareasAsignadas.length})
-          </h2>
-          {!cargando && tareasAsignadas.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-400 text-sm">
-              No tienes tareas asignadas por tu rol o directamente a ti ahora mismo.
-            </div>
-          ) : !cargando && (
-            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-              {tareasAsignadas.map((t) => (
-                <FilaTarea key={`${t.proyectoSlug}-${t.id}`} t={t} base={base} onIniciar={handleIniciar} onCompletar={handleCompletar} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-            Disponibles para cualquiera del equipo ({cargando ? '…' : tareasDisponibles.length})
-          </h2>
-
-          {cargando ? (
-            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
-          ) : tareasDisponibles.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-              <div className="text-3xl mb-2">✅</div>
-              <div className="font-medium">No tienes tareas disponibles ahora</div>
-              <div className="text-sm mt-1">Las tareas aparecen aquí cuando están desbloqueadas</div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-              {tareasDisponibles.map((t) => (
-                <FilaTarea key={`${t.proyectoSlug}-${t.id}`} t={t} base={base} onIniciar={handleIniciar} onCompletar={handleCompletar} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {!cargando && tareasBloqueadas.length > 0 && (
-          <section>
-            <button
-              onClick={() => setMostrarBloqueadas((v) => !v)}
-              className="flex items-center gap-2 text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
-            >
-              Próximamente ({tareasBloqueadas.length})
-              {mostrarBloqueadas ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-
-            {mostrarBloqueadas && (
-              <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-                {tareasBloqueadas.map((t) => (
-                  <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start gap-3 bg-slate-50/60">
-                    <Lock size={13} className="text-slate-400 mt-1 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-slate-600 text-sm">{t.titulo}</span>
-                        <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
-                      </div>
-                      <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
-                      <div className="text-xs text-slate-400 mt-1">Falta: {t.faltaPor.join(', ')}</div>
-                    </div>
-                    <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5 shrink-0">
-                      Ver <ChevronRight size={13} />
-                    </Link>
-                  </div>
-                ))}
-              </div>
+        {esAdmin && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <ChipObjetivo activo={objetivo === 'mias'} onClick={() => setObjetivo('mias')}>
+              Mías
+            </ChipObjetivo>
+            {totalSinAsignar > 0 && (
+              <ChipObjetivo activo={objetivo === 'sinasignar'} onClick={() => setObjetivo('sinasignar')} tono="amber">
+                <UserX size={12} /> Sin asignar ({totalSinAsignar})
+              </ChipObjetivo>
             )}
-          </section>
+            {miembrosVisibles.map((m) => (
+              <ChipObjetivo key={m.id} activo={objetivo === m.id} onClick={() => setObjetivo(m.id)}>
+                <Avatar nombre={m.nombre} avatarUrl={m.avatarUrl} size={18} />
+                {m.nombre.split(' ')[0]} ({conteoPorMiembro.get(m.id)})
+              </ChipObjetivo>
+            ))}
+          </div>
         )}
 
-        {tareasRecientes.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Completadas recientemente</h2>
-            <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-              {tareasRecientes.map((t) => (
-                <div key={t.id} className="px-5 py-3 flex items-start gap-3">
-                  <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
-                  <div>
-                    <div className="text-sm text-slate-600 line-through">{t.titulo}</div>
-                    <div className="text-xs text-slate-400">{t.proyectoNombre} · {formatFechaHora(t.completadaEn)}</div>
+        {objetivo === 'sinasignar' ? (
+          cargando ? (
+            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
+          ) : (
+            <>
+              <div className="text-sm text-slate-400 dark:text-ink-400 -mt-2">
+                Tareas que nadie tiene en su bandeja: quedaron con responsable "equipo" o con un rol que nadie cubre en su proyecto. Asígnalas con el círculo punteado — la persona recibe un correo de aviso.
+              </div>
+              {sinAsignarPorProyecto.map(({ proyecto: p, tareas }) => (
+                <section key={p.id}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide truncate">
+                      {p.cliente.nombreComercial} <span className="font-normal">({tareas.length})</span>
+                    </h2>
+                    <Link to={`${base}/proyecto/${p.slug}`} className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-ink-100 flex items-center gap-0.5 shrink-0">
+                      Ver proyecto <ChevronRight size={12} />
+                    </Link>
                   </div>
-                </div>
+                  <div className="bg-white dark:bg-ink-800 rounded-xl border border-amber-200 dark:border-amber-800 divide-y divide-slate-100 dark:divide-ink-500">
+                    {tareas.map((t) => (
+                      <div key={t.id} className="px-5 py-4 flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <UserX size={15} className="text-amber-500 mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-slate-800 dark:text-ink-100 text-sm">{t.titulo}</span>
+                              {ROLES_CON_PERSONA.includes(t.responsable) && (
+                                <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                                  {RESPONSABLE_LABEL[t.responsable]} sin persona
+                                </span>
+                              )}
+                            </div>
+                            {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 dark:text-ink-300 mt-1" />}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <ControlesTarea t={t} slug={p.slug} onActualizar={actualizarTareaRapida} />
+                          <SelectorResponsableRapido
+                            miembros={miembrosDelEquipo(p.equipo, miembros)}
+                            onAsignar={(userId) => handleAsignar(p.slug, t.id, userId)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               ))}
-            </div>
-          </section>
+            </>
+          )
+        ) : (
+          <>
+            {tareasEnProceso.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-3">
+                  En proceso ({tareasEnProceso.length})
+                </h2>
+                <div className="bg-white dark:bg-ink-800 rounded-xl border-2 border-blue-300 dark:border-blue-700 divide-y divide-blue-100 dark:divide-blue-900/40">
+                  {tareasEnProceso.map((t) => (
+                    <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start justify-between gap-3 bg-blue-50/80 dark:bg-blue-500/10">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <PlayCircle size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => setTareaAbierta({ proyectoSlug: t.proyectoSlug, id: t.id })}
+                              className="font-medium text-slate-800 dark:text-ink-100 text-sm text-left hover:underline underline-offset-2 decoration-brand-400"
+                            >
+                              {t.titulo}
+                            </button>
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-300 shrink-0">{t.proyectoNombre}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <ControlesTarea t={t} slug={t.proyectoSlug} onActualizar={actualizarTareaRapida} />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setTareaAbierta({ proyectoSlug: t.proyectoSlug, id: t.id })}
+                            className="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-ink-100 flex items-center gap-0.5"
+                          >
+                            Ver <ChevronRight size={13} />
+                          </button>
+                          {!viendoOtro && (
+                            <button
+                              onClick={() => handleCompletar(t.proyectoSlug, t.id)}
+                              className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              <CheckCircle2 size={14} /> Listo
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                {objetivo === 'mias' ? 'Asignadas a ti' : `Asignadas a ${nombreObjetivo}`} ({cargando ? '…' : tareasAsignadas.length})
+              </h2>
+              {!cargando && tareasAsignadas.length === 0 ? (
+                <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-6 text-center text-slate-400 text-sm">
+                  {objetivo === 'mias'
+                    ? 'No tienes tareas asignadas por tu rol o directamente a ti ahora mismo.'
+                    : `${nombreObjetivo} no tiene tareas asignadas por su rol o directamente ahora mismo.`}
+                </div>
+              ) : !cargando && (
+                <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 divide-y divide-slate-100 dark:divide-ink-500">
+                  {tareasAsignadas.map((t) => (
+                    <FilaTarea key={`${t.proyectoSlug}-${t.id}`} t={t} base={base} soloVer={viendoOtro} onAbrir={(x) => setTareaAbierta({ proyectoSlug: x.proyectoSlug, id: x.id })} onActualizar={actualizarTareaRapida} onIniciar={handleIniciar} onCompletar={handleCompletar} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {!cargando && tareasBloqueadas.length > 0 && (
+              <section>
+                <button
+                  onClick={() => setMostrarBloqueadas((v) => !v)}
+                  className="flex items-center gap-2 text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
+                >
+                  Próximamente ({tareasBloqueadas.length})
+                  {mostrarBloqueadas ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {mostrarBloqueadas && (
+                  <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 divide-y divide-slate-100 dark:divide-ink-500">
+                    {tareasBloqueadas.map((t) => (
+                      <div key={`${t.proyectoSlug}-${t.id}`} className="px-5 py-4 flex items-start justify-between gap-3 bg-slate-50/60 dark:bg-ink-900/30">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <Lock size={13} className="text-slate-400 mt-1 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                onClick={() => setTareaAbierta({ proyectoSlug: t.proyectoSlug, id: t.id })}
+                                className="font-medium text-slate-600 dark:text-ink-200 text-sm text-left hover:underline underline-offset-2 decoration-brand-400"
+                              >
+                                {t.titulo}
+                              </button>
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-ink-700 text-slate-600 dark:text-ink-200 shrink-0">{t.proyectoNombre}</span>
+                            </div>
+                            <div className="text-xs text-slate-400 dark:text-ink-400 mt-1">Falta: {t.faltaPor.join(', ')}</div>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <ControlesTarea t={t} slug={t.proyectoSlug} onActualizar={actualizarTareaRapida} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {tareasRecientes.length > 0 && (
+              <section>
+                <button
+                  onClick={() => setMostrarRecientes((v) => !v)}
+                  className="flex items-center gap-2 text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
+                >
+                  Completadas recientemente ({tareasRecientes.length})
+                  {mostrarRecientes ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {mostrarRecientes && (
+                  <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 divide-y divide-slate-100 dark:divide-ink-500">
+                    {tareasRecientes.map((t) => (
+                      <div key={t.id} className="px-5 py-3 flex items-start gap-3">
+                        <CheckCircle2 size={15} className="text-emerald-400 mt-0.5 shrink-0" />
+                        <div>
+                          <div className="text-sm text-slate-600 dark:text-ink-300 line-through">{t.titulo}</div>
+                          <div className="text-xs text-slate-400 dark:text-ink-400">{t.proyectoNombre} · {formatFechaHora(t.completadaEn)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
+        )}
+
+        {tareaModal && (
+          <ModalTarea
+            t={tareaModal}
+            base={base}
+            soloVer={viendoOtro}
+            onCerrar={() => setTareaAbierta(null)}
+            onActualizar={actualizarTareaRapida}
+            onIniciar={handleIniciar}
+            onCompletar={handleCompletar}
+          />
         )}
       </div>
     </Layout>
   )
 }
 
-function FilaTarea({ t, base, onIniciar, onCompletar }) {
+function ChipObjetivo({ activo, onClick, tono, children }) {
   return (
-    <div className="px-5 py-4 flex items-start gap-3">
-      <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-slate-800 text-sm">{t.titulo}</span>
-          <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-800">{RESPONSABLE_LABEL[t.responsable] || 'Asignada a ti'}</span>
-          {t.prioridad === 'urgente' && <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">Urgente</span>}
-          {t.fechaLimite && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${new Date(t.fechaLimite) < new Date() ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>
-              Límite: {formatFecha(t.fechaLimite)}
-            </span>
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-colors border ${
+        activo
+          ? tono === 'amber'
+            ? 'bg-amber-500 text-white border-amber-500'
+            : 'bg-slate-800 dark:bg-ink-600 text-white border-slate-800 dark:border-ink-600'
+          : 'bg-white dark:bg-ink-800 text-slate-600 dark:text-ink-300 border-slate-200 dark:border-ink-500 hover:border-slate-300 dark:hover:border-ink-400'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+// Prioridad y fecha límite visibles Y ajustables en línea: cada usuario
+// ordena lo suyo, el admin lo de cualquiera (el server valida permisos).
+function ControlesTarea({ t, slug, onActualizar }) {
+  const actualizar = (tareaId, cambios) => onActualizar(slug, tareaId, cambios)
+  return (
+    <div className="flex items-center gap-0.5">
+      <PrioridadRapida tarea={t} onActualizar={actualizar} />
+      <FechaRapida tarea={t} onActualizar={actualizar} />
+    </div>
+  )
+}
+
+const ESTADOS_MODAL = {
+  en_proceso: { label: 'En proceso', clase: 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300' },
+  revision: { label: 'En revisión', clase: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
+  pendiente: { label: 'Pendiente', clase: 'bg-slate-100 text-slate-600 dark:bg-ink-700 dark:text-ink-300' },
+}
+
+// Tarjeta de la tarea estilo Trello (mismo shell que el detalle del proyecto):
+// detalle completo + acciones sin salir de la bandeja.
+function ModalTarea({ t, base, soloVer, onCerrar, onActualizar, onIniciar, onCompletar }) {
+  const est = ESTADOS_MODAL[t.estado] || ESTADOS_MODAL.pendiente
+  const bloqueada = (t.faltaPor || []).length > 0
+
+  return (
+    <ModalDetalleTarea
+      titulo={t.titulo}
+      badges={
+        <>
+          <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full shrink-0 ${est.clase}`}>{est.label}</span>
+          {bloqueada && <span className="text-[10px] font-medium uppercase px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-ink-700 dark:text-ink-300 shrink-0">Bloqueada</span>}
+        </>
+      }
+      onCerrar={onCerrar}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-300">{t.proyectoNombre}</span>
+        <span className="text-xs text-slate-400 dark:text-ink-400">{RESPONSABLE_LABEL[t.responsable] || 'Asignación directa'}</span>
+      </div>
+
+      {t.descripcion && (
+        <div>
+          <p className="text-[11px] uppercase font-medium text-slate-400 dark:text-ink-400 mb-1">Descripción</p>
+          <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-600 dark:text-ink-300" />
+        </div>
+      )}
+      {t.queHacer && (
+        <div>
+          <p className="text-[11px] uppercase font-medium text-slate-400 dark:text-ink-400 mb-1">Qué hacer</p>
+          <p className="text-sm text-slate-600 dark:text-ink-300 whitespace-pre-line">{t.queHacer}</p>
+        </div>
+      )}
+      {t.necesitasAntes && (
+        <div>
+          <p className="text-[11px] uppercase font-medium text-slate-400 dark:text-ink-400 mb-1">Necesitas antes</p>
+          <p className="text-sm text-slate-600 dark:text-ink-300 whitespace-pre-line">{t.necesitasAntes}</p>
+        </div>
+      )}
+      {bloqueada && (
+        <div className="text-sm text-slate-500 dark:text-ink-300 bg-slate-50 dark:bg-ink-900/50 rounded-lg px-3 py-2">
+          Espera a que se completen: {t.faltaPor.join(', ')}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-ink-500 flex-wrap">
+        <ControlesTarea t={t} slug={t.proyectoSlug} onActualizar={onActualizar} />
+        <div className="flex items-center gap-2">
+          <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-ink-100 flex items-center gap-0.5">
+            Abrir proyecto <ChevronRight size={13} />
+          </Link>
+          {!soloVer && !bloqueada && t.estado !== 'en_proceso' && (
+            <button
+              onClick={() => onIniciar(t.proyectoSlug, t.id)}
+              className="flex items-center gap-1.5 text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-500/10 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <PlayCircle size={14} /> Empezar
+            </button>
+          )}
+          {!soloVer && t.estado === 'en_proceso' && (
+            <button
+              onClick={() => onCompletar(t.proyectoSlug, t.id)}
+              className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <CheckCircle2 size={14} /> Listo
+            </button>
           )}
         </div>
-        <div className="text-sm text-slate-400 mt-0.5">{t.proyectoNombre}</div>
-        {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 mt-1" />}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <Link to={`${base}/proyecto/${t.proyectoSlug}`} className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-0.5">
-          Ver <ChevronRight size={13} />
-        </Link>
-        <button
-          onClick={() => onIniciar(t.proyectoSlug, t.id)}
-          className="flex items-center gap-1.5 text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <PlayCircle size={14} /> Empezar
-        </button>
-        <button
-          onClick={() => onCompletar(t.proyectoSlug, t.id)}
-          className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <CheckCircle2 size={14} /> Listo
-        </button>
+    </ModalDetalleTarea>
+  )
+}
+
+function FilaTarea({ t, base, soloVer, onAbrir, onActualizar, onIniciar, onCompletar }) {
+  return (
+    <div className="px-5 py-4 flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => onAbrir(t)}
+              className="font-medium text-slate-800 dark:text-ink-100 text-sm text-left hover:underline underline-offset-2 decoration-brand-400"
+            >
+              {t.titulo}
+            </button>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-300 shrink-0">{t.proyectoNombre}</span>
+          </div>
+          {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 dark:text-ink-300 mt-1" />}
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-2 shrink-0">
+        <ControlesTarea t={t} slug={t.proyectoSlug} onActualizar={onActualizar} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onAbrir(t)}
+            className="text-sm text-slate-400 hover:text-slate-700 dark:hover:text-ink-100 flex items-center gap-0.5"
+          >
+            Ver <ChevronRight size={13} />
+          </button>
+          {!soloVer && (
+            <>
+              <button
+                onClick={() => onIniciar(t.proyectoSlug, t.id)}
+                className="flex items-center gap-1.5 text-sm border border-brand-300 text-brand-700 hover:bg-brand-50 dark:hover:bg-brand-500/10 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <PlayCircle size={14} /> Empezar
+              </button>
+              <button
+                onClick={() => onCompletar(t.proyectoSlug, t.id)}
+                className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <CheckCircle2 size={14} /> Listo
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

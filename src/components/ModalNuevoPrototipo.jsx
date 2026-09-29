@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { crearPrototipo } from '../data/api'
+import useEscape from '../hooks/useEscape'
 import { X } from 'lucide-react'
 
 const inputCls = 'w-full border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2.5 text-sm text-slate-800 dark:text-ink-100 bg-white dark:bg-ink-900 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-ink-400'
@@ -10,6 +11,7 @@ const inputCls = 'w-full border border-slate-200 dark:border-ink-500 rounded-lg 
  * - proyectoSlug/proyectoNombre (opcional): si no hay `proyectos`, el proyecto queda fijo (pestaña dentro de un proyecto).
  */
 export default function ModalNuevoPrototipo({ proyectos, proyectoSlug: proyectoFijo, proyectoNombre: proyectoFijoNombre, onCreado, onCerrar }) {
+  useEscape(onCerrar)
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState('prototipo')
   const [modo, setModo] = useState('html')

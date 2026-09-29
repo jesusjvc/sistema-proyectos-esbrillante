@@ -5,6 +5,7 @@ import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { tareaLeCorresponde, usuarioParticipaEnProyecto } from '../lib/permisos.js'
 import { crearTareaCustom, activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
+import { notificarAsignacion } from '../lib/notificaciones.js'
 import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
@@ -113,6 +114,13 @@ router.post('/masivo', requireAuth, async (req, res) => {
     })
 
     emitirCambio(p.id)
+
+    // La asignación masiva avisa UNA vez por persona con todas las tareas que
+    // recibió, no un correo por tarea.
+    if (tipo === 'responsable') {
+      await notificarAsignacion(p, seleccionadas.map((tarea) => ({ ...tarea, responsable: valor })), req.user)
+    }
+
     res.json({ ok: true, actualizadas: seleccionadas.length })
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message })
@@ -389,6 +397,13 @@ router.put('/:tareaId', requireAuth, async (req, res) => {
     await logEntry(p.id, usuario, 'Tarea editada', tarea.titulo)
     await activarTareasClienteDisponibles(p.id)
 
+    // Si la edición cambió el responsable, avisa por correo a quien la
+    // recibió (no hace nada si quedó "equipo"/"cliente" o si el destinatario
+    // es quien mismo asignó).
+    if (data.responsable !== undefined && data.responsable !== tareaActual.responsable) {
+      await notificarAsignacion(p, [tarea], req.user)
+    }
+
     emitirCambio(p.id)
     res.json(tarea)
   } catch (err) {
@@ -411,6 +426,10 @@ router.post('/', requireAuth, async (req, res) => {
 
     const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite })
     await logEntry(p.id, usuario, 'Tarea agregada', nueva.titulo)
+
+    if (!nueva.esCliente && nueva.responsable !== 'equipo') {
+      await notificarAsignacion(p, [nueva], req.user)
+    }
 
     emitirCambio(p.id)
     res.status(201).json(nueva)

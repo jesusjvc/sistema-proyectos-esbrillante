@@ -9,13 +9,14 @@ import { requireMcpAuth } from '../middleware/auth.js'
 import { tareaLeCorresponde, validarYNormalizarEquipo } from '../lib/permisos.js'
 import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
+import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
-import { notificarMencion } from '../lib/notificaciones.js'
+import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, aprobarSolicitud } from '../lib/tareaHelpers.js'
 import { importarClienteCrm, normBusqueda, dominioDesde, crmConfigurado } from '../lib/clientesCrm.js'
 import { listarCustomers, buscarContacts, terminoSeguro } from '../lib/perfexClient.js'
@@ -39,7 +40,13 @@ function fail(text) {
 async function getProyecto(slug) {
   return prisma.proyecto.findFirst({
     where: { OR: [{ slug }, { id: slug }] },
-    include: { tareas: true, solicitudes: { orderBy: { creadaEn: 'desc' } } },
+    include: {
+      // comentarios take 1: a calcularSalud solo le importa el comentario más
+      // reciente (última actividad); ningún tool lee el hilo completo.
+      tareas: { include: { comentarios: { orderBy: { creadoEn: 'desc' }, take: 1 } } },
+      log: { orderBy: { fecha: 'desc' }, take: 1 },
+      solicitudes: { orderBy: { creadaEn: 'desc' } },
+    },
   })
 }
 
@@ -130,19 +137,29 @@ function buildServer(usuario) {
     async () => {
       const proyectos = await prisma.proyecto.findMany({
         where: { status: { not: 'pendiente_anticipo' } },
-        include: { tareas: true, log: { orderBy: { fecha: 'desc' }, take: 20 } },
+        include: {
+          tareas: { include: { comentarios: { orderBy: { creadoEn: 'desc' }, take: 1 } } },
+          // 20 entradas: tieneRespuestaNueva escanea varias; a salud solo le
+          // sirve la primera.
+          log: { orderBy: { fecha: 'desc' }, take: 20 },
+        },
         orderBy: { creadoEn: 'desc' },
       })
-      const resumen = proyectos.map((p) => ({
-        slug: p.slug,
-        cliente: p.cliente?.nombreComercial || '(sin nombre)',
-        paquete: p.proyecto?.paquete || '(sin paquete)',
-        status: p.status,
-        tipo: p.tipo,
-        ...(p.tipo === 'continuo' ? { columnas: contarPorColumna(p) } : { avance: calcularAvance(p) }),
-        pendientesCliente: contarPendientesCliente(p),
-        respuestaNuevaSinRevisar: tieneRespuestaNueva(p),
-      }))
+      const resumen = proyectos.map((p) => {
+        const salud = calcularSalud(p)
+        return {
+          slug: p.slug,
+          cliente: p.cliente?.nombreComercial || '(sin nombre)',
+          paquete: p.proyecto?.paquete || '(sin paquete)',
+          etiquetas: p.etiquetas,
+          status: p.status,
+          tipo: p.tipo,
+          ...(p.tipo === 'continuo' ? { columnas: contarPorColumna(p) } : { avance: calcularAvance(p) }),
+          pendientesCliente: contarPendientesCliente(p),
+          respuestaNuevaSinRevisar: tieneRespuestaNueva(p),
+          salud: { nivel: salud.nivel, diasSinActividad: salud.diasSinActividad, sinResponsable: salud.tareasEquipoSinResponsable },
+        }
+      })
       return ok(JSON.stringify(resumen, null, 2))
     },
   )
@@ -421,7 +438,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título).',
+      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título). También incluye "salud": la clasificación del proyecto en "atrasado" (tareas de cliente con plazo vencido o del equipo con fecha límite pasada), "estancado" (7+ días sin movimiento) o "avanza", con "motivos" que detallan las tareas exactas implicadas.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         incluirCompletadas: z.boolean().optional().describe('Solo aplica a proyectos "finito". Si es true, agrega "tareasCompletadas" con las tareas del equipo ya completadas (id, fase, título, responsable, completadaPor, completadaEn). No cambia ningún otro listado — el propósito principal de esta tool sigue siendo mostrar qué falta.'),
@@ -437,6 +454,7 @@ function buildServer(usuario) {
         tipo: p.tipo,
         cliente: p.cliente?.nombreComercial || '(sin nombre)',
         paquete: p.proyecto?.paquete || '(sin paquete)',
+        etiquetas: p.etiquetas,
         descripcion: p.proyecto?.descripcion || null,
         status: p.status,
       }
@@ -507,7 +525,66 @@ function buildServer(usuario) {
           creadaEn: s.creadaEn,
         }))
 
+      // Clasificación de salud: atrasado / estancado / avanza, con los
+      // motivos concretos (tareas vencidas, inactividad, espera al cliente).
+      resumen.salud = calcularSalud(p)
+
       return ok(JSON.stringify(resumen, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'ver_salud_proyectos',
+    {
+      title: 'Ver salud de los proyectos',
+      description: `Clasifica los proyectos ACTIVOS por su estado de avance y detecta atrasos: "atrasado" (hay tareas del cliente con plazo vencido, o tareas del equipo con fecha límite ya pasada), "estancado" (sin ningún movimiento —log, completados, comentarios— hace ${DIAS_INACTIVIDAD}+ días) o "avanza" (sin obstáculos — el equipo puede seguir trabajando). Devuelve por proyecto los motivos concretos: títulos de las tareas implicadas, días de atraso, días sin actividad, cuántas tareas del equipo no tienen fecha límite aún (buenas candidatas para coordinar fechas con el equipo) y cuántas quedaron sin responsable asignado (motivo "equipo_sin_responsable" — nadie las tiene en su bandeja de "Mis tareas"; reasígnalas con editar_actividad, que además avisa por correo a quien las recibe). Úsala para responder "¿qué proyectos están atrasados y por qué?", "¿en cuáles se puede continuar?" o para armar un resumen de status. Los proyectos no activos (en_pausa, pendiente_anticipo, completado) no se clasifican — solo aparecen en "otros" como conteo. Con el parámetro estado filtras a un solo grupo.`,
+      inputSchema: {
+        estado: z.enum(['atrasado', 'estancado', 'avanza', 'todos']).optional().describe('Filtrar a un solo nivel de salud. Default: "todos".'),
+      },
+    },
+    async ({ estado = 'todos' }) => {
+      const proyectos = await prisma.proyecto.findMany({
+        include: {
+          tareas: { include: { comentarios: { orderBy: { creadoEn: 'desc' }, take: 1 } } },
+          log: { orderBy: { fecha: 'desc' }, take: 1 },
+        },
+        orderBy: { creadoEn: 'desc' },
+      })
+
+      const clasificados = proyectos.map((p) => ({ p, salud: calcularSalud(p) }))
+      const conteos = { atrasado: 0, estancado: 0, avanza: 0 }
+      const otros = {}
+      for (const { p, salud } of clasificados) {
+        if (salud.nivel) conteos[salud.nivel]++
+        else otros[p.status] = (otros[p.status] || 0) + 1
+      }
+
+      const ORDEN_NIVEL = { atrasado: 0, estancado: 1, avanza: 2 }
+      const lista = clasificados
+        .filter(({ salud }) => salud.nivel && (estado === 'todos' || salud.nivel === estado))
+        .sort((a, b) => (ORDEN_NIVEL[a.salud.nivel] - ORDEN_NIVEL[b.salud.nivel])
+          || (a.p.cliente?.nombreComercial || '').localeCompare(b.p.cliente?.nombreComercial || ''))
+        .map(({ p, salud }) => ({
+          slug: p.slug,
+          cliente: p.cliente?.nombreComercial || '(sin nombre)',
+          tipo: p.tipo,
+          paquete: p.proyecto?.paquete || '(sin paquete)',
+          etiquetas: p.etiquetas,
+          salud: {
+            nivel: salud.nivel,
+            resumen: salud.resumen,
+            motivos: salud.motivos,
+            diasSinActividad: salud.diasSinActividad,
+            tareasEquipoSinFecha: salud.tareasEquipoSinFecha,
+            tareasEquipoSinResponsable: salud.tareasEquipoSinResponsable,
+          },
+        }))
+
+      return ok(JSON.stringify({
+        conteos,
+        ...(Object.keys(otros).length ? { otros } : {}),
+        proyectos: lista,
+      }, null, 2))
     },
   )
 
@@ -570,6 +647,12 @@ function buildServer(usuario) {
       })
       await logEntry(p.id, usuario.nombre, marcarCompletada ? 'Tarea agregada y completada' : 'Tarea agregada', titulo)
       if (marcarCompletada) await activarTareasClienteDisponibles(p.id)
+
+      // Si nació con responsable específico (y queda pendiente), avisa por
+      // correo a quien la recibió — igual que el alta desde el panel.
+      if (!marcarCompletada && responsable && responsable !== 'equipo') {
+        await notificarAsignacion(p, [{ titulo, responsable }], usuario)
+      }
       emitirCambio(p.id)
 
       const ubicacion = esContinuo ? `columna "${posicion.estadoFinal}"` : `fase ${posicion.faseFinal}`
@@ -815,6 +898,11 @@ function buildServer(usuario) {
       await prisma.tarea.update({ where: { id: tareaId }, data })
       await logEntry(p.id, usuario.nombre, 'Tarea editada', tarea.titulo)
       await activarTareasClienteDisponibles(p.id)
+
+      // Reasignar también avisa por correo a quien la recibió.
+      if (data.responsable !== undefined && data.responsable !== tarea.responsable) {
+        await notificarAsignacion(p, [{ ...tarea, ...data }], usuario)
+      }
       emitirCambio(p.id)
 
       return ok(`"${tarea.titulo}" actualizada.`)

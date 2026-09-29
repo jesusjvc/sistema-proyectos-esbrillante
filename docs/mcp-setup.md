@@ -106,17 +106,30 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 
 | Tool | Uso |
 |---|---|
-| `listar_proyectos` | Ver todos los proyectos activos, su slug, cuántas tareas tiene pendientes el cliente y si respondió algo que el admin no ha visto todavía |
+| `listar_proyectos` | Ver todos los proyectos (slug, cliente, paquete, etiquetas, status, tipo, avance o columnas Kanban, pendientes del cliente) con un `salud` compacto (`nivel`, `diasSinActividad`) por proyecto |
+| `ver_salud_proyectos(estado?)` | Clasifica los proyectos activos en `atrasado` (tareas de cliente vencidas o del equipo con fecha límite pasada), `estancado` (7+ días sin movimiento) o `avanza`, con los motivos concretos por proyecto (títulos, días, tareas sin fecha, tareas sin responsable). La tool para "¿qué está atrasado y por qué?" y para armar resúmenes de status |
 | `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
-| `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente |
+| `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente, respuestas recientes, solicitudes y el objeto `salud` completo |
 | `registrar_actividad(slug, titulo, descripcion?, fase?, completada?, antesDeTareaId?, despuesDeTareaId?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
 | `solicitar_al_cliente(slug, titulo, instrucciones, plazoHoras?, fase?, antesDeTareaId?, despuesDeTareaId?)` | Pedirle algo al cliente — aparece de inmediato en su portal |
 | `iniciar_actividad(slug, tareaId)` | Marcar una tarea como "en proceso" de verdad — que alguien la está trabajando ahora, no solo que está disponible. Úsala solo cuando realmente empieces algo, no para todo lo que esté disponible en paralelo (ver nota abajo). |
 | `completar_actividad(slug, tareaId, respuesta?)` | Marcar como lista una tarea ya existente (del equipo o del cliente). Si estás cerrando una solicitud al cliente porque respondió por otro canal, pasa `respuesta` para dejarlo registrado. |
-| `editar_actividad(slug, tareaId, titulo?, descripcion?, instrucciones?, plazoHoras?)` | Corregir una tarea ya creada (equipo o cliente) sin tener que cancelarla y volver a crearla |
+| `editar_actividad(slug, tareaId, titulo?, descripcion?, instrucciones?, plazoHoras?, fechaLimite?, responsable?, prioridad?, dependeDeTareaIds?, antesDeTareaId?, despuesDeTareaId?)` | Corregir/reposicionar una tarea ya creada (equipo o cliente) sin tener que cancelarla y volver a crearla |
 | `cancelar_actividad(slug, tareaId, motivo?)` | Cancelar una actividad o solicitud que ya no aplica — queda omitida, no se borra |
 | `actualizar_fase(slug, numero, fechaEstimada?, requierePago?, pagoConfirmado?)` | Ajustar la fecha estimada o el estado de pago de una fase — útil en proyectos con pagos parciales por fase, donde una sola "fecha de entrega" no refleja la realidad |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
+| `listar_plantillas` | Checklists base por paquete (fases, tareas, dependencias) — consultar antes de crear un proyecto de un paquete conocido |
+| `cambiar_tipo_proyecto(slug, tipo)` | Convertir un proyecto entre `finito` (fases) y `continuo` (tablero Kanban) |
+| `editar_proyecto(slug, descripcion?, fechaEstimadaEntrega?)` | Actualizar la descripción libre o la fecha estimada de entrega |
+| `mover_a_revision(slug, tareaId)` | (Solo continuos) mover una tarjeta del Kanban a la columna Revisión |
+| `crear_solicitud_interna(slug, titulo, ...)` | Registrar un ticket llegado por fuera del portal (WhatsApp, teléfono, detectado por el equipo) en la cola de un proyecto continuo |
+| `comentar_actividad(slug, tareaId, mensaje, mencionar?)` | Comentario interno sobre una tarea (nunca visible al cliente); con `mencionar` notifica por correo |
+| `listar_prototipos(proyectoSlug?)` | Prototipos publicados en prototipos.esbrillante.mx y sus comentarios pendientes |
+| `ver_comentarios_prototipo(prototipoSlug, estado?)` | Comentarios/anotaciones del widget de revisión de un prototipo |
+| `resolver_comentario_prototipo(prototipoSlug, anotacionId)` | Marcar como implementado un comentario de prototipo |
+| `listar_tickets(estado?, prioridad?, texto?)` | Tickets de la mesa de mantenimiento web (folio, cliente, sitio, estado, antigüedad) |
+| `crear_ticket(titulo, cliente, ...)` | Registrar un ticket de mantenimiento; resuelve cliente y sitio automáticamente |
+| `actualizar_ticket(ticket, ...)` | Actualizar estado, prioridad, diagnóstico, causa raíz o resolución de un ticket |
 
 **El orden del checklist es explícito, no por fecha de creación:** cada tarea tiene un campo `orden` interno. Si registras una actividad sin indicar posición, se agrega al final de su fase — lo cual puede quedar fuera de secuencia lógica (ej. "verificar acceso" apareciendo después de "revisión" solo porque se reportó después). `ver_proyecto` ya devuelve las tareas pendientes en su orden real, así que puedes referenciar sus IDs: usa `antesDeTareaId`/`despuesDeTareaId` en `registrar_actividad`/`solicitar_al_cliente` para insertar la nueva actividad justo donde corresponde, en vez de siempre al final.
 

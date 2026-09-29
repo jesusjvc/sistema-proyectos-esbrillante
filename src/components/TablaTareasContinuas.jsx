@@ -40,6 +40,24 @@ function estaVencida(tarea) {
   return fechaLocal(tarea.fechaLimite) < hoy
 }
 
+// Días que faltan para la fecha límite (negativo = ya venció). Null sin fecha.
+export function diasParaLimite(tarea) {
+  if (!tarea.fechaLimite) return null
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  return Math.round((fechaLocal(tarea.fechaLimite) - hoy) / 86400000)
+}
+
+// Texto de contexto para el tooltip del botón de fecha: dice a simple vista
+// qué tan cerca está el vencimiento, no solo la fecha cruda.
+export function tituloLimite(tarea) {
+  const dias = diasParaLimite(tarea)
+  if (dias === null) return 'Agregar fecha límite'
+  if (dias < 0) return `Venció hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? '' : 's'}`
+  if (dias === 0) return 'Vence hoy'
+  return `Vence en ${dias} día${dias === 1 ? '' : 's'}`
+}
+
 function fechaIso(fecha) {
   const year = fecha.getFullYear()
   const month = String(fecha.getMonth() + 1).padStart(2, '0')
@@ -274,7 +292,14 @@ export function FechaRapida({ tarea, onActualizar, disabled }) {
           onClick={toggle}
           disabled={disabled}
           aria-expanded={abierto}
-          className={`inline-flex min-h-11 md:min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs tabular-nums transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-60 dark:hover:bg-ink-700 ${estaVencida(tarea) ? 'font-medium text-rose-700 dark:text-rose-300' : tarea.fechaLimite ? 'text-slate-600 dark:text-ink-300' : 'text-slate-400 dark:text-ink-400'}`}
+          title={tituloLimite(tarea)}
+          className={`inline-flex min-h-11 md:min-h-8 items-center gap-1.5 rounded-lg px-2 text-xs tabular-nums transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-60 dark:hover:bg-ink-700 ${
+            estaVencida(tarea)
+              ? 'font-medium text-rose-700 dark:text-rose-300'
+              : (diasParaLimite(tarea) !== null && diasParaLimite(tarea) <= 3)
+              ? 'font-medium text-amber-700 dark:text-amber-300'
+              : 'text-slate-600 dark:text-ink-300'
+          }`}
         >
           <CalendarDays size={14} aria-hidden="true" /> {tarea.fechaLimite ? formatFecha(tarea.fechaLimite) : 'Agregar'}
         </button>

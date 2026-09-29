@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { KANBAN_COLUMNAS } from '../data/kanban'
+import useEscape from '../hooks/useEscape'
 import { formatFechaHora } from '../data/storage'
 import { AlertCircle, CheckCircle2, XCircle, Clock, X, Paperclip } from 'lucide-react'
 
@@ -160,6 +161,7 @@ export default function PanelSolicitudes({ solicitudes, esContinuo, fases, miemb
 }
 
 function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto, onGuardar, onCerrar }) {
+  useEscape(onCerrar)
   const [form, setForm] = useState({
     fase: fases?.[0]?.numero || 1,
     columna: 'todo',
@@ -262,6 +264,7 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembrosProyecto,
 // lo detectó el propio equipo) — a diferencia de una solicitud del cliente,
 // este se aprueba de una vez, no queda pendiente (plan-foco.md 4.5).
 function ModalNuevoTicket({ esContinuo, fases, miembrosProyecto, onGuardar, onCerrar }) {
+  useEscape(onCerrar)
   const [form, setForm] = useState({
     titulo: '',
     descripcion: '',
@@ -407,6 +410,7 @@ function ModalNuevoTicket({ esContinuo, fases, miembrosProyecto, onGuardar, onCe
 }
 
 function ModalRechazarSolicitud({ solicitud, onGuardar, onCerrar }) {
+  useEscape(onCerrar)
   const [motivo, setMotivo] = useState('')
   const [enviando, setEnviando] = useState(false)
 

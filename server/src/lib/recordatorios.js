@@ -1,6 +1,7 @@
 import prisma from './prisma.js'
 import { enviarEmail } from './email.js'
 import { dispararWebhookRecordatorio } from './webhooks.js'
+import { tareaClienteVencida as tareaVencida } from './salud.js'
 
 const HORA_MS = 3600_000
 const DIA_MS = 24 * HORA_MS
@@ -8,11 +9,6 @@ const DIA_MS = 24 * HORA_MS
 // ahora cada 2 días para no saturar al cliente.
 const INTERVALO_RECORDATORIO_MS = 2 * DIA_MS
 const DOMINGO = 0
-
-function tareaVencida(t) {
-  return t.esCliente && t.estado === 'pendiente' && t.disponibleDesde && t.plazoHoras
-    && (Date.now() - new Date(t.disponibleDesde).getTime()) > t.plazoHoras * HORA_MS
-}
 
 function pasoElIntervalo(t) {
   if (!t.ultimoRecordatorioEn) return true

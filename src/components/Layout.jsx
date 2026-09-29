@@ -53,10 +53,10 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
         <nav className={`flex-1 ${colapsado ? 'px-2' : 'px-3'} py-4 space-y-1 overflow-y-auto`}>
           {esAdmin && (
             <>
+              <NavLink to="/admin/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/admin/tareas'} colapsado={colapsado} />
               <NavLink to="/admin" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/admin'} colapsado={colapsado} />
               <NavLink to="/admin/mantenimiento" icon={<Wrench size={16} />} label="Mantenimiento" active={location.pathname.startsWith('/admin/mantenimiento')} colapsado={colapsado} />
               <NavLink to="/admin/proyecto/nuevo" icon={<PlusCircle size={16} />} label="Nuevo proyecto" active={location.pathname === '/admin/proyecto/nuevo'} colapsado={colapsado} />
-              <NavLink to="/admin/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/admin/tareas'} colapsado={colapsado} />
               <NavLink to="/admin/paquetes" icon={<Package size={16} />} label="Paquetes" active={location.pathname.startsWith('/admin/paquetes')} colapsado={colapsado} />
               <NavLink to="/admin/equipo" icon={<Users size={16} />} label="Equipo" active={location.pathname === '/admin/equipo'} colapsado={colapsado} />
               <NavLink to="/admin/prototipos" icon={<LayoutTemplate size={16} />} label="Prototipos" active={location.pathname === '/admin/prototipos'} colapsado={colapsado} />
@@ -65,10 +65,10 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
           )}
           {esEquipo && (
             <>
+              <NavLink to="/equipo/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/equipo/tareas'} colapsado={colapsado} />
               <NavLink to="/equipo" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/equipo'} colapsado={colapsado} />
               <NavLink to="/equipo/mantenimiento" icon={<Wrench size={16} />} label="Mantenimiento" active={location.pathname.startsWith('/equipo/mantenimiento')} colapsado={colapsado} />
               <NavLink to="/equipo/proyecto/nuevo" icon={<PlusCircle size={16} />} label="Nuevo proyecto" active={location.pathname === '/equipo/proyecto/nuevo'} colapsado={colapsado} />
-              <NavLink to="/equipo/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/equipo/tareas'} colapsado={colapsado} />
               <NavLink to="/equipo/prototipos" icon={<LayoutTemplate size={16} />} label="Prototipos" active={location.pathname === '/equipo/prototipos'} colapsado={colapsado} />
               <NavLink to="/equipo/mcp" icon={<Terminal size={16} />} label="Conectar Claude Code" active={location.pathname === '/equipo/mcp'} colapsado={colapsado} />
             </>

@@ -20,7 +20,9 @@ export default function Login() {
 
   useEffect(() => {
     if (user?.rol === 'admin') navigate('/admin', { replace: true })
-    if (user?.rol === 'equipo') navigate('/equipo', { replace: true })
+    // El equipo aterriza directo en su bandeja de tareas — es su pantalla
+    // principal: qué tienen por hacer hoy.
+    if (user?.rol === 'equipo') navigate('/equipo/tareas', { replace: true })
   }, [user])
 
   async function handleSubmit(e) {
