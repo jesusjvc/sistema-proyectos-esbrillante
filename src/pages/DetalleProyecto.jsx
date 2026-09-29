@@ -382,82 +382,98 @@ export default function DetalleProyecto() {
     >
       {/* Header del proyecto — siempre visible: descripción y métricas de avance */}
       <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5 mb-5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-400 dark:text-ink-400">{proyecto.proyecto.paquete}</span>
-          <button
-            onClick={handleCambiarTipo}
-            className="text-xs text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 underline decoration-dotted transition-colors"
-            title={esContinuo ? 'Convertir a proyecto finito (con fases)' : 'Convertir a proyecto continuo (tablero Kanban)'}
-          >
-            Cambiar a {esContinuo ? 'finito' : 'continuo'}
-          </button>
-        </div>
-        <EtiquetasProyecto
-          slug={proyecto.slug}
-          etiquetas={proyecto.etiquetas}
-          editable={esAdminRol}
-          onGuardado={refresh}
-        />
-        <p className="text-sm text-slate-500 dark:text-ink-300 mt-0.5">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
-
-        <DescripcionProyecto
-          descripcion={proyecto.proyecto?.descripcion}
-          onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
-        />
-
-        <InfoClaveCompacta infoClave={proyecto.proyecto?.infoClave} />
-
-        {esContinuo ? (
-          <div className="mt-4 flex items-center gap-4">
-            <MedidorCircular porcentaje={avancePorcentajeContinuo} tamano={56} nivel={proyecto.salud?.nivel} />
-            <div className="flex items-center gap-3 flex-wrap">
-              {KANBAN_COLUMNAS.map((c) => (
-                <div key={c.columna} className="text-sm text-slate-500 dark:text-ink-300">
-                  <span className="font-bold text-slate-800 dark:text-ink-100">{columnasCount[c.columna]}</span> {c.label}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 flex items-center gap-4">
-            <MedidorCircular porcentaje={avance} tamano={56} nivel={proyecto.salud?.nivel} />
-            <span className="text-sm text-slate-600 dark:text-ink-300 font-medium">
-              Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}
-            </span>
-          </div>
-        )}
-
-        {/* Status de primera mano — solo proyectos activos; el tab Status es el archivo */}
-        {proyecto.status === 'activo' && (
-          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-ink-500">
+        {/* Identidad (izquierda) + progreso (derecha) */}
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8">
+          <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <StatusSaludChip nivel={proyecto.salud?.nivel} />
-              <span className="text-xs text-slate-400 dark:text-ink-400">
-                {proyecto.salud?.diasSinActividad != null
-                  ? (proyecto.salud.diasSinActividad === 0 ? 'Actividad hoy' : `Sin actividad hace ${proyecto.salud.diasSinActividad} día${proyecto.salud.diasSinActividad === 1 ? '' : 's'}`)
-                  : ''}
-              </span>
+              <span className="text-sm font-semibold text-slate-700 dark:text-ink-200">{proyecto.proyecto.paquete}</span>
+              <button
+                onClick={handleCambiarTipo}
+                className="text-xs text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 underline decoration-dotted transition-colors"
+                title={esContinuo ? 'Convertir a proyecto finito (con fases)' : 'Convertir a proyecto continuo (tablero Kanban)'}
+              >
+                Cambiar a {esContinuo ? 'finito' : 'continuo'}
+              </button>
             </div>
+            <EtiquetasProyecto
+              slug={proyecto.slug}
+              etiquetas={proyecto.etiquetas}
+              editable={esAdminRol}
+              onGuardado={refresh}
+            />
+            <p className="text-sm text-slate-500 dark:text-ink-300">{proyecto.cliente.contactoPrincipal} · {proyecto.cliente.correo}</p>
+
+            <DescripcionProyecto
+              descripcion={proyecto.proyecto?.descripcion}
+              onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
+            />
+
+            <InfoClaveCompacta infoClave={proyecto.proyecto?.infoClave} />
+          </div>
+
+          <div className="shrink-0 flex md:flex-col items-center md:items-end gap-3 md:gap-1.5 md:text-right">
+            <MedidorCircular
+              porcentaje={esContinuo ? avancePorcentajeContinuo : avance}
+              tamano={76}
+              grosor={6}
+              nivel={proyecto.salud?.nivel}
+            />
+            {esContinuo ? (
+              <div className="text-xs text-slate-500 dark:text-ink-300 leading-relaxed">
+                {KANBAN_COLUMNAS.map((c) => (
+                  <span key={c.columna} className="ml-2 whitespace-nowrap">
+                    <span className={`font-bold text-sm ${KANBAN_COUNT_COLOR[c.columna]}`}>{columnasCount[c.columna]}</span>{' '}
+                    <span className="text-slate-400 dark:text-ink-400">{c.columna === 'revision' ? 'Rev' : c.label}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 dark:text-ink-300 leading-snug">
+                Fase {faseActual}
+                <span className="block text-slate-400 dark:text-ink-400">{fases.find(f => f.numero === faseActual)?.nombre}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Status de primera mano — panel con el color de su estado; el tab Status es el archivo */}
+        {proyecto.status === 'activo' && (
+          <div className={`mt-4 rounded-xl px-4 py-3 ${FONDO_SALUD[proyecto.salud?.nivel] || 'bg-slate-50 dark:bg-ink-900'}`}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusSaludChip nivel={proyecto.salud?.nivel} />
+                <span className="text-xs text-slate-400 dark:text-ink-400">
+                  {proyecto.salud?.diasSinActividad != null
+                    ? (proyecto.salud.diasSinActividad === 0 ? 'Actividad hoy' : `Sin actividad hace ${proyecto.salud.diasSinActividad} día${proyecto.salud.diasSinActividad === 1 ? '' : 's'}`)
+                    : ''}
+                </span>
+              </div>
+              <button onClick={() => setTab('status')} className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:underline shrink-0 ml-auto">
+                Ver hilo completo →
+              </button>
+            </div>
+
             {(proyecto.salud?.motivos?.length || 0) > 0 && (
-              <div className="mt-1.5 space-y-0.5">
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
                 {proyecto.salud.motivos.slice(0, 3).map((m) => (
-                  <p key={m.tipo} className="text-xs text-slate-600 dark:text-ink-300">• {m.detalle}</p>
+                  <span key={m.tipo} className="inline-flex items-start gap-1.5 text-xs text-slate-600 dark:text-ink-300">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${PUNTO_MOTIVO[m.tipo] || 'bg-slate-400'}`} />
+                    {m.detalle}
+                  </span>
                 ))}
                 {proyecto.salud.motivos.length > 3 && (
                   <button onClick={() => setTab('status')} className="text-xs text-brand-700 dark:text-brand-400 hover:underline">
-                    Ver todos los motivos →
+                    +{proyecto.salud.motivos.length - 3} más
                   </button>
                 )}
               </div>
             )}
+
             {notas.slice(-2).map((n) => (
               <p key={n.id} className="text-xs text-slate-500 dark:text-ink-400 mt-1.5 truncate">
-                <span className="font-medium text-slate-600 dark:text-ink-300">{n.autor}:</span> {n.texto.slice(0, 140)}{n.texto.length > 140 ? '…' : ''}
+                <span className="font-medium text-slate-600 dark:text-ink-300">{n.autor}:</span> {n.texto.slice(0, 120)}{n.texto.length > 120 ? '…' : ''}
               </p>
             ))}
-            <button onClick={() => setTab('status')} className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:underline mt-1">
-              Ver hilo completo →
-            </button>
           </div>
         )}
 
@@ -2270,6 +2286,25 @@ function TextoFormateado({ texto }) {
       ))}
     </div>
   )
+}
+
+// Fondo del panel de status según el nivel — el color cuenta el estado de
+// un vistazo (tonos semánticos del sistema, muy suaves en ambos temas).
+const FONDO_SALUD = {
+  atrasado: 'bg-red-50 dark:bg-red-950/30',
+  estancado: 'bg-amber-50 dark:bg-amber-950/30',
+  completo: 'bg-emerald-50 dark:bg-emerald-950/30',
+  avanza: 'bg-slate-50 dark:bg-ink-900',
+}
+
+// Color del punto de cada motivo en el panel de status.
+const PUNTO_MOTIVO = {
+  cliente_vencido: 'bg-red-500',
+  equipo_vencido: 'bg-red-500',
+  inactividad: 'bg-amber-500',
+  cliente_esperando: 'bg-brand-500',
+  equipo_sin_fechas: 'bg-slate-400 dark:bg-ink-400',
+  equipo_sin_responsable: 'bg-amber-500',
 }
 
 // Chip del nivel de salud para el resumen del tab Status.
