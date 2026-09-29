@@ -27,6 +27,7 @@ import MedidorCircular from '../components/MedidorCircular'
 import { MODULOS_CLIENTE } from '../data/modulosCliente'
 import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
+import { esUrl } from '../lib/texto'
 import KanbanBoard from '../components/KanbanBoard'
 import TablaTareasContinuas from '../components/TablaTareasContinuas'
 import Avatar from '../components/Avatar'
@@ -88,11 +89,12 @@ export default function DetalleProyecto() {
     }).catch(() => {})
   }, [id])
 
-  // El tab Status carga sus notas aparte (no van en el payload del listado).
+  // Las notas se cargan al abrir el proyecto: el header muestra las últimas
+  // y el tab Status el hilo completo.
   useEffect(() => {
-    if (tab !== 'status' || !proyecto) return
+    if (!proyecto) return
     getNotas(proyecto.slug).then((ns) => setNotas([...ns].reverse())).catch(() => {})
-  }, [tab, proyecto?.id])
+  }, [proyecto?.id])
 
   async function handleEnviarNota(texto, mencionados) {
     await agregarNota(proyecto.slug, { texto, mencionados })
@@ -403,6 +405,8 @@ export default function DetalleProyecto() {
           onGuardar={async (descripcion) => { await actualizarDescripcion(proyecto.slug, descripcion); await refresh() }}
         />
 
+        <InfoClaveCompacta infoClave={proyecto.proyecto?.infoClave} />
+
         {esContinuo ? (
           <div className="mt-4 flex items-center gap-4">
             <MedidorCircular porcentaje={avancePorcentajeContinuo} tamano={56} nivel={proyecto.salud?.nivel} />
@@ -420,6 +424,40 @@ export default function DetalleProyecto() {
             <span className="text-sm text-slate-600 dark:text-ink-300 font-medium">
               Fase {faseActual} — {fases.find(f => f.numero === faseActual)?.nombre}
             </span>
+          </div>
+        )}
+
+        {/* Status de primera mano — solo proyectos activos; el tab Status es el archivo */}
+        {proyecto.status === 'activo' && (
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-ink-500">
+            <div className="flex items-center gap-2 flex-wrap">
+              <StatusSaludChip nivel={proyecto.salud?.nivel} />
+              <span className="text-xs text-slate-400 dark:text-ink-400">
+                {proyecto.salud?.diasSinActividad != null
+                  ? (proyecto.salud.diasSinActividad === 0 ? 'Actividad hoy' : `Sin actividad hace ${proyecto.salud.diasSinActividad} día${proyecto.salud.diasSinActividad === 1 ? '' : 's'}`)
+                  : ''}
+              </span>
+            </div>
+            {(proyecto.salud?.motivos?.length || 0) > 0 && (
+              <div className="mt-1.5 space-y-0.5">
+                {proyecto.salud.motivos.slice(0, 3).map((m) => (
+                  <p key={m.tipo} className="text-xs text-slate-600 dark:text-ink-300">• {m.detalle}</p>
+                ))}
+                {proyecto.salud.motivos.length > 3 && (
+                  <button onClick={() => setTab('status')} className="text-xs text-brand-700 dark:text-brand-400 hover:underline">
+                    Ver todos los motivos →
+                  </button>
+                )}
+              </div>
+            )}
+            {notas.slice(-2).map((n) => (
+              <p key={n.id} className="text-xs text-slate-500 dark:text-ink-400 mt-1.5 truncate">
+                <span className="font-medium text-slate-600 dark:text-ink-300">{n.autor}:</span> {n.texto.slice(0, 140)}{n.texto.length > 140 ? '…' : ''}
+              </p>
+            ))}
+            <button onClick={() => setTab('status')} className="text-xs font-medium text-brand-700 dark:text-brand-400 hover:underline mt-1">
+              Ver hilo completo →
+            </button>
           </div>
         )}
 
@@ -2246,6 +2284,18 @@ function StatusSaludChip({ nivel }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${config.clase}`}>{config.label}</span>
 }
 
+// Valor de Info clave que se vuelve enlace clickeable cuando es una URL.
+function ValorConEnlace({ valor }) {
+  if (esUrl(valor)) {
+    return (
+      <a href={valor} target="_blank" rel="noreferrer" className="text-brand-700 dark:text-brand-300 underline underline-offset-2">
+        {valor.replace(/^https?:\/\/(www\.)?/, '')}
+      </a>
+    )
+  }
+  return <>{valor}</>
+}
+
 // Información clave del proyecto: dominio, grupo de WhatsApp y extras libres
 // ({etiqueta, valor}) para lo que surja (hosting, redes del cliente...).
 // Todos en el proyecto pueden editar; vive en proyecto.proyecto.infoClave.
@@ -2307,19 +2357,19 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
           {infoClave.dominio && (
             <div className="flex items-center gap-2 text-sm">
               <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0">Dominio</dt>
-              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate">{infoClave.dominio}</dd>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate"><ValorConEnlace valor={infoClave.dominio} /></dd>
             </div>
           )}
           {infoClave.grupoWhatsapp && (
             <div className="flex items-center gap-2 text-sm">
               <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0">Grupo WhatsApp</dt>
-              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate">{infoClave.grupoWhatsapp}</dd>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate"><ValorConEnlace valor={infoClave.grupoWhatsapp} /></dd>
             </div>
           )}
           {(infoClave.extras || []).map((e) => (
             <div key={e.etiqueta} className="flex items-center gap-2 text-sm">
               <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0 truncate">{e.etiqueta}</dt>
-              <dd className="font-medium text-slate-800 dark:text-ink-100 min-w-0">{e.valor}</dd>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 min-w-0"><ValorConEnlace valor={e.valor} /></dd>
             </div>
           ))}
         </dl>
@@ -2329,6 +2379,45 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
       <button onClick={iniciar} className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium mt-2">
         {tieneAlgo ? 'Editar' : 'Agregar información'}
       </button>
+    </div>
+  )
+}
+
+// Línea compacta de Info clave para el header del proyecto: dominio, grupo
+// de WhatsApp y extras (Stack, Repositorio...) — los valores que son URL se
+// muestran como enlace. La edición vive en el tab Info.
+function InfoClaveCompacta({ infoClave }) {
+  if (!infoClave) return null
+  const items = [
+    infoClave.dominio && { etiqueta: 'Dominio', valor: infoClave.dominio },
+    infoClave.grupoWhatsapp && { etiqueta: 'WhatsApp', valor: infoClave.grupoWhatsapp },
+    ...(infoClave.extras || []),
+  ].filter(Boolean)
+  if (!items.length) return null
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+      {items.map((e) =>
+        esUrl(e.valor) ? (
+          <a
+            key={e.etiqueta}
+            href={e.valor}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(ev) => ev.stopPropagation()}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-ink-700 text-brand-700 dark:text-brand-300 hover:underline max-w-64"
+            title={e.valor}
+          >
+            <span className="text-slate-400 dark:text-ink-400">{e.etiqueta}:</span>
+            <span className="truncate underline underline-offset-2">{e.valor.replace(/^https?:\/\/(www\.)?/, '')}</span>
+          </a>
+        ) : (
+          <span key={e.etiqueta} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-ink-700 text-slate-600 dark:text-ink-300 max-w-64" title={`${e.etiqueta}: ${e.valor}`}>
+            <span className="text-slate-400 dark:text-ink-400">{e.etiqueta}:</span>
+            <span className="truncate">{e.valor}</span>
+          </span>
+        ),
+      )}
     </div>
   )
 }

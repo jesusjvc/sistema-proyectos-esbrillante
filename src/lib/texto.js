@@ -5,3 +5,9 @@
 export function normalizarTexto(s) {
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 }
+
+// Detecta si un valor de Info clave es un enlace (para renderizarlo como
+// <a> clickeable en vez de texto plano).
+export function esUrl(valor) {
+  return /^https?:\/\/\S+$/i.test(String(valor || '').trim())
+}
