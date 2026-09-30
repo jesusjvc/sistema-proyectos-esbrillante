@@ -14,6 +14,7 @@ import gifFalta from '../../assets/gif-falta.gif'
 import gifWaiting from '../../assets/gif-waiting.gif'
 import gifCatWorking from '../../assets/gif-cat-working.gif'
 import gifSirena from '../../assets/gif-sirena.gif'
+import gifTrofeo from '../../assets/gif-trofeo.gif'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../../lib/areas'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, ChevronDown, Bell, MessageCircle, Search, X, LayoutList, LayoutGrid, CalendarDays, UserX } from 'lucide-react'
@@ -291,10 +292,11 @@ export default function AdminDashboard() {
           {[
             ['Finitos', finitos],
             ['Continuos', continuos],
-            ['Completos — esperando cierre', completos],
-          ].map(([titulo, lista]) => lista.length > 0 && (
+            ['Completos — esperando cierre', completos, gifTrofeo],
+          ].map(([titulo, lista, gif]) => lista.length > 0 && (
             <section key={titulo}>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-400 mb-2 px-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-400 mb-2 px-1 flex items-center gap-1.5">
+                {gif && <img src={gif} alt="" className="h-5 w-5 rounded-full object-cover" />}
                 {titulo} <span className="font-normal normal-case">({lista.length})</span>
               </h3>
               <div className="flex flex-col gap-2">
@@ -496,6 +498,14 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
             className="h-8 w-8 rounded-full object-cover shrink-0"
           />
         )}
+        {salud?.nivel === 'completo' && (
+          <img
+            src={gifTrofeo}
+            alt="Proyecto completo"
+            title="¡100% completado! Esperando cierre con el cliente"
+            className="h-8 w-8 rounded-full object-cover shrink-0"
+          />
+        )}
 
         <BadgeEntrega proyecto={p} />
 
@@ -643,6 +653,11 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
     nivelSalud === 'estancado' && (
       <span key="sirena" className="inline-flex items-center gap-1 shrink-0" title="Proyecto estancado">
         <img src={gifSirena} alt="" className="h-6 w-6 rounded-full object-cover" />
+      </span>
+    ),
+    nivelSalud === 'completo' && (
+      <span key="trofeo" className="inline-flex items-center gap-1 shrink-0" title="¡100% completado! Esperando cierre">
+        <img src={gifTrofeo} alt="" className="h-6 w-6 rounded-full object-cover" />
       </span>
     ),
     ...(p.areas?.map((a) => (
