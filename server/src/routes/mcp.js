@@ -451,7 +451,12 @@ function buildServer(usuario) {
         fechaEstimadaEntrega: z.string().optional().describe('Nueva fecha estimada de entrega, formato YYYY-MM-DD. Solo aplica a proyectos "finito".'),
         infoClave: z.object({
           dominio: z.string().nullable().optional().describe('Dominio del proyecto (ej. midominio.com)'),
-          grupoWhatsapp: z.string().nullable().optional().describe('Nombre del grupo de WhatsApp del proyecto'),
+          grupoWhatsapp: z.string().nullable().optional().describe('Grupo de WhatsApp único (forma legado — usa grupos si hay varios)'),
+          grupos: z.array(z.object({
+            nombre: z.string().describe('Nombre exacto del grupo en WhatsApp'),
+            etiqueta: z.string().optional().describe('Etiqueta corta del enfoque (ej. "Diseños", "Prototipos", "Copywriting")'),
+            nota: z.string().optional().describe('Nota del enfoque de ese grupo'),
+          })).optional().describe('Grupos de WhatsApp del proyecto — un proyecto puede tener varios (trabajo en paralelo). Reemplaza la lista completa; el primer grupo queda como principal.'),
           extras: z.array(z.object({ etiqueta: z.string(), valor: z.string() })).optional().describe('Datos libres adicionales (ej. "Redes sociales del cliente", "Hosting")'),
         }).optional().describe('Información clave del proyecto — reemplaza el objeto completo'),
       },
@@ -459,6 +464,10 @@ function buildServer(usuario) {
     async ({ slug, descripcion, fechaEstimadaEntrega, infoClave }) => {
       if (descripcion === undefined && fechaEstimadaEntrega === undefined && infoClave === undefined) {
         return fail('Manda al menos descripcion, fechaEstimadaEntrega o infoClave.')
+      }
+      if (infoClave?.grupos !== undefined) {
+        const invalidos = infoClave.grupos.filter((g) => !g || !String(g.nombre || '').trim())
+        if (invalidos.length) return fail('Cada grupo necesita al menos su nombre.')
       }
 
       const p = await getProyecto(slug)
@@ -474,6 +483,18 @@ function buildServer(usuario) {
         cambios.infoClave = {
           dominio: infoClave.dominio ?? p.proyecto?.infoClave?.dominio ?? null,
           grupoWhatsapp: infoClave.grupoWhatsapp ?? p.proyecto?.infoClave?.grupoWhatsapp ?? null,
+          // Grupos múltiples: si mandan grupos[], el primero queda como
+          // grupoWhatsapp (forma legada) para no dejar dos fuentes de verdad.
+          ...(infoClave.grupos !== undefined
+            ? {
+                grupos: infoClave.grupos.map((g) => ({
+                  nombre: String(g.nombre).trim().slice(0, 200),
+                  etiqueta: String(g.etiqueta || '').trim().slice(0, 80),
+                  nota: String(g.nota || '').trim().slice(0, 500),
+                })),
+                grupoWhatsapp: infoClave.grupoWhatsapp ?? infoClave.grupos[0]?.nombre ?? null,
+              }
+            : { grupoWhatsapp: p.proyecto?.infoClave?.grupoWhatsapp ?? null }),
           extras: infoClave.extras ?? p.proyecto?.infoClave?.extras ?? [],
         }
       }
