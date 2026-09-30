@@ -11,7 +11,7 @@ const AREAS_VALIDAS = ['web', 'diseno_grafico', 'redes_sociales']
 router.get('/', requireAuthOrApiKey, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true, habilidades: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true, habilidades: true, emailsAlternos: true },
       orderBy: { nombre: 'asc' },
     })
     res.json(users)
@@ -31,7 +31,7 @@ router.post('/', requireAdmin, async (req, res) => {
     const hash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
       data: { email: email.toLowerCase().trim(), password: hash, nombre, rol: rol || 'EQUIPO', esKarla: esKarla || false, area: area || null, habilidades: Array.isArray(habilidades) ? habilidades : [] },
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true, habilidades: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true, habilidades: true, emailsAlternos: true },
     })
     res.status(201).json(user)
   } catch (err) {
@@ -43,7 +43,7 @@ router.post('/', requireAdmin, async (req, res) => {
 
 // PUT /api/miembros/:id
 router.put('/:id', requireAdminOrApiKey, async (req, res) => {
-  const { nombre, email, rol, esKarla, area, activo, password, habilidades, avatarUrl } = req.body
+  const { nombre, email, rol, esKarla, area, activo, password, habilidades, avatarUrl, emailsAlternos } = req.body
   if (area && !AREAS_VALIDAS.includes(area)) return res.status(400).json({ error: `area inválida — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
   try {
     const data = {}
@@ -55,6 +55,24 @@ router.put('/:id', requireAdminOrApiKey, async (req, res) => {
     if (activo !== undefined) data.activo = activo
     if (password) data.password = await bcrypt.hash(password, 12)
     if (habilidades !== undefined) data.habilidades = Array.isArray(habilidades) ? habilidades : []
+    // Correos alternos para entrar con Google. Si un alterno coincidiera con el
+    // principal o con un correo de otro miembro, dos cuentas podrían entrar con
+    // la misma sesión de Google — se descarta el propio y se rechaza el ajeno.
+    if (emailsAlternos !== undefined) {
+      if (!Array.isArray(emailsAlternos)) return res.status(400).json({ error: 'emailsAlternos debe ser un array de texto' })
+      const emailFinal = email !== undefined
+        ? email.toLowerCase().trim()
+        : (await prisma.user.findUnique({ where: { id: req.params.id }, select: { email: true } }))?.email
+      data.emailsAlternos = [...new Set(emailsAlternos.map((a) => (typeof a === 'string' ? a.toLowerCase().trim() : '')).filter(Boolean))]
+        .filter((a) => a !== emailFinal)
+      for (const alt of data.emailsAlternos) {
+        const enUso = await prisma.user.findFirst({
+          where: { id: { not: req.params.id }, OR: [{ email: alt }, { emailsAlternos: { has: alt } }] },
+          select: { nombre: true },
+        })
+        if (enUso) return res.status(409).json({ error: `El correo ${alt} ya lo usa ${enUso.nombre}` })
+      }
+    }
     // Misma validación que PUT /api/auth/me/avatar: data URL de imagen,
     // ya redimensionada en el cliente, con tope de peso.
     if (avatarUrl !== undefined) {
@@ -72,7 +90,7 @@ router.put('/:id', requireAdminOrApiKey, async (req, res) => {
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true, habilidades: true },
+      select: { id: true, email: true, nombre: true, rol: true, esKarla: true, area: true, activo: true, avatarUrl: true, habilidades: true, emailsAlternos: true },
     })
     res.json(user)
   } catch (err) {

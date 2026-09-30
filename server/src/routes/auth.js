@@ -43,9 +43,12 @@ router.post('/login', async (req, res) => {
 })
 
 // POST /api/auth/google — login con Google Identity Services. No da de alta
-// cuentas nuevas: el correo verificado por Google debe coincidir con un User
-// ya existente y activo (los da de alta un admin en /admin/equipo, igual que
-// siempre). No se restringe por dominio (hd) — el control real es este match.
+// cuentas nuevas: el correo verificado por Google debe coincidir con el email
+// principal de un User ya existente y activo, o con uno de sus emailsAlternos
+// (correos distintos con los que alguien entra a Google — p. ej. webmaster@
+// para el usuario jesus@). Los usuarios los da de alta un admin en
+// /admin/equipo, igual que siempre. No se restringe por dominio (hd) — el
+// control real es este match. La sesión siempre queda a nombre del principal.
 router.post('/google', async (req, res) => {
   if (!googleClient) return res.status(503).json({ error: 'Login con Google no está configurado' })
 
@@ -59,7 +62,11 @@ router.post('/google', async (req, res) => {
       return res.status(401).json({ error: 'No se pudo verificar el correo de Google' })
     }
 
-    const user = await prisma.user.findUnique({ where: { email: payload.email.toLowerCase().trim() } })
+    const email = payload.email.toLowerCase().trim()
+    let user = await prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      user = await prisma.user.findFirst({ where: { emailsAlternos: { has: email }, activo: true } })
+    }
     if (!user || !user.activo) {
       return res.status(401).json({ error: 'No hay una cuenta con ese correo — pide a un admin que te dé de alta primero.' })
     }

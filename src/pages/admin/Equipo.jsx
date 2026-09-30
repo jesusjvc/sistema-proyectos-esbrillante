@@ -9,7 +9,7 @@ import { Plus, Pencil, Trash2, Check, X, Shield, Star, Camera, Loader2 } from 'l
 const FORM_VACIO = { nombre: '', email: '', password: '', rol: 'EQUIPO', esKarla: false, area: '', habilidadesTexto: '' }
 
 // "copy, wordpress, elementor" <-> ['copy', 'wordpress', 'elementor']
-function textoAHabilidades(texto) {
+function textoALista(texto) {
   return [...new Set(texto.split(',').map((h) => h.trim()).filter(Boolean))]
 }
 
@@ -41,12 +41,12 @@ export default function Equipo() {
 
   function iniciarEdicion(m) {
     setEditandoId(m.id)
-    setEditForm({ nombre: m.nombre, email: m.email, rol: m.rol, esKarla: m.esKarla, area: m.area || '', password: '', habilidadesTexto: (m.habilidades || []).join(', ') })
+    setEditForm({ nombre: m.nombre, email: m.email, rol: m.rol, esKarla: m.esKarla, area: m.area || '', password: '', habilidadesTexto: (m.habilidades || []).join(', '), emailsAlternosTexto: (m.emailsAlternos || []).join(', ') })
   }
 
   async function guardarEdicion(id) {
     if (!editForm.nombre.trim()) return
-    const data = { nombre: editForm.nombre, email: editForm.email, rol: editForm.rol, esKarla: editForm.esKarla, area: editForm.area || null, habilidades: textoAHabilidades(editForm.habilidadesTexto) }
+    const data = { nombre: editForm.nombre, email: editForm.email, rol: editForm.rol, esKarla: editForm.esKarla, area: editForm.area || null, habilidades: textoALista(editForm.habilidadesTexto), emailsAlternos: textoALista(editForm.emailsAlternosTexto) }
     if (editForm.password) data.password = editForm.password
     await editarMiembro(id, data)
     setEditandoId(null)
@@ -79,7 +79,7 @@ export default function Equipo() {
       return
     }
     try {
-      await crearMiembro({ nombre: nuevoForm.nombre, email: nuevoForm.email, password: nuevoForm.password, rol: nuevoForm.rol, esKarla: nuevoForm.esKarla, area: nuevoForm.area || null, habilidades: textoAHabilidades(nuevoForm.habilidadesTexto) })
+      await crearMiembro({ nombre: nuevoForm.nombre, email: nuevoForm.email, password: nuevoForm.password, rol: nuevoForm.rol, esKarla: nuevoForm.esKarla, area: nuevoForm.area || null, habilidades: textoALista(nuevoForm.habilidadesTexto) })
       setNuevoForm(FORM_VACIO)
       setMostrarNuevo(false)
       cargar()
@@ -147,6 +147,12 @@ export default function Equipo() {
                         placeholder="Habilidades separadas por coma (ej. copy, wordpress)"
                         className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 flex-1 min-w-[16rem]"
                       />
+                      <input
+                        value={editForm.emailsAlternosTexto}
+                        onChange={(e) => setEditForm({ ...editForm, emailsAlternosTexto: e.target.value })}
+                        placeholder="Correos alternos para Google (separados por coma)"
+                        className="border border-brand-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-brand-400 flex-1 min-w-[16rem]"
+                      />
                     </div>
                     <div className="flex items-center gap-4">
                       <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
@@ -193,6 +199,7 @@ export default function Equipo() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-slate-800 text-sm">{m.nombre}</div>
                       <div className="text-xs text-slate-400">{m.email}</div>
+                      {m.emailsAlternos?.length > 0 && <div className="text-xs text-slate-400">Google: {m.emailsAlternos.join(', ')}</div>}
                       <div className="flex items-center gap-2 mt-0.5">
                         {m.rol === 'ADMIN' && <span className="text-xs text-brand-700 flex items-center gap-0.5"><Shield size={11} /> Admin</span>}
                         {m.esKarla && <span className="text-xs text-amber-600 flex items-center gap-0.5"><Star size={11} /> QA</span>}

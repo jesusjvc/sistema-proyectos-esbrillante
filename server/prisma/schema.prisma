@@ -27,6 +27,10 @@ model User {
   // Lista plana de etiquetas libres (ej. "copy", "wordpress", "elementor") —
   // transparencia de quién puede hacer qué, sin niveles ni jerarquía.
   habilidades String[] @default([])
+  // Correos distintos al principal con los que también se puede entrar por
+  // Google (ej. webmaster@ para el usuario jesus@). Solo login con Google:
+  // la contraseña y todos los correos del sistema siguen ligados al principal.
+  emailsAlternos String[] @default([])
 
   apiKeys ApiKey[]
   notificaciones Notificacion[]
