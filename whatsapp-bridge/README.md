@@ -37,3 +37,22 @@ npm start
 
 Déjalo corriendo cuando trabajes (pm2, tmux o una terminal abierta).
 Ctrl+C lo detiene — la próxima vuelta sincroniza lo acumulado.
+
+## Arranque automático (systemd, horario de la empresa)
+
+Instalado en `~/.config/systemd/user/`: el puente **arranca lunes a viernes a
+las 10:00 y se detiene a las 18:00** (la máquina puede encenderse antes — con
+`Persistent=true` y linger habilitado, los timers corren aunque no haya
+sesión iniciada). OpenWA (contenedor `openwa-api`, `unless-stopped`) queda
+corriendo 24/7 y guarda los mensajes que lleguen fuera de horario: al
+arrancar el puente a las 10:00 sincroniza todo lo acumulado.
+
+```bash
+systemctl --user start foco-bridge.service    # arrancar manualmente
+systemctl --user stop foco-bridge.service     # detener
+systemctl --user list-timers | grep foco      # ver próximos disparos
+journalctl --user -u foco-bridge.service -f   # ver el log
+```
+
+Units: `foco-bridge.service` + `foco-bridge-inicio.timer` (10:00) +
+`foco-bridge-paro.timer`/`.service` (18:00).
