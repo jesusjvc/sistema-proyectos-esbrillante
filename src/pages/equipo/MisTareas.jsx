@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import SelectorResponsableRapido from '../../components/SelectorResponsableRapido'
 import ModalDetalleTarea from '../../components/ModalDetalleTarea'
+import gifFalta from '../../assets/gif-falta.gif'
 import AdjuntosTarea from '../../components/AdjuntosTarea'
 import { PrioridadRapida, FechaRapida } from '../../components/TablaTareasContinuas'
 import { useAuth } from '../../context/AuthContext'
@@ -257,7 +258,7 @@ export default function MisTareas() {
                     {tareas.map((t) => (
                       <div key={t.id} className="px-5 py-4 flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
-                          <UserX size={15} className="text-amber-500 mt-0.5 shrink-0" />
+                          <img src={gifFalta} alt="" className="h-7 w-7 rounded-full object-cover mt-0.5 shrink-0" />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-slate-800 dark:text-ink-100 text-sm">{t.titulo}</span>

@@ -10,6 +10,9 @@ import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { miembrosDelEquipo } from '../../lib/permisos'
 import { normalizarTexto } from '../../lib/texto'
 import MedidorCircular from '../../components/MedidorCircular'
+import gifFalta from '../../assets/gif-falta.gif'
+import gifWaiting from '../../assets/gif-waiting.gif'
+import gifCatWorking from '../../assets/gif-cat-working.gif'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../../lib/areas'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, ChevronDown, Bell, MessageCircle, Search, X, LayoutList, LayoutGrid, CalendarDays, UserX } from 'lucide-react'
@@ -459,10 +462,30 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
           </span>
         )}
 
+        {/* Indicadores animados — dónde falta gente, dónde espera el cliente, dónde vamos atrasados */}
         {p.salud?.tareasEquipoSinResponsable > 0 && (
-          <Chip className="bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300">
-            <UserX size={11} /> {p.salud.tareasEquipoSinResponsable} sin responsable
-          </Chip>
+          <img
+            src={gifFalta}
+            alt="Faltan responsables"
+            title={`${p.salud.tareasEquipoSinResponsable} tarea(s) sin responsable — clic para ver el detalle`}
+            className="h-8 w-8 rounded-full object-cover shrink-0"
+          />
+        )}
+        {salud?.motivos?.some((m) => m.tipo === 'cliente_esperando') && (
+          <img
+            src={gifWaiting}
+            alt="Esperando al cliente"
+            title="Esperando respuesta del cliente"
+            className="h-8 w-8 rounded-full object-cover shrink-0"
+          />
+        )}
+        {salud?.nivel === 'atrasado' && (
+          <img
+            src={gifCatWorking}
+            alt="Trabajando en los atrasos"
+            title="Proyecto atrasado — el equipo está en ello"
+            className="h-8 w-8 rounded-full object-cover shrink-0"
+          />
         )}
 
         <BadgeEntrega proyecto={p} />
@@ -594,9 +617,19 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
       </Chip>
     ),
     p.salud?.tareasEquipoSinResponsable > 0 && (
-      <Chip key="sinresp" className="bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300">
-        <UserX size={11} /> {p.salud.tareasEquipoSinResponsable} sin responsable
-      </Chip>
+      <span key="sinresp" className="inline-flex items-center gap-1 shrink-0" title={`${p.salud.tareasEquipoSinResponsable} tarea(s) sin responsable`}>
+        <img src={gifFalta} alt="" className="h-6 w-6 rounded-full object-cover" />
+      </span>
+    ),
+    p.salud?.motivos?.some((m) => m.tipo === 'cliente_esperando') && (
+      <span key="waiting" className="inline-flex items-center gap-1 shrink-0" title="Esperando respuesta del cliente">
+        <img src={gifWaiting} alt="" className="h-6 w-6 rounded-full object-cover" />
+      </span>
+    ),
+    nivelSalud === 'atrasado' && (
+      <span key="cat" className="inline-flex items-center gap-1 shrink-0" title="Proyecto atrasado">
+        <img src={gifCatWorking} alt="" className="h-6 w-6 rounded-full object-cover" />
+      </span>
     ),
     ...(p.areas?.map((a) => (
       <Chip key={a} className={AREA_COLOR[a] || 'bg-slate-100 dark:bg-ink-700 text-slate-500 dark:text-ink-300'}>{AREA_LABEL[a] || a}</Chip>

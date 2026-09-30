@@ -33,11 +33,11 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
         className={
           children
             ? 'rounded-full flex items-center justify-center ring-offset-2 dark:ring-offset-ink-800 hover:ring-2 hover:ring-brand-300 transition-all'
-            : 'rounded-full border-2 border-dashed border-amber-400 flex items-center justify-center hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors'
+            : 'rounded-full flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-amber-400 transition-all'
         }
         title={children ? 'Cambiar responsable' : 'Sin responsable — clic para asignar a alguien'}
       >
-        {children || <UserX size={iconSize} className="text-amber-500" />}
+        {children || <img src={gifFalta} alt="Sin responsable" className="h-full w-full object-cover" />}
       </button>
 
       {abierto && (
