@@ -106,14 +106,32 @@ async function sincronizar() {
   // 4. Mensajes nuevos por grupo (solo entrantes; la sincronización es
   // continua, ya no hace falta el lote diario a hora fija).
   for (const objetivo of objetivos) {
+    // Mapa id de participante → nombre: los senders pueden llegar como ids
+    // de privacidad (@lid) sin nombre en el mensaje.
+    let nombresPorId = {}
+    try {
+      const info = await openwa(`/sessions/${sesionId}/groups/${encodeURIComponent(objetivo.chatId)}`)
+      for (const p of info.participants || []) {
+        if (p.name) nombresPorId[p.id] = p.name
+      }
+    } catch (err) {
+      console.log(`No pude traer los participantes de "${objetivo.grupo}": ${err.message}`)
+    }
+
     const ultimo = estado[objetivo.chatId] || 0
     const pagina = await openwa(`/sessions/${sesionId}/messages?chatId=${encodeURIComponent(objetivo.chatId)}&limit=500&inlineMedia=false`)
     const mensajes = pagina.messages || []
     const nuevos = mensajes
-      .filter((m) => (m.timestamp || 0) > ultimo && (m.body || '').trim() && m.direction === 'INCOMING')
+      .filter((m) => (m.timestamp || 0) > ultimo && (m.body || '').trim())
+      .filter((m) => ['incoming', 'outgoing'].includes(String(m.direction || '').toLowerCase()))
       .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
       .map((m) => ({
-        autor: m.contact?.pushName || m.contact?.name || m.author || 'Desconocido',
+        // outgoing = enviado por el account del puente (respuestas del equipo);
+        // incoming = el resto del grupo. El nombre humano va cuando el
+        // contacto lo expone; el id crudo como último recurso.
+        autor: String(m.direction || '').toLowerCase() === 'outgoing'
+          ? 'Equipo (WhatsApp)'
+          : (m.contact?.pushName || m.contact?.name || nombresPorId[m.author] || m.author || 'Desconocido'),
         texto: m.body,
         fecha: new Date((m.timestamp || 0) * 1000).toISOString(),
       }))
