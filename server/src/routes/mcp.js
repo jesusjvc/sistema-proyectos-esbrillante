@@ -704,14 +704,24 @@ function buildServer(usuario) {
       const porProyecto = new Map()
       for (const m of mensajes) {
         const clave = m.proyecto.slug
-        if (!porProyecto.has(clave)) porProyecto.set(clave, { slug: m.proyecto.slug, cliente: m.proyecto.cliente?.nombreComercial || clave, grupo: m.grupo, total: 0, mensajes: [] })
-        porProyecto.get(clave).total++
-        porProyecto.get(clave).mensajes.push({ autor: m.autor, texto: m.texto.slice(0, 500), fecha: m.fechaMensaje })
+        if (!porProyecto.has(clave)) {
+          porProyecto.set(clave, { slug: m.proyecto.slug, cliente: m.proyecto.cliente?.nombreComercial || clave, total: 0, grupos: {}, mensajes: [] })
+        }
+        const entrada = porProyecto.get(clave)
+        entrada.total++
+        if (!entrada.grupos[m.grupo]) entrada.grupos[m.grupo] = 0
+        entrada.grupos[m.grupo]++
+        entrada.mensajes.push({ grupo: m.grupo, autor: m.autor, texto: m.texto.slice(0, 500), fecha: m.fechaMensaje })
       }
 
       return ok(JSON.stringify({
         ventanaDias: ventana,
-        proyectos: [...porProyecto.values()],
+        proyectos: [...porProyecto.values()].map(({ mensajes, ...resto }) => ({
+          ...resto,
+          // Mensajes ordenados por grupo primero (un proyecto puede tener
+          // varios grupos con enfoques distintos) y luego por fecha.
+          mensajes: [...mensajes].sort((a, b) => (a.grupo === b.grupo ? new Date(a.fecha) - new Date(b.fecha) : a.grupo.localeCompare(b.grupo))),
+        })),
       }, null, 2))
     },
   )

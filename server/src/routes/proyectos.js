@@ -412,9 +412,12 @@ router.delete('/:slug/fases/:numero', requireAuth, async (req, res) => {
 // libres [{etiqueta, valor}] (redes del cliente, hosting, etc.). Vive dentro
 // del Json `proyecto.proyecto` — sin migración, merge de solo estas claves.
 router.put('/:slug/info-clave', requireAuth, async (req, res) => {
-  const { dominio, grupoWhatsapp, extras } = req.body
+  const { dominio, grupoWhatsapp, grupos, extras } = req.body
   if (extras !== undefined && (!Array.isArray(extras) || !extras.every((e) => e && typeof e.etiqueta === 'string' && typeof e.valor === 'string'))) {
     return res.status(400).json({ error: 'extras debe ser una lista de {etiqueta, valor}' })
+  }
+  if (grupos !== undefined && (!Array.isArray(grupos) || !grupos.every((g) => g && typeof g.nombre === 'string'))) {
+    return res.status(400).json({ error: 'grupos debe ser una lista de {nombre, etiqueta?, nota?}' })
   }
 
   try {
@@ -424,6 +427,19 @@ router.put('/:slug/info-clave', requireAuth, async (req, res) => {
     const infoClave = { ...(p.proyecto?.infoClave || {}) }
     if (dominio !== undefined) infoClave.dominio = (dominio || '').trim().slice(0, 200) || null
     if (grupoWhatsapp !== undefined) infoClave.grupoWhatsapp = (grupoWhatsapp || '').trim().slice(0, 200) || null
+    if (grupos !== undefined) {
+      infoClave.grupos = grupos
+        .map((g) => ({
+          nombre: g.nombre.trim().slice(0, 200),
+          etiqueta: (g.etiqueta || '').trim().slice(0, 80),
+          nota: (g.nota || '').trim().slice(0, 500),
+        }))
+        .filter((g) => g.nombre)
+        .slice(0, 10)
+      // El string legado se alinea con el primer grupo para no dejar dos
+      // fuentes de verdad.
+      infoClave.grupoWhatsapp = infoClave.grupos[0]?.nombre || null
+    }
     if (extras !== undefined) {
       infoClave.extras = extras
         .map((e) => ({ etiqueta: e.etiqueta.trim().slice(0, 80), valor: e.valor.trim().slice(0, 500) }))

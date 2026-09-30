@@ -2341,7 +2341,11 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
   function iniciar() {
     setForm({
       dominio: infoClave.dominio || '',
-      grupoWhatsapp: infoClave.grupoWhatsapp || '',
+      grupos: gruposDeInfoClave(infoClave).map((g) => ({
+        nombre: g.nombre || '',
+        etiqueta: g.etiqueta || '',
+        nota: g.nota || '',
+      })),
       extras: (infoClave.extras || []).map((e) => ({ ...e })),
     })
     setEditando(true)
@@ -2350,7 +2354,13 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
   async function guardar() {
     await onGuardar({
       dominio: form.dominio?.trim() || null,
-      grupoWhatsapp: form.grupoWhatsapp?.trim() || null,
+      grupos: (form.grupos || [])
+        .filter((g) => g.nombre.trim())
+        .map((g) => ({
+          nombre: g.nombre.trim(),
+          etiqueta: g.etiqueta.trim(),
+          nota: g.nota.trim(),
+        })),
       extras: (form.extras || []).filter((e) => e.etiqueta.trim() && e.valor.trim()),
     })
     setEditando(false)
@@ -2359,10 +2369,27 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
   if (editando) {
     return (
       <div className="space-y-2.5">
-        <div className="grid grid-cols-2 gap-2">
-          <input value={form.dominio || ''} onChange={(e) => setForm({ ...form, dominio: e.target.value })} placeholder="Dominio (midominio.com)" className={inputCls} />
-          <input value={form.grupoWhatsapp || ''} onChange={(e) => setForm({ ...form, grupoWhatsapp: e.target.value })} placeholder="Grupo de WhatsApp" className={inputCls} />
+        <input value={form.dominio || ''} onChange={(e) => setForm({ ...form, dominio: e.target.value })} placeholder="Dominio (midominio.com)" className={inputCls} />
+
+      <div>
+        <p className="text-xs font-medium text-slate-500 dark:text-ink-300 mb-1">Grupos de WhatsApp (nombre exacto + etiqueta del enfoque)</p>
+        <div className="space-y-1.5">
+          {(form.grupos || []).map((g, i) => (
+            <div key={i} className="flex gap-1.5">
+              <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre del grupo en WhatsApp" className={inputCls + ' flex-1 min-w-0'} />
+              <input value={g.etiqueta} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Diseños)" className={inputCls + ' w-28 shrink-0'} />
+              <input value={g.nota} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nota: e.target.value } : x) })} placeholder="Nota del enfoque (opcional)" className={inputCls + ' w-44 shrink-0'} />
+              <button onClick={() => setForm({ ...form, grupos: form.grupos.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+            </div>
+          ))}
+          <button
+            onClick={() => setForm({ ...form, grupos: [...(form.grupos || []), { nombre: '', etiqueta: '', nota: '' }] })}
+            className="text-xs text-brand-700 dark:text-brand-400 hover:underline"
+          >
+            + Agregar grupo
+          </button>
         </div>
+      </div>
         {(form.extras || []).map((extra, i) => (
           <div key={i} className="flex gap-2">
             <input value={extra.etiqueta} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Hosting)" className={inputCls + ' w-40 shrink-0'} />
@@ -2395,12 +2422,16 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
               <dd className="font-medium text-slate-800 dark:text-ink-100 truncate"><ValorConEnlace valor={infoClave.dominio} /></dd>
             </div>
           )}
-          {infoClave.grupoWhatsapp && (
-            <div className="flex items-center gap-2 text-sm">
-              <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0">Grupo WhatsApp</dt>
-              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate"><ValorConEnlace valor={infoClave.grupoWhatsapp} /></dd>
+          {gruposDeInfoClave(infoClave).map((g) => (
+            <div key={g.nombre} className="flex items-center gap-2 text-sm">
+              <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0 truncate">
+                Grupo WhatsApp{g.etiqueta ? ` — ${g.etiqueta}` : ''}
+              </dt>
+              <dd className="font-medium text-slate-800 dark:text-ink-100 truncate" title={g.nota || undefined}>
+                <ValorConEnlace valor={g.nombre} />
+              </dd>
             </div>
-          )}
+          ))}
           {(infoClave.extras || []).map((e) => (
             <div key={e.etiqueta} className="flex items-center gap-2 text-sm">
               <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0 truncate">{e.etiqueta}</dt>
@@ -2421,11 +2452,22 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
 // Línea compacta de Info clave para el header del proyecto: dominio, grupo
 // de WhatsApp y extras (Stack, Repositorio...) — los valores que son URL se
 // muestran como enlace. La edición vive en el tab Info.
+function gruposDeInfoClave(infoClave) {
+  // Grupos en su forma nueva (grupos[]) con caída al string legado.
+  if (infoClave?.grupos?.length) return infoClave.grupos
+  if (infoClave?.grupoWhatsapp) return [{ nombre: infoClave.grupoWhatsapp, etiqueta: '', nota: '' }]
+  return []
+}
+
 function InfoClaveCompacta({ infoClave }) {
   if (!infoClave) return null
   const items = [
     infoClave.dominio && { etiqueta: 'Dominio', valor: infoClave.dominio },
-    infoClave.grupoWhatsapp && { etiqueta: 'WhatsApp', valor: infoClave.grupoWhatsapp },
+    ...gruposDeInfoClave(infoClave).map((g) => ({
+      etiqueta: `WA · ${g.etiqueta || 'Grupo'}`,
+      valor: g.nombre,
+      titulo: [g.nombre, g.nota].filter(Boolean).join(' — '),
+    })),
     ...(infoClave.extras || []),
   ].filter(Boolean)
   if (!items.length) return null
@@ -2435,19 +2477,19 @@ function InfoClaveCompacta({ infoClave }) {
       {items.map((e) =>
         esUrl(e.valor) ? (
           <a
-            key={e.etiqueta}
+            key={e.etiqueta + e.valor}
             href={e.valor}
             target="_blank"
             rel="noreferrer"
             onClick={(ev) => ev.stopPropagation()}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-ink-700 text-brand-700 dark:text-brand-300 hover:underline max-w-64"
-            title={e.valor}
+            title={e.titulo || e.valor}
           >
             <span className="text-slate-400 dark:text-ink-400">{e.etiqueta}:</span>
             <span className="truncate underline underline-offset-2">{e.valor.replace(/^https?:\/\/(www\.)?/, '')}</span>
           </a>
         ) : (
-          <span key={e.etiqueta} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-ink-700 text-slate-600 dark:text-ink-300 max-w-64" title={`${e.etiqueta}: ${e.valor}`}>
+          <span key={e.etiqueta + e.valor} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-ink-700 text-slate-600 dark:text-ink-300 max-w-64" title={e.titulo || `${e.etiqueta}: ${e.valor}`}>
             <span className="text-slate-400 dark:text-ink-400">{e.etiqueta}:</span>
             <span className="truncate">{e.valor}</span>
           </span>
