@@ -555,6 +555,7 @@ export default function DetalleProyecto() {
                   estado={estadoCalculado(t)}
                   avatares={avatares}
                   equipo={proyecto.equipo}
+                  slug={proyecto.slug}
                   miembrosPorId={miembrosPorId}
                   miembros={miembros}
                   todasLasTareas={proyecto.tareas}
@@ -587,6 +588,7 @@ export default function DetalleProyecto() {
                       onRefrescar={refresh}
                       avatares={avatares}
                       equipo={proyecto.equipo}
+                      slug={proyecto.slug}
                       miembrosPorId={miembrosPorId}
                       miembros={miembros}
                       todasLasTareas={proyecto.tareas}
@@ -840,6 +842,7 @@ export default function DetalleProyecto() {
                                 estado={est}
                                 avatares={avatares}
                                 equipo={proyecto.equipo}
+                                slug={proyecto.slug}
                                 miembrosPorId={miembrosPorId}
                                 miembros={miembros}
                                 todasLasTareas={proyecto.tareas}
@@ -1260,7 +1263,7 @@ function FilaArrastrable({ id, children }) {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin, resaltada = false, onRefrescar }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin, resaltada = false, onRefrescar, slug }) {
   const [modalAbierto, setModalAbierto] = useState(false)
   const filaRef = useRef(null)
 
@@ -1439,7 +1442,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
           })()}
 
           {!t.esCliente && (
-            <AdjuntosTarea slug={t.proyectoSlug || proyecto.slug} tarea={t} onRefrescar={onRefrescar} compacto />
+            <AdjuntosTarea slug={t.proyectoSlug || slug} tarea={t} onRefrescar={onRefrescar} compacto />
           )}
 
           {numComentarios > 0 && (

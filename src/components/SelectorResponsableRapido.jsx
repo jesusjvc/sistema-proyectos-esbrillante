@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { UserX } from 'lucide-react'
+import gifFalta from '../assets/gif-falta.gif'
 
 // Popover que se abre al hacer clic en el ícono de "sin responsable" (el
 // círculo punteado ámbar) o en el avatar de quien ya está asignado, para
