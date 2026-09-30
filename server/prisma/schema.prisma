@@ -95,6 +95,7 @@ model Proyecto {
   log         LogEntry[]
   solicitudes Solicitud[]
   notas       NotaProyecto[]
+  mensajesWhatsapp MensajeWhatsApp[]
 
   creadoEn DateTime @default(now())
 
@@ -117,6 +118,25 @@ model NotaProyecto {
 
   @@index([proyectoId, creadoEn])
   @@map("notas_proyecto")
+}
+
+// Mensajes de WhatsApp de los grupos de proyecto, reenviados por el puente
+// local (whatsapp-bridge/, OpenWA en la máquina del equipo). Con retención
+// de 7 días — el ingest purga lo viejo; lo permanente es el resumen diario
+// que la automatización deja como NotaProyecto.
+model MensajeWhatsApp {
+  id         String @id @default(cuid())
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  grupo      String
+  autor      String
+  texto      String
+  fechaMensaje DateTime
+
+  creadoEn DateTime @default(now())
+
+  @@index([proyectoId, fechaMensaje])
+  @@map("mensajes_whatsapp")
 }
 
 // Cliente real (persona/negocio), independiente de cuántos Proyecto tenga.

@@ -1,0 +1,15 @@
+{
+  "name": "foco-whatsapp-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Puente local OpenWA → Foco: reenvía los mensajes de los grupos de proyecto a la API de Foco (lote diario). Corre en la máquina del equipo, no se despliega.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@open-wa/wa-automate": "^4.76.0",
+    "dotenv": "^16.4.5"
+  }
+}

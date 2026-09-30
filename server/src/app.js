@@ -7,6 +7,7 @@ import authRouter from './routes/auth.js'
 import proyectosRouter from './routes/proyectos.js'
 import tareasRouter from './routes/tareas.js'
 import miembrosRouter from './routes/miembros.js'
+import integracionesWhatsAppRouter from './routes/integracionesWhatsApp.js'
 import clienteRouter from './routes/cliente.js'
 import clientesRouter from './routes/clientes.js'
 import incidenciasRouter from './routes/incidencias.js'
@@ -49,6 +50,7 @@ app.use('/api/prototipos', prototiposRouter)
 app.use('/api/cliente', clienteRouter)
 app.use('/api/clientes', clientesRouter)
 app.use('/api/incidencias', incidenciasRouter)
+app.use('/api/integraciones/whatsapp', integracionesWhatsAppRouter)
 app.use('/mcp', mcpRouter)
 app.use('/api/eventos', eventosRouter)
 app.use('/api/notificaciones', notificacionesRouter)

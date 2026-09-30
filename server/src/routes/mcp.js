@@ -676,6 +676,47 @@ function buildServer(usuario) {
   )
 
   server.registerTool(
+    'ver_mensajes_whatsapp',
+    {
+      title: 'Ver mensajes de WhatsApp',
+      description: 'Mensajes de WhatsApp de los grupos de proyecto (capturados por el puente OpenWA local), con retención de 7 días. Sin slug: los mensajes de las últimas 48 h agrupados por proyecto — el punto de partida para resumir la actividad del día y detectar datos valiosos (decisiones, accesos, redes del cliente) para registrarlos en la Info clave o como nota de status. Con slug: mensajes de ese proyecto en la ventana de dias indicada (máx. 7).',
+      inputSchema: {
+        slug: z.string().optional().describe('Slug o ID del proyecto — si se omite, devuelve los mensajes recientes de todos los proyectos con actividad'),
+        dias: z.number().int().optional().describe('Ventana en días hacia atrás. Default 2, máximo 7 (retención).'),
+      },
+    },
+    async ({ slug, dias }) => {
+      const ventana = Math.min(Math.max(dias ?? 2, 1), 7)
+      const desde = new Date(Date.now() - ventana * 24 * 3600_000)
+
+      const where = {
+        fechaMensaje: { gte: desde },
+        ...(slug ? { proyecto: { OR: [{ slug }, { id: slug }] } } : {}),
+      }
+      const mensajes = await prisma.mensajeWhatsApp.findMany({
+        where,
+        orderBy: { fechaMensaje: 'asc' },
+        take: 1000,
+        include: { proyecto: { select: { slug: true, cliente: true } } },
+      })
+      if (!mensajes.length) return ok('Sin mensajes de WhatsApp en la ventana consultada.')
+
+      const porProyecto = new Map()
+      for (const m of mensajes) {
+        const clave = m.proyecto.slug
+        if (!porProyecto.has(clave)) porProyecto.set(clave, { slug: m.proyecto.slug, cliente: m.proyecto.cliente?.nombreComercial || clave, grupo: m.grupo, total: 0, mensajes: [] })
+        porProyecto.get(clave).total++
+        porProyecto.get(clave).mensajes.push({ autor: m.autor, texto: m.texto.slice(0, 500), fecha: m.fechaMensaje })
+      }
+
+      return ok(JSON.stringify({
+        ventanaDias: ventana,
+        proyectos: [...porProyecto.values()],
+      }, null, 2))
+    },
+  )
+
+  server.registerTool(
     'registrar_actividad',
     {
       title: 'Registrar actividad',
