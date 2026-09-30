@@ -23,11 +23,16 @@ export default function Equipo() {
   const [mostrarNuevo, setMostrarNuevo] = useState(false)
   const [error, setError] = useState('')
   const [filtroHabilidad, setFiltroHabilidad] = useState(null)
+  const [verInactivos, setVerInactivos] = useState(false)
 
   const todasLasHabilidades = [...new Set(miembros.flatMap((m) => m.habilidades || []))].sort()
   const miembrosFiltrados = filtroHabilidad
     ? miembros.filter((m) => (m.habilidades || []).includes(filtroHabilidad))
     : miembros
+  // Los inactivos (borrado lógico) no estorban en la lista del día a día —
+  // se muestran solo bajo demanda con el toggle de abajo.
+  const inactivos = miembrosFiltrados.filter((m) => !m.activo)
+  const miembrosVisibles = verInactivos ? miembrosFiltrados : miembrosFiltrados.filter((m) => m.activo)
 
   async function cargar() {
     try {
@@ -112,11 +117,19 @@ export default function Equipo() {
           </div>
         )}
 
+        {inactivos.length > 0 && (
+          <div className="mb-3">
+            <button onClick={() => setVerInactivos((v) => !v)} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-ink-200 transition-colors">
+              {verInactivos ? 'Ocultar miembros inactivos' : `Ver miembros inactivos (${inactivos.length})`}
+            </button>
+          </div>
+        )}
+
         {cargando ? (
           <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
-            {miembrosFiltrados.map((m, idx) => (
+            {miembrosVisibles.map((m, idx) => (
               <div key={m.id} className={`px-5 py-4 flex items-center gap-3 ${idx !== 0 ? 'border-t border-slate-100' : ''}`}>
                 {editandoId === m.id ? (
                   <div className="flex-1 flex flex-col gap-2">
