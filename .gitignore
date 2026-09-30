@@ -35,3 +35,6 @@ docs/desing.pen
 **.node-persist**
 **_IGNORE_**
 # end managed by open-wa
+
+# Estado del puente de WhatsApp (runtime)
+whatsapp-bridge/estado.json
