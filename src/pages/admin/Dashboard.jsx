@@ -13,6 +13,7 @@ import MedidorCircular from '../../components/MedidorCircular'
 import gifFalta from '../../assets/gif-falta.gif'
 import gifWaiting from '../../assets/gif-waiting.gif'
 import gifCatWorking from '../../assets/gif-cat-working.gif'
+import gifSirena from '../../assets/gif-sirena.gif'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../../lib/areas'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { PlusCircle, Clock, CheckCircle2, PauseCircle, AlertCircle, ChevronRight, ChevronDown, Bell, MessageCircle, Search, X, LayoutList, LayoutGrid, CalendarDays, UserX } from 'lucide-react'
@@ -487,6 +488,14 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
             className="h-8 w-8 rounded-full object-cover shrink-0"
           />
         )}
+        {salud?.nivel === 'estancado' && (
+          <img
+            src={gifSirena}
+            alt="Proyecto estancado"
+            title="Proyecto estancado — sin movimiento hace más de una semana"
+            className="h-8 w-8 rounded-full object-cover shrink-0"
+          />
+        )}
 
         <BadgeEntrega proyecto={p} />
 
@@ -629,6 +638,11 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
     nivelSalud === 'atrasado' && (
       <span key="cat" className="inline-flex items-center gap-1 shrink-0" title="Proyecto atrasado">
         <img src={gifCatWorking} alt="" className="h-6 w-6 rounded-full object-cover" />
+      </span>
+    ),
+    nivelSalud === 'estancado' && (
+      <span key="sirena" className="inline-flex items-center gap-1 shrink-0" title="Proyecto estancado">
+        <img src={gifSirena} alt="" className="h-6 w-6 rounded-full object-cover" />
       </span>
     ),
     ...(p.areas?.map((a) => (
