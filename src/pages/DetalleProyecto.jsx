@@ -24,6 +24,7 @@ import { generarMensajeInicio } from '../data/mensajes'
 import { useEventosProyecto } from '../hooks/useEventos'
 import useEscape from '../hooks/useEscape'
 import MedidorCircular from '../components/MedidorCircular'
+import AdjuntosTarea from '../components/AdjuntosTarea'
 import { MODULOS_CLIENTE } from '../data/modulosCliente'
 import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
@@ -47,7 +48,7 @@ import { normalizarTexto } from '../lib/texto'
 import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
-  FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle, Globe,
+  FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle, Globe, Paperclip,
   AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3, Search,
 } from 'lucide-react'
 
@@ -564,6 +565,7 @@ export default function DetalleProyecto() {
                   onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
                   onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                   onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
+                  onRefrescar={refresh}
                   esAdmin={true}
                 />
               ))}
@@ -582,6 +584,7 @@ export default function DetalleProyecto() {
                       key={t.id}
                       tarea={t}
                       estado={estadoCalculado(t)}
+                      onRefrescar={refresh}
                       avatares={avatares}
                       equipo={proyecto.equipo}
                       miembrosPorId={miembrosPorId}
@@ -1257,7 +1260,7 @@ function FilaArrastrable({ id, children }) {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin, resaltada = false }) {
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin, resaltada = false, onRefrescar }) {
   const [modalAbierto, setModalAbierto] = useState(false)
   const filaRef = useRef(null)
 
@@ -1404,6 +1407,39 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                 </a>
               )}
             </div>
+          )}
+
+          {/* Lo que el cliente ya mandó para esta tarea (dependencias hacia tareas del cliente con respuesta) */}
+          {!t.esCliente && (() => {
+            const referencias = (t.dependencias || [])
+              .map((id) => todasLasTareas.find((x) => x.id === id))
+              .filter((x) => x && x.esCliente && (x.respuestaTexto || x.respuestaArchivoUrl || x.driveFolderUrl))
+            if (!referencias.length) return null
+            return (
+              <div className="text-sm bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 rounded-lg px-2.5 py-2 space-y-1.5">
+                <p className="text-xs font-semibold text-slate-500 dark:text-ink-300 uppercase tracking-wide">Lo que ya mandó el cliente</p>
+                {referencias.map((ref) => (
+                  <div key={ref.id} className="space-y-0.5">
+                    <p className="text-xs font-medium text-slate-600 dark:text-ink-200">{ref.titulo}</p>
+                    {ref.respuestaTexto && <p className="text-xs text-slate-500 dark:text-ink-300">{ref.respuestaTexto.slice(0, 200)}{ref.respuestaTexto.length > 200 ? '…' : ''}</p>}
+                    {ref.respuestaArchivoUrl && (
+                      <a href={ref.respuestaArchivoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand-700 dark:text-brand-300 hover:underline">
+                        <Paperclip size={11} /> {ref.respuestaArchivoNombre || 'Archivo del cliente'}
+                      </a>
+                    )}
+                    {ref.driveFolderUrl && (
+                      <a href={ref.driveFolderUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-brand-700 dark:text-brand-300 hover:underline">
+                        <FolderOpen size={11} /> Carpeta donde subió sus archivos
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {!t.esCliente && (
+            <AdjuntosTarea slug={t.proyectoSlug || proyecto.slug} tarea={t} onRefrescar={onRefrescar} compacto />
           )}
 
           {numComentarios > 0 && (

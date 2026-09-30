@@ -286,6 +286,9 @@ model Tarea {
   // 'vobo'. Solo tiene sentido en tareas esCliente — define la plantilla de
   // instrucciones y efectos al completarse (p. ej. dominio → infoClave).
   modulo               String?
+  // Archivos que el equipo adjunta a la tarea (van a Drive; aquí quedan
+  // nombre + enlace + quién subió). [{nombre, url, subidoPor, fecha}]
+  adjuntos             Json @default("[]")
   plazoHoras           Int?
   esRutaCritica        Boolean @default(false)
   soloAdmin            Boolean @default(false)

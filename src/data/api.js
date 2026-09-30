@@ -79,6 +79,22 @@ export const actualizarInfoClave = (slug, infoClave) => req('PUT', `/api/proyect
 export const agregarFase = (slug, nombre) => req('POST', `/api/proyectos/${slug}/fases`, { nombre })
 export const eliminarFase = (slug, numero) => req('DELETE', `/api/proyectos/${slug}/fases/${numero}`)
 export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
+export const adjuntarArchivoTarea = (slug, tareaId, archivo) => {
+  const form = new FormData()
+  form.append('archivo', archivo)
+  return fetch(`${BASE}/api/proyectos/${slug}/tareas/${tareaId}/adjuntos`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  }).then(async (res) => {
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error || `Error ${res.status}`)
+    }
+    return res.json()
+  })
+}
+export const quitarAdjuntoTarea = (slug, tareaId, url) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}/adjuntos`, { url })
 export const listarComentarios = (slug, tareaId) => req('GET', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`)
 export const crearComentario = (slug, tareaId, data) => req('POST', `/api/proyectos/${slug}/tareas/${tareaId}/comentarios`, data)
 

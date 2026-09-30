@@ -4,6 +4,7 @@ import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import SelectorResponsableRapido from '../../components/SelectorResponsableRapido'
 import ModalDetalleTarea from '../../components/ModalDetalleTarea'
+import AdjuntosTarea from '../../components/AdjuntosTarea'
 import { PrioridadRapida, FechaRapida } from '../../components/TablaTareasContinuas'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, getMiembros, iniciarTarea, completarTarea, editarTarea } from '../../data/api'
@@ -11,7 +12,7 @@ import { formatFechaHora } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { tareaLeCorresponde, tareaAsignadaDirectamente, miembrosDelEquipo, idsDeRol, RESPONSABLE_LABEL } from '../../lib/permisos'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
-import { CheckCircle2, ChevronRight, PlayCircle, Lock, ChevronDown, ChevronUp, UserX } from 'lucide-react'
+import { CheckCircle2, ChevronRight, PlayCircle, Lock, ChevronDown, ChevronUp, UserX, Paperclip, FolderOpen } from 'lucide-react'
 
 // Roles que se resuelven contra el equipo del proyecto — una tarea con uno de
 // estos roles y NADIE cubriéndolo en el proyecto está igual "al aire" que una
@@ -141,7 +142,13 @@ export default function MisTareas() {
         // copy/disenador, o una persona asignada directamente) ya es tuyo
         // específicamente, aunque todavía no le hayas dado clic a "Empezar".
         if (t.responsable !== 'equipo') {
-          asignadas.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
+          // Referencias del cliente: tareas del cliente de las que esta
+          // depende y que ya tienen respuesta o carpeta de Drive.
+          const infoCliente = t.dependencias
+            .map((id) => p.tareas.find((x) => x.id === id))
+            .filter((x) => x && x.esCliente && (x.respuestaTexto || x.respuestaArchivoUrl || x.driveFolderUrl))
+            .map((x) => ({ titulo: x.titulo, respuestaTexto: x.respuestaTexto, respuestaArchivoUrl: x.respuestaArchivoUrl, driveFolderUrl: x.driveFolderUrl }))
+          asignadas.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial, infoCliente })
         }
       })
     })
@@ -417,6 +424,7 @@ export default function MisTareas() {
             t={tareaModal}
             base={base}
             soloVer={viendoOtro}
+            proyectos={proyectos}
             onCerrar={() => setTareaAbierta(null)}
             onActualizar={actualizarTareaRapida}
             onIniciar={handleIniciar}
@@ -465,7 +473,7 @@ const ESTADOS_MODAL = {
 
 // Tarjeta de la tarea estilo Trello (mismo shell que el detalle del proyecto):
 // detalle completo + acciones sin salir de la bandeja.
-function ModalTarea({ t, base, soloVer, onCerrar, onActualizar, onIniciar, onCompletar }) {
+function ModalTarea({ t, base, soloVer, proyectos = [], onCerrar, onActualizar, onIniciar, onCompletar }) {
   const est = ESTADOS_MODAL[t.estado] || ESTADOS_MODAL.pendiente
   const bloqueada = (t.faltaPor || []).length > 0
 
@@ -503,11 +511,34 @@ function ModalTarea({ t, base, soloVer, onCerrar, onActualizar, onIniciar, onCom
           <p className="text-sm text-slate-600 dark:text-ink-300 whitespace-pre-line">{t.necesitasAntes}</p>
         </div>
       )}
+      {(t.infoCliente || []).length > 0 && (
+        <div className="text-sm bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2.5 space-y-1.5">
+          <p className="text-xs font-semibold text-slate-500 dark:text-ink-300 uppercase tracking-wide">Lo que ya mandó el cliente</p>
+          {t.infoCliente.map((ref) => (
+            <div key={ref.titulo} className="space-y-0.5">
+              <p className="text-xs font-medium text-slate-600 dark:text-ink-200">{ref.titulo}</p>
+              {ref.respuestaTexto && <p className="text-xs text-slate-500 dark:text-ink-300">{ref.respuestaTexto.slice(0, 220)}{ref.respuestaTexto.length > 220 ? '…' : ''}</p>}
+              {ref.respuestaArchivoUrl && (
+                <a href={ref.respuestaArchivoUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-brand-700 dark:text-brand-300 hover:underline">
+                  <Paperclip size={11} /> {ref.respuestaArchivoUrl.split('/').pop().split('?')[0] || 'Archivo del cliente'}
+                </a>
+              )}
+              {ref.driveFolderUrl && (
+                <a href={ref.driveFolderUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-brand-700 dark:text-brand-300 hover:underline">
+                  <FolderOpen size={11} /> Carpeta de Drive del cliente
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       {bloqueada && (
         <div className="text-sm text-slate-500 dark:text-ink-300 bg-slate-50 dark:bg-ink-900/50 rounded-lg px-3 py-2">
           Espera a que se completen: {t.faltaPor.join(', ')}
         </div>
       )}
+
+      <AdjuntosTarea slug={t.proyectoSlug} tarea={t} compacto />
 
       <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-ink-500 flex-wrap">
         <ControlesTarea t={t} slug={t.proyectoSlug} onActualizar={onActualizar} />
@@ -551,6 +582,15 @@ function FilaTarea({ t, base, soloVer, onAbrir, onActualizar, onIniciar, onCompl
               {t.titulo}
             </button>
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 dark:bg-brand-500/15 dark:text-brand-300 shrink-0">{t.proyectoNombre}</span>
+            {(t.infoCliente || []).length > 0 && (
+              <button
+                onClick={() => onAbrir(t)}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-500/25 transition-colors"
+                title="El cliente ya envió la información — clic para verla"
+              >
+                <Paperclip size={9} /> info del cliente lista
+              </button>
+            )}
           </div>
           {t.descripcion && <TextoEnriquecido html={t.descripcion} className="text-sm text-slate-500 dark:text-ink-300 mt-1" />}
         </div>

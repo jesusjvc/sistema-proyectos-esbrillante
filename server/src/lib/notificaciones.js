@@ -1,6 +1,8 @@
 import { enviarEmail } from './email.js'
 import prisma from './prisma.js'
 import { idsDeRol } from './permisos.js'
+import { destinatariosDeTarea } from './tareaHelpers.js'
+import { crearNotificacion } from './notificacionesHelper.js'
 
 const ROLES_EQUIPO_TAREA = ['copy', 'disenador', 'programador', 'redes']
 
@@ -113,5 +115,65 @@ export async function notificarAsignacion(proyecto, tareas, actor) {
     }))
   } catch (err) {
     console.error('notificarAsignacion falló:', err?.message || err)
+  }
+}
+
+// Avisa al equipo responsable de una tarea que quedó desbloqueada porque el
+// cliente ya envió la información que se le pidió. In-app + correo, con el
+// enlace al proyecto y el excerpt de lo que respondió.
+export async function notificarInformacionLista(proyecto, tareaDesbloqueada, tareaCliente, respuesta) {
+  try {
+    const destinatarioIds = await destinatariosDeTarea(tareaDesbloqueada, proyecto.equipo)
+    if (!destinatarioIds.length) return
+
+    const usuarios = await prisma.user.findMany({
+      where: { id: { in: destinatarioIds }, activo: true },
+      select: { id: true, email: true, nombre: true, rol: true },
+    })
+    if (!usuarios.length) return
+
+    const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
+    const clientUrl = process.env.CLIENT_URL || ''
+
+    await crearNotificacion({
+      destinatarioIds: usuarios.map((u) => u.id),
+      tipo: 'tarea_informacion_lista',
+      mensaje: `El cliente envió la información — "${tareaDesbloqueada.titulo}" ya está desbloqueada`,
+      proyecto,
+      tarea: tareaDesbloqueada,
+    })
+
+    await Promise.all(usuarios.map((u) => {
+      const base = u.rol === 'ADMIN' ? '/admin' : '/equipo'
+      const linkProyecto = `${clientUrl}${base}/proyecto/${proyecto.slug}`
+      const excerpt = respuesta?.texto ? `Respuesta del cliente: "${respuesta.texto.slice(0, 300)}"` : ''
+      const archivo = respuesta?.archivoUrl ? `\nArchivo: ${respuesta.archivoUrl}` : ''
+
+      const texto = [
+        `El cliente ya envió la información que se le pidió en "${tareaCliente.titulo}" (${nombreCliente}).`,
+        excerpt,
+        `Puedes continuar con: "${tareaDesbloqueada.titulo}"`,
+        '',
+        `Ver proyecto: ${linkProyecto}`,
+      ].filter(Boolean).join('\n')
+
+      const html = `
+        <p>El cliente ya envió la información que se le pidió en <strong>${escapeHtml(tareaCliente.titulo)}</strong> (${escapeHtml(nombreCliente)}).</p>
+        ${excerpt ? `<p>${escapeHtml(excerpt)}</p>` : ''}
+        ${respuesta?.archivoUrl ? `<p><a href="${respuesta.archivoUrl}">Ver el archivo que subió →</a></p>` : ''}
+        <p>Puedes continuar con: <strong>${escapeHtml(tareaDesbloqueada.titulo)}</strong></p>
+        <p><a href="${linkProyecto}">Ver proyecto en el sistema →</a></p>
+      `
+
+      return enviarEmail({
+        to: u.email,
+        nombreDestino: u.nombre,
+        asunto: `📩 Información lista del cliente — ${tareaDesbloqueada.titulo}`,
+        texto,
+        html,
+      })
+    }))
+  } catch (err) {
+    console.error('notificarInformacionLista falló:', err?.message || err)
   }
 }

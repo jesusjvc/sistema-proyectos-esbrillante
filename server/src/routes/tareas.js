@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import multer from 'multer'
 import prisma from '../lib/prisma.js'
 import { requireAuth } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
@@ -8,10 +9,11 @@ import { crearTareaCustom, activarTareasClienteDisponibles, asegurarResponsableV
 import { notificarAsignacion } from '../lib/notificaciones.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
-import { obtenerOCrearCarpetaRecursos, driveConfigurado } from '../lib/drive.js'
+import { obtenerOCrearCarpetaRecursos, obtenerOCrearCarpetaProyecto, subirArchivo, driveConfigurado } from '../lib/drive.js'
 import comentariosRouter from './comentarios.js'
 
 const router = Router({ mergeParams: true })
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
 router.use('/:tareaId/comentarios', comentariosRouter)
 
@@ -379,6 +381,72 @@ router.post('/:tareaId/reordenar', requireAuth, async (req, res) => {
 
     emitirCambio(p.id)
     res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/proyectos/:slug/tareas/:tareaId/adjuntos — archivo del equipo a
+// Drive (misma carpeta de respuestas del proyecto); en la tarea quedan
+// nombre + enlace + quién subió.
+router.post('/:tareaId/adjuntos', requireAuth, upload.single('archivo'), async (req, res) => {
+  const { slug, tareaId } = req.params
+  const usuario = req.user.nombre
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const tarea = p.tareas.find((t) => t.id === tareaId)
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para adjuntar archivos a esta tarea' })
+    }
+    if (!req.file) return res.status(400).json({ error: 'Falta el archivo' })
+    if (!driveConfigurado()) return res.status(503).json({ error: 'La subida de archivos todavía no está configurada' })
+
+    const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+    if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+    const subido = await subirArchivo({ carpetaId, nombre: req.file.originalname, mimeType: req.file.mimetype, buffer: req.file.buffer })
+
+    const adjuntos = [...(Array.isArray(tarea.adjuntos) ? tarea.adjuntos : []), {
+      nombre: req.file.originalname,
+      url: subido.url,
+      subidoPor: usuario,
+      fecha: new Date().toISOString(),
+    }]
+    await prisma.tarea.update({ where: { id: tareaId }, data: { adjuntos } })
+    await logEntry(p.id, usuario, 'Archivo adjunto', `${req.file.originalname} → "${tarea.titulo}"`)
+    emitirCambio(p.id)
+    res.json({ ok: true, adjuntos })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// DELETE /api/proyectos/:slug/tareas/:tareaId/adjuntos — quita el enlace de
+// la tarea (el archivo permanece en Drive). Body: { url }
+router.delete('/:tareaId/adjuntos', requireAuth, async (req, res) => {
+  const { slug, tareaId } = req.params
+  const { url } = req.body || {}
+
+  try {
+    const p = await getProyecto(slug)
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const tarea = p.tareas.find((t) => t.id === tareaId)
+    if (!tarea) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!tareaLeCorresponde(tarea, p.equipo, req.user)) {
+      return res.status(403).json({ error: 'No tienes permiso para editar los adjuntos de esta tarea' })
+    }
+
+    const adjuntos = (Array.isArray(tarea.adjuntos) ? tarea.adjuntos : []).filter((a) => a.url !== url)
+    if (adjuntos.length === (tarea.adjuntos || []).length) return res.status(404).json({ error: 'Adjunto no encontrado' })
+
+    await prisma.tarea.update({ where: { id: tareaId }, data: { adjuntos } })
+    await logEntry(p.id, req.user.nombre, 'Adjunto quitado', `"${tarea.titulo}"`)
+    emitirCambio(p.id)
+    res.json({ ok: true, adjuntos })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })

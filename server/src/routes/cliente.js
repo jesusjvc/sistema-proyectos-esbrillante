@@ -9,6 +9,7 @@ import { enviarEmail } from '../lib/email.js'
 import { enviarGoogleChat } from '../lib/googleChat.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import { extraerDominio } from '../lib/modulosCliente.js'
+import { notificarInformacionLista } from '../lib/notificaciones.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
@@ -112,6 +113,21 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
       data: { proyectoId: p.id, usuario: 'Cliente', accion: 'Tarea completada por cliente', detalle: partesDetalle.join(' — ') },
     })
     await activarTareasClienteDisponibles(p.id)
+
+    // Avisar al equipo responsable de las tareas de equipo que quedaron
+    // desbloqueadas con esta respuesta ("el cliente ya mandó lo que se le
+    // pidió — pueden continuar"), con el excerpt y el archivo del cliente.
+    const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+    const desbloqueadas = p.tareas.filter((t) =>
+      !t.esCliente && t.estado === 'pendiente' && t.dependencias.includes(tareaId) &&
+      t.dependencias.every((d) => completadasIds.has(d)),
+    )
+    for (const dep of desbloqueadas) {
+      notificarInformacionLista(p, dep, tarea, {
+        texto: respuestaTexto,
+        archivoUrl: data.respuestaArchivoUrl,
+      }).catch((err) => console.error('Error avisando información lista:', err))
+    }
 
     emitirCambio(p.id)
     notificarAdminsRespuestaCliente(p, tarea, { respuestaTexto, archivoNombre: data.respuestaArchivoNombre, archivoUrl: data.respuestaArchivoUrl }).catch((err) => console.error('Error notificando a admins:', err))
