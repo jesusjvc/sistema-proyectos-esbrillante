@@ -25,8 +25,9 @@ import { useEventosProyecto } from '../hooks/useEventos'
 import useEscape from '../hooks/useEscape'
 import MedidorCircular from '../components/MedidorCircular'
 import AdjuntosTarea from '../components/AdjuntosTarea'
+import TarjetaTarea from '../components/TarjetaTarea'
 import { MODULOS_CLIENTE } from '../data/modulosCliente'
-import { EQUIPO_NO_APLICA, infoResponsable, opcionesResponsable } from '../lib/permisos'
+import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import { esUrl } from '../lib/texto'
 import KanbanBoard from '../components/KanbanBoard'
@@ -38,10 +39,7 @@ import DescripcionProyecto from '../components/DescripcionProyecto'
 import EtiquetasProyecto from '../components/EtiquetasProyecto'
 import FechaEntregaProyecto from '../components/FechaEntregaProyecto'
 import EditorEnriquecido from '../components/EditorEnriquecido'
-import TextoEnriquecido from '../components/TextoEnriquecido'
 import HiloComentarios from '../components/HiloComentarios'
-import SelectorDependencias from '../components/SelectorDependencias'
-import ModalDetalleTarea from '../components/ModalDetalleTarea'
 import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import IconGoogleDrive from '../components/IconGoogleDrive'
 import { normalizarTexto } from '../lib/texto'
@@ -68,7 +66,7 @@ export default function DetalleProyecto() {
   const [faseEliminando, setFaseEliminando] = useState(null)
   const [vistaContinuo, setVistaContinuo] = useState('tabla')
   const [copiado, setCopiado] = useState(false)
-  const [modalEditar, setModalEditar] = useState(null)
+  const [tarjetaAbierta, setTarjetaAbierta] = useState(null)
   const [modalNueva, setModalNueva] = useState(null)
   const [modalLink, setModalLink] = useState(null)
   const [modalEliminar, setModalEliminar] = useState(false)
@@ -206,10 +204,17 @@ export default function DetalleProyecto() {
     await refresh()
   }
 
+  // Guardado inmediato de la tarjeta de tarea (y de los controles rápidos de la
+  // tabla continua): devuelve true/false para que los popovers sepan si cerrarse.
   async function handleGuardarEdicion(tareaId, cambios) {
-    await editarTarea(proyecto.slug, tareaId, cambios)
-    setModalEditar(null)
-    await refresh()
+    try {
+      await editarTarea(proyecto.slug, tareaId, cambios)
+      return true
+    } catch {
+      return false
+    } finally {
+      await refresh()
+    }
   }
 
   async function asignarResponsable(tareaId, personaId) {
@@ -218,9 +223,12 @@ export default function DetalleProyecto() {
   }
 
   async function handleAgregarTarea(datos) {
-    await agregarTarea(proyecto.slug, datos)
+    const nueva = await agregarTarea(proyecto.slug, datos)
     setModalNueva(null)
     await refresh()
+    // La tarea nace abierta en su tarjeta para afinar prioridad, fecha,
+    // dependencias... ahí mismo (la creación es mínima a propósito).
+    if (nueva?.id) setTarjetaAbierta(nueva.id)
   }
 
   async function handleAprobarSolicitud(id, datos) {
@@ -560,10 +568,9 @@ export default function DetalleProyecto() {
                   miembros={miembros}
                   todasLasTareas={proyecto.tareas}
                   onCompletar={() => marcarCompleta(t.id)}
-                  onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                   onReabrir={() => reabrir(t.id)}
                   onOmitir={() => omitir(t.id)}
-                  onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
+                  onAbrir={() => setTarjetaAbierta(t.id)}
                   onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                   onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                   onRefrescar={refresh}
@@ -593,10 +600,9 @@ export default function DetalleProyecto() {
                       miembros={miembros}
                       todasLasTareas={proyecto.tareas}
                       onCompletar={() => marcarCompleta(t.id)}
-                      onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                       onReabrir={() => reabrir(t.id)}
                       onOmitir={() => omitir(t.id)}
-                      onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
+                      onAbrir={() => setTarjetaAbierta(t.id)}
                       onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                       onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                       esAdmin={true}
@@ -707,7 +713,7 @@ export default function DetalleProyecto() {
               onMover={handleMoverTarea}
               onActualizar={handleGuardarEdicion}
               onAccionMasiva={handleAccionMasivaTareas}
-              onEditar={(t) => setModalEditar(t)}
+              onEditar={(t) => setTarjetaAbierta(t.id)}
               onEliminar={(t) => handleEliminarTarea(t.id)}
               onComentar={comentar}
               onAsignar={asignarResponsable}
@@ -720,7 +726,7 @@ export default function DetalleProyecto() {
               miembrosPorId={miembrosPorId}
               miembros={miembros}
               onMover={handleMoverTarea}
-              onEditar={(t) => setModalEditar(t)}
+              onEditar={(t) => setTarjetaAbierta(t.id)}
               onEliminar={(t) => handleEliminarTarea(t.id)}
               onComentar={comentar}
               onAsignar={asignarResponsable}
@@ -847,10 +853,9 @@ export default function DetalleProyecto() {
                                 miembros={miembros}
                                 todasLasTareas={proyecto.tareas}
                                 onCompletar={() => marcarCompleta(t.id)}
-                                onComentar={(texto, mencionados) => comentar(t.id, texto, mencionados)}
                                 onReabrir={() => reabrir(t.id)}
                                 onOmitir={() => omitir(t.id)}
-                                onGuardarEdicion={(cambios) => handleGuardarEdicion(t.id, cambios)}
+                                onAbrir={() => setTarjetaAbierta(t.id)}
                                 onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
                                 onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
                                 esAdmin={true}
@@ -917,23 +922,41 @@ export default function DetalleProyecto() {
         </div>
       )}
 
-      {/* ─── Modal: Editar tarea ─── */}
-      {modalEditar && (
-        <ModalEditarTarea
-          tarea={modalEditar}
-          miembros={miembros}
-          todasLasTareas={proyecto.tareas}
-          onGuardar={(cambios) => handleGuardarEdicion(modalEditar.id, cambios)}
-          onCerrar={() => setModalEditar(null)}
-        />
-      )}
+      {/* ─── Tarjeta de tarea (estilo Trello, guardado inmediato) ─── */}
+      {tarjetaAbierta && (() => {
+        // Identidad fresca: se resuelve contra las tareas del proyecto en cada
+        // render, así la tarjeta siempre muestra datos recién guardados y se
+        // auto-cierra si la tarea desaparece (ej. al eliminarla).
+        const t = proyecto.tareas.find((x) => x.id === tarjetaAbierta)
+        if (!t) return null
+        return (
+          <TarjetaTarea
+            tarea={t}
+            estado={estadoCalculado(t)}
+            slug={proyecto.slug}
+            puedeEditar={esAdminRol}
+            esAdmin={esAdminRol}
+            equipo={proyecto.equipo}
+            miembros={miembros}
+            miembrosPorId={miembrosPorId}
+            avatares={avatares}
+            todasLasTareas={proyecto.tareas}
+            onCerrar={() => setTarjetaAbierta(null)}
+            onActualizar={handleGuardarEdicion}
+            onComentar={comentar}
+            onAsignar={asignarResponsable}
+            onCompletar={() => marcarCompleta(t.id)}
+            onReabrir={() => reabrir(t.id)}
+            onRefrescar={refresh}
+          />
+        )
+      })()}
 
       {/* ─── Modal: Nueva tarea ─── */}
       {modalNueva !== null && (
         <ModalNuevaTarea
           contexto={modalNueva}
           miembros={miembros}
-          todasLasTareas={proyecto.tareas}
           onGuardar={handleAgregarTarea}
           onCerrar={() => setModalNueva(null)}
         />
@@ -1263,8 +1286,7 @@ function FilaArrastrable({ id, children }) {
   )
 }
 
-function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onComentar, onReabrir, onOmitir, onGuardarEdicion, onEliminar, onAsignarResponsable, esAdmin, resaltada = false, onRefrescar, slug }) {
-  const [modalAbierto, setModalAbierto] = useState(false)
+function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {}, miembros = [], todasLasTareas = [], onCompletar, onReabrir, onOmitir, onEliminar, onAsignarResponsable, esAdmin, resaltada = false, onRefrescar, slug, onAbrir }) {
   const filaRef = useRef(null)
 
   // Viene del buscador de tareas (arriba, en el render de fases) — hace scroll
@@ -1272,45 +1294,8 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   useEffect(() => {
     if (resaltada) filaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [resaltada])
-  const [editando, setEditando] = useState(false)
-  const [form, setForm] = useState(null)
   const [confirmarEliminar, setConfirmarEliminar] = useState(false)
-  const [copiadoPlantilla, setCopiadoPlantilla] = useState(false)
   const responsableInfo = infoResponsable(t, equipo, miembrosPorId)
-  const hayDetalle = t.queHacer || t.necesitasAntes || t.plantillaMensaje || t.queEntregas || t.descripcion || t.instruccionesCliente
-  const opcionesDependencia = todasLasTareas.filter((tt) => tt.id !== t.id)
-
-  function abrirModal(conEdicion) {
-    setForm({
-      titulo: t.titulo,
-      descripcion: t.esCliente ? '' : (t.descripcion || ''),
-      instruccionesCliente: t.esCliente ? (t.instruccionesCliente || '') : '',
-      responsable: t.responsable,
-      esCliente: t.esCliente,
-      esRutaCritica: t.esRutaCritica,
-      soloKarlaOAdmin: t.soloKarlaOAdmin,
-      plazoHoras: t.plazoHoras || '',
-      avisosDesactivados: t.avisosDesactivados || false,
-      dependencias: t.dependencias || [],
-      prioridad: t.prioridad || '',
-      fechaLimite: t.fechaLimite ? t.fechaLimite.slice(0, 10) : '',
-    })
-    setEditando(conEdicion)
-    setModalAbierto(true)
-  }
-
-  async function guardarEdicion(e) {
-    e.preventDefault()
-    if (!form.titulo.trim()) return
-    await onGuardarEdicion({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null, prioridad: form.prioridad || null, fechaLimite: form.fechaLimite || null })
-    setEditando(false)
-  }
-
-  function copiarPlantilla() {
-    navigator.clipboard.writeText(t.plantillaMensaje)
-    setCopiadoPlantilla(true)
-    setTimeout(() => setCopiadoPlantilla(false), 2000)
-  }
 
   const iconMap = {
     completada: <CheckCircle2 size={18} className="text-emerald-500 dark:text-emerald-400 shrink-0" />,
@@ -1357,7 +1342,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
   return (
     <div
       ref={filaRef}
-      onClick={() => abrirModal(false)}
+      onClick={onAbrir}
       className={`px-5 py-3.5 border-b border-slate-50 dark:border-ink-500 last:border-0 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-ink-900/50 transition-colors ${bgMap[estado]} ${resaltada ? 'ring-2 ring-inset ring-brand-400 dark:ring-brand-500' : ''}`}
     >
       <div className="flex items-start gap-3">
@@ -1474,9 +1459,9 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 
             {estado !== 'omitida' && (
               <button
-                onClick={() => abrirModal(true)}
+                onClick={onAbrir}
                 className="p-1.5 text-slate-400 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
-                title="Editar tarea"
+                title="Abrir tarjeta"
               >
                 <Pencil size={13} />
               </button>
@@ -1508,163 +1493,6 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
         )}
       </div>
 
-      {modalAbierto && (
-        // El modal queda anidado dentro de la fila arrastrable (FilaArrastrable, drag and drop
-        // de dnd-kit) — sin este stopPropagation, cualquier pointerdown adentro (ej. arrastrar
-        // el mouse para seleccionar texto de la descripción) burbujea hasta los listeners de
-        // arrastre de la fila y dnd-kit se queda con el gesto en vez de dejar seleccionar texto.
-        <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
-          <ModalDetalleTarea
-            titulo={editando ? 'Editar tarea' : t.titulo}
-            badges={editando ? null : badges}
-            accionesHeader={
-              !editando && onGuardarEdicion && (
-                <button
-                  onClick={() => setEditando(true)}
-                  className="p-1.5 text-slate-400 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/10 rounded-lg transition-colors"
-                  title="Editar tarea"
-                >
-                  <Pencil size={15} />
-                </button>
-              )
-            }
-            onCerrar={() => { setModalAbierto(false); setEditando(false) }}
-          >
-            {editando ? (
-              <form onSubmit={guardarEdicion} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Título *</label>
-                  <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} autoFocus />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
-                  <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                    {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
-                  </select>
-                </div>
-                {!form.esCliente && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción interna</label>
-                    <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
-                  </div>
-                )}
-                {form.esCliente && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente</label>
-                    <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente..." minHeight="6rem" />
-                  </div>
-                )}
-                <div className="flex gap-4 flex-wrap">
-                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-                    <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
-                    Tarea del cliente
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-                    <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-brand-500" />
-                    Ruta crítica
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-                    <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-brand-500" />
-                    Solo Karla/Admin
-                  </label>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Prioridad</label>
-                    <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className={inputCls}>
-                      <option value="">Normal</option>
-                      <option value="urgente">Urgente</option>
-                      <option value="cuando_se_pueda">Cuando se pueda</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Fecha límite (equipo)</label>
-                    <input type="date" value={form.fechaLimite} onChange={(e) => setForm({ ...form, fechaLimite: e.target.value })} className={inputCls} />
-                  </div>
-                </div>
-                {form.esCliente && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
-                    <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
-                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer mt-2.5">
-                      <input
-                        type="checkbox"
-                        checked={!form.avisosDesactivados}
-                        onChange={(e) => setForm({ ...form, avisosDesactivados: !e.target.checked })}
-                        className="accent-brand-500"
-                      />
-                      Enviar recordatorios automáticos al cliente si se atrasa
-                    </label>
-                  </div>
-                )}
-                <SelectorDependencias
-                  opciones={opcionesDependencia}
-                  seleccionadas={form.dependencias}
-                  onChange={(dependencias) => setForm({ ...form, dependencias })}
-                />
-                <div className="flex gap-3 pt-1">
-                  <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
-                    Guardar cambios
-                  </button>
-                  <button type="button" onClick={() => setEditando(false)} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <>
-                <div className="rounded-xl border border-brand-100 dark:border-brand-500/20 bg-brand-50 dark:bg-brand-500/10 overflow-hidden">
-                  {hayDetalle ? (
-                    <>
-                      {t.queHacer && (
-                        <DetalleSeccion titulo="¿Qué hay que hacer?">
-                          <TextoFormateado texto={t.queHacer} />
-                        </DetalleSeccion>
-                      )}
-                      {t.necesitasAntes && (
-                        <DetalleSeccion titulo="Antes de empezar">
-                          <TextoFormateado texto={t.necesitasAntes} />
-                        </DetalleSeccion>
-                      )}
-                      {t.plantillaMensaje && (
-                        <DetalleSeccion titulo="Plantilla de mensaje">
-                          <div className="relative">
-                            <pre className="text-xs text-slate-700 dark:text-ink-300 whitespace-pre-wrap font-sans bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-lg p-3 pr-10">{t.plantillaMensaje}</pre>
-                            <button
-                              onClick={copiarPlantilla}
-                              className="absolute top-2 right-2 p-1.5 rounded-md bg-slate-100 dark:bg-ink-700 hover:bg-brand-100 dark:hover:bg-brand-500/20 text-slate-500 dark:text-ink-300 hover:text-brand-700 dark:hover:text-brand-400 transition-colors"
-                              title="Copiar plantilla"
-                            >
-                              {copiadoPlantilla ? <Check size={13} className="text-emerald-500 dark:text-emerald-400" /> : <Copy size={13} />}
-                            </button>
-                          </div>
-                        </DetalleSeccion>
-                      )}
-                      {t.queEntregas && (
-                        <DetalleSeccion titulo="Al completar esta tarea entrego">
-                          <TextoFormateado texto={t.queEntregas} />
-                        </DetalleSeccion>
-                      )}
-                      {!t.queHacer && !t.necesitasAntes && !t.plantillaMensaje && !t.queEntregas && (
-                        <TextoEnriquecido html={t.esCliente ? t.instruccionesCliente : t.descripcion} className="px-4 py-3 text-sm text-slate-600 dark:text-ink-300" />
-                      )}
-                    </>
-                  ) : (
-                    onGuardarEdicion && (
-                      <button onClick={() => setEditando(true)} className="w-full text-left px-4 py-3 text-sm text-slate-400 dark:text-ink-400 hover:text-brand-700 dark:hover:text-brand-400 transition-colors">
-                        Sin descripción — clic para agregar
-                      </button>
-                    )
-                  )}
-                </div>
-                {onComentar && (
-                  <HiloComentarios comentarios={t.comentarios} miembrosPorId={miembrosPorId} onEnviar={onComentar} />
-                )}
-              </>
-            )}
-          </ModalDetalleTarea>
-        </div>
-      )}
     </div>
   )
 }
@@ -1679,133 +1507,12 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 // asignar en particular" + personas activas. Los valores de rol legados solo
 // se muestran como "(actual)" al editar una tarea que todavía los trae.
 
-function ModalEditarTarea({ tarea, miembros = [], todasLasTareas = [], onGuardar, onCerrar }) {
-  useEscape(onCerrar)
-  const [form, setForm] = useState({
-    titulo: tarea.titulo,
-    descripcion: tarea.esCliente ? '' : (tarea.descripcion || ''),
-    instruccionesCliente: tarea.esCliente ? (tarea.instruccionesCliente || '') : '',
-    responsable: tarea.responsable,
-    esCliente: tarea.esCliente,
-    esRutaCritica: tarea.esRutaCritica,
-    soloKarlaOAdmin: tarea.soloKarlaOAdmin,
-    plazoHoras: tarea.plazoHoras || '',
-    avisosDesactivados: tarea.avisosDesactivados || false,
-    dependencias: tarea.dependencias || [],
-    prioridad: tarea.prioridad || '',
-    fechaLimite: tarea.fechaLimite ? tarea.fechaLimite.slice(0, 10) : '',
-  })
-  const opcionesDependencia = todasLasTareas.filter((t) => t.id !== tarea.id)
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!form.titulo.trim()) return
-    onGuardar({ ...form, plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null, prioridad: form.prioridad || null, fechaLimite: form.fechaLimite || null })
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
-          <h3 className="font-semibold text-slate-800 dark:text-ink-100">Editar tarea</h3>
-          <button onClick={onCerrar} className="text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Título *</label>
-            <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} autoFocus />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
-            <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-              {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
-            </select>
-          </div>
-
-          {!form.esCliente && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción interna</label>
-              <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
-            </div>
-          )}
-
-          {form.esCliente && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente</label>
-              <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente..." minHeight="6rem" />
-            </div>
-          )}
-
-          <div className="flex gap-4 flex-wrap">
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-              <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
-              Tarea del cliente
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-              <input type="checkbox" checked={form.esRutaCritica} onChange={(e) => setForm({ ...form, esRutaCritica: e.target.checked })} className="accent-brand-500" />
-              Ruta crítica
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-              <input type="checkbox" checked={form.soloKarlaOAdmin} onChange={(e) => setForm({ ...form, soloKarlaOAdmin: e.target.checked })} className="accent-brand-500" />
-              Solo Karla/Admin
-            </label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Prioridad</label>
-              <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className={inputCls}>
-                <option value="">Normal</option>
-                <option value="urgente">Urgente</option>
-                <option value="cuando_se_pueda">Cuando se pueda</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Fecha límite (equipo)</label>
-              <input type="date" value={form.fechaLimite} onChange={(e) => setForm({ ...form, fechaLimite: e.target.value })} className={inputCls} />
-            </div>
-          </div>
-
-          {form.esCliente && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
-              <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer mt-2.5">
-                <input
-                  type="checkbox"
-                  checked={!form.avisosDesactivados}
-                  onChange={(e) => setForm({ ...form, avisosDesactivados: !e.target.checked })}
-                  className="accent-brand-500"
-                />
-                Enviar recordatorios automáticos al cliente si se atrasa
-              </label>
-            </div>
-          )}
-
-          <SelectorDependencias
-            opciones={opcionesDependencia}
-            seleccionadas={form.dependencias}
-            onChange={(dependencias) => setForm({ ...form, dependencias })}
-          />
-
-          <div className="flex gap-3 pt-2">
-            <button type="submit" className="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
-              Guardar cambios
-            </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// Checklist para elegir de qué tareas depende otra: mientras no estén todas
-// completadas, la tarea queda bloqueada (oculta al cliente si es tarea suya).
-function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuardar, onCerrar }) {
+// Creación mínima a propósito (estilo Trello): título, responsable, columna y
+// descripción. La tarea nace y SE ABRE SU TARJETA (TarjetaTarea) para afinar
+// ahí prioridad, fecha, dependencias y ajustes. Las tareas del cliente sí
+// revelan módulo + instrucciones + plazo aquí, porque definen lo que el
+// cliente verá en su portal desde el primer momento.
+function ModalNuevaTarea({ contexto, miembros = [], onGuardar, onCerrar }) {
   useEscape(onCerrar)
   const esContinuo = typeof contexto === 'string'
   const [form, setForm] = useState({
@@ -1817,10 +1524,17 @@ function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuard
     modulo: '',
     plazoHoras: '',
     columna: esContinuo ? contexto : 'todo',
-    dependencias: [],
-    prioridad: '',
-    fechaLimite: '',
   })
+
+  function elegirModulo(valor) {
+    const modulo = valor ? MODULOS_CLIENTE[valor] : null
+    setForm((f) => ({
+      ...f,
+      modulo: valor,
+      titulo: !f.titulo.trim() && modulo ? modulo.generica : f.titulo,
+      instruccionesCliente: modulo ? modulo.plantilla() : f.instruccionesCliente,
+    }))
+  }
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -1835,120 +1549,88 @@ function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuard
       esCliente: form.esCliente,
       modulo: form.esCliente ? (form.modulo || null) : null,
       plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null,
-      dependencias: form.dependencias,
-      prioridad: form.prioridad || null,
-      fechaLimite: form.fechaLimite || null,
     })
   }
+
+  const responsableElegido = miembros.find((m) => m.id === form.responsable && m.activo !== false)
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
       <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
           <h3 className="font-semibold text-slate-800 dark:text-ink-100">{esContinuo ? 'Nueva tarjeta' : `Nueva tarea — Fase ${contexto}`}</h3>
-          <button onClick={onCerrar} className="text-slate-400 dark:text-ink-400 hover:text-slate-700 dark:hover:text-ink-300"><X size={18} /></button>
+          <button onClick={onCerrar} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-ink-100"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Título *</label>
-            <input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} className={inputCls} placeholder="Nombre de la tarea..." autoFocus />
+          <input
+            value={form.titulo}
+            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+            placeholder="Título de la tarea…"
+            autoFocus
+            className="w-full text-lg font-semibold bg-transparent border-b border-slate-200 dark:border-ink-500 focus:border-brand-400 dark:focus:border-brand-500 text-slate-800 dark:text-ink-100 py-1.5 outline-none placeholder:text-slate-300 dark:placeholder:text-ink-500 transition-colors"
+          />
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {!form.esCliente && (
+              <SelectorResponsableRapido
+                miembros={miembros}
+                onAsignar={(personaId) => setForm((f) => ({ ...f, responsable: personaId }))}
+                size={32}
+                iconSize={14}
+              >
+                {responsableElegido ? <Avatar nombre={responsableElegido.nombre} avatarUrl={responsableElegido.avatarUrl} size={32} /> : null}
+              </SelectorResponsableRapido>
+            )}
+            {esContinuo && !form.esCliente && (
+              <select value={form.columna} onChange={(e) => setForm({ ...form, columna: e.target.value })} className="text-xs border border-slate-200 dark:border-ink-500 rounded-lg px-2 py-1.5 bg-white dark:bg-ink-900 text-slate-600 dark:text-ink-300 outline-none focus:ring-2 focus:ring-brand-400">
+                {KANBAN_COLUMNAS.map((c) => <option key={c.estado} value={c.estado}>{c.label}</option>)}
+              </select>
+            )}
           </div>
 
-          {esContinuo && !form.esCliente && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Columna</label>
-              <select value={form.columna} onChange={(e) => setForm({ ...form, columna: e.target.value })} className={inputCls}>
-                {KANBAN_COLUMNAS.map((c) => <option key={c.columna} value={c.columna}>{c.label}</option>)}
-              </select>
-            </div>
-          )}
-
           <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked, modulo: '' })} className="accent-brand-500" />
+            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
             Es una tarea del cliente
           </label>
 
-          {form.esCliente && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Módulo de solicitud</label>
-              <select
-                value={form.modulo}
-                onChange={(e) => {
-                  const valor = e.target.value
-                  const modulo = valor ? MODULOS_CLIENTE[valor] : null
-                  setForm({
-                    ...form,
-                    modulo: valor,
-                    instruccionesCliente: modulo ? modulo.plantilla() : form.instruccionesCliente,
-                    titulo: form.titulo || (modulo ? modulo.generica : ''),
-                  })
-                }}
-                className={inputCls}
-              >
-                <option value="">Sin módulo — instrucciones libres</option>
-                {Object.entries(MODULOS_CLIENTE).map(([valor, m]) => <option key={valor} value={valor}>{m.label}</option>)}
-              </select>
-              {form.modulo && <p className="text-xs text-slate-400 dark:text-ink-400 mt-1">{MODULOS_CLIENTE[form.modulo].ayuda}</p>}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Prioridad</label>
-              <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })} className={inputCls}>
-                <option value="">Normal</option>
-                <option value="urgente">Urgente</option>
-                <option value="cuando_se_pueda">Cuando se pueda</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Fecha límite (equipo)</label>
-              <input type="date" value={form.fechaLimite} onChange={(e) => setForm({ ...form, fechaLimite: e.target.value })} className={inputCls} />
-            </div>
-          </div>
-
-          {!form.esCliente && (
+          {form.esCliente ? (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
-                <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                  {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
+                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Módulo (opcional)</label>
+                <select value={form.modulo} onChange={(e) => elegirModulo(e.target.value)} className={inputCls}>
+                  <option value="">Sin módulo</option>
+                  {Object.entries(MODULOS_CLIENTE).map(([valor, m]) => <option key={valor} value={valor}>{m.label}</option>)}
                 </select>
+                {form.modulo && MODULOS_CLIENTE[form.modulo] && (
+                  <p className="text-xs text-slate-400 dark:text-ink-400 mt-1">{MODULOS_CLIENTE[form.modulo].ayuda}</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción interna</label>
-                <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="¿Qué hay que hacer exactamente?" />
-              </div>
-            </>
-          )}
-
-          {form.esCliente && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente</label>
-                <EditorEnriquecido value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente en su portal..." minHeight="6rem" />
+                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente *</label>
+                {/* key por módulo: el editor lee el contenido una sola vez al montar */}
+                <EditorEnriquecido key={form.modulo || 'manual'} value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente en su portal..." />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
                 <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
               </div>
             </>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción (opcional)</label>
+              <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
+            </div>
           )}
 
-          <SelectorDependencias
-            opciones={todasLasTareas}
-            seleccionadas={form.dependencias}
-            onChange={(dependencias) => setForm({ ...form, dependencias })}
-          />
-
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
-              Agregar tarea
+              Crear tarea
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
               Cancelar
             </button>
           </div>
+          <p className="text-xs text-slate-400 dark:text-ink-400 text-center">Al crear se abre la tarjeta para asignar prioridad, fecha y dependencias.</p>
         </form>
       </div>
     </div>
@@ -2279,27 +1961,6 @@ function InfoBool({ label, valor }) {
     <div className="flex items-center justify-between text-sm">
       <span className="text-slate-500 dark:text-ink-300">{label}</span>
       <span className={valor ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-ink-400'}>{valor ? '✓ Sí' : '✗ No'}</span>
-    </div>
-  )
-}
-
-function DetalleSeccion({ titulo, children }) {
-  return (
-    <div className="px-4 pt-3 pb-1">
-      <div className="text-xs font-semibold text-brand-800 dark:text-brand-400 uppercase tracking-wide mb-1.5">{titulo}</div>
-      {children}
-    </div>
-  )
-}
-
-function TextoFormateado({ texto }) {
-  return (
-    <div className="text-xs text-slate-700 dark:text-ink-300 space-y-0.5">
-      {texto.split('\n').map((linea, i) => (
-        <div key={i} className={linea === '' ? 'h-1' : ''}>
-          {linea}
-        </div>
-      ))}
     </div>
   )
 }

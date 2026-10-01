@@ -13,7 +13,11 @@ function resaltarMenciones(texto, nombres) {
   )
 }
 
-export default function HiloComentarios({ comentarios = [], miembrosPorId = {}, onEnviar }) {
+// `variante="panel"`: para vivir como columna derecha de la tarjeta de tarea
+// (ModalDetalleTarea con aside) — sin borde superior ni tope de alto (el scroll
+// lo da la columna); la variante por defecto es la de tarjeta compacta al final
+// de un bloque, con max-h-64.
+export default function HiloComentarios({ comentarios = [], miembrosPorId = {}, onEnviar, variante = 'compacto' }) {
   const [texto, setTexto] = useState('')
   const [mencionados, setMencionados] = useState([])
   const [picker, setPicker] = useState(null) // { query, inicio }
@@ -67,13 +71,13 @@ export default function HiloComentarios({ comentarios = [], miembrosPorId = {}, 
   }
 
   return (
-    <div className="border-t border-slate-100 dark:border-ink-500 pt-3 mt-3">
+    <div className={variante === 'panel' ? '' : 'border-t border-slate-100 dark:border-ink-500 pt-3 mt-3'}>
       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-ink-300 uppercase tracking-wide mb-2">
         <MessageSquare size={12} /> Comentarios {comentarios.length > 0 && `(${comentarios.length})`}
       </div>
 
       {comentarios.length > 0 && (
-        <div className="space-y-2.5 mb-3 max-h-64 overflow-y-auto">
+        <div className={`space-y-2.5 mb-3 ${variante === 'panel' ? '' : 'max-h-64'} overflow-y-auto`}>
           {comentarios.map((c) => (
             <div key={c.id} className="text-sm bg-slate-50 dark:bg-ink-900 rounded-lg px-3 py-2">
               <div className="flex items-baseline gap-2">
