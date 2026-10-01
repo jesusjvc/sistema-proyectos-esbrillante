@@ -83,6 +83,25 @@ export function infoResponsable(tarea, equipo, miembrosPorId = {}) {
   return { label: nombre || 'Equipo', nombre: nombre || null }
 }
 
+// Opciones para los selects de "Responsable" de tareas y solicitudes: la
+// asignación por rol quedó deprecada — solo queda 'equipo' como "sin asignar
+// en particular" y las personas activas del sistema. Si el valor actual es
+// algo que ya no se ofrece (un rol legado como admin/karla/cliente, o un
+// miembro inactivo), se agrega como opción extra marcada "(actual)" para que
+// editar una tarea vieja no lo cambie en silencio.
+export function opcionesResponsable(miembros = [], actual = null) {
+  const activos = miembros.filter((m) => m.activo !== false)
+  const opciones = [
+    { valor: 'equipo', label: 'Sin asignar en particular' },
+    ...activos.map((m) => ({ valor: m.id, label: m.nombre })),
+  ]
+  if (actual && !opciones.some((o) => o.valor === actual)) {
+    const miembro = miembros.find((m) => m.id === actual)
+    opciones.push({ valor: actual, label: `${(miembro && miembro.nombre) || RESPONSABLE_LABEL[actual] || actual} (actual)` })
+  }
+  return opciones
+}
+
 // Miembros del sistema que están asignados al equipo de este proyecto
 // (copy/diseñador/programador/redes/adminProyecto) — usado para poblar
 // selectores de "Responsable" limitados a quien ya participa en el proyecto.

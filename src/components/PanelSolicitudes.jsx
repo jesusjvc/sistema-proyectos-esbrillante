@@ -3,14 +3,7 @@ import { KANBAN_COLUMNAS } from '../data/kanban'
 import useEscape from '../hooks/useEscape'
 import { formatFechaHora } from '../data/storage'
 import { AlertCircle, CheckCircle2, XCircle, Clock, X, Paperclip } from 'lucide-react'
-
-// Los roles de equipo (copy/diseñador/programador/redes) se dejaron de usar aquí — asignar a
-// una persona específica de la lista completa la reemplaza. Ver la misma nota en DetalleProyecto.jsx.
-const RESPONSABLES = [
-  { valor: 'equipo', label: 'Sin asignar en particular' },
-  { valor: 'karla', label: 'Karla (QA)' },
-  { valor: 'admin', label: 'Admin' },
-]
+import { opcionesResponsable } from '../lib/permisos'
 
 const ORIGEN_LABEL = {
   whatsapp: 'WhatsApp',
@@ -218,14 +211,7 @@ function ModalAprobarSolicitud({ solicitud, esContinuo, fases, miembros = [], on
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-              <optgroup label="General">
-                {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
-              </optgroup>
-              {miembros.length > 0 && (
-                <optgroup label="Persona específica">
-                  {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                </optgroup>
-              )}
+                {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
             </select>
           </div>
 
@@ -377,14 +363,7 @@ function ModalNuevoTicket({ esContinuo, fases, miembros = [], onGuardar, onCerra
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
               <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                <optgroup label="General">
-                  {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
-                </optgroup>
-                {miembros.length > 0 && (
-                  <optgroup label="Persona específica">
-                    {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                  </optgroup>
-                )}
+                  {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
               </select>
             </div>
             <div>

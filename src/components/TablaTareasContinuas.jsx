@@ -442,7 +442,7 @@ function BarraMasiva({ tareas, miembros, procesando, onAplicar, onLimpiar, onEli
 
       <select value="" onChange={(event) => event.target.value && onAplicar('responsable', event.target.value)} disabled={procesando} className={claseControl} aria-label="Asignar responsable a tareas seleccionadas">
         <option value="">Responsable</option>
-        {miembros.map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}
+        {miembros.filter((miembro) => miembro.activo !== false).map((miembro) => <option key={miembro.id} value={miembro.id}>{miembro.nombre}</option>)}
       </select>
 
       <select value="" onChange={(event) => event.target.value && onAplicar('prioridad', event.target.value)} disabled={procesando} className={claseControl} aria-label="Cambiar prioridad de tareas seleccionadas">

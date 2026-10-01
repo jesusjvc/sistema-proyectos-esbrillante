@@ -43,19 +43,22 @@ export default function SelectorResponsableRapido({ miembros = [], onAsignar, si
 
       {abierto && (
         <div className="absolute z-20 top-full left-0 mt-1 w-48 bg-white dark:bg-ink-700 border border-slate-200 dark:border-ink-500 rounded-lg shadow-lg py-1 max-h-64 overflow-y-auto">
-          {miembros.length === 0 && (
-            <div className="px-3 py-2 text-sm text-slate-400">No hay usuarios</div>
-          )}
-          {miembros.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => { onAsignar(m.id); setAbierto(false) }}
-              className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-ink-100 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
-            >
-              {m.nombre}
-            </button>
-          ))}
+          {(() => {
+            // Solo personas activas — los inactivos (borrado lógico) no se
+            // pueden elegir como responsables.
+            const activos = miembros.filter((m) => m.activo !== false)
+            if (!activos.length) return <div className="px-3 py-2 text-sm text-slate-400">No hay usuarios</div>
+            return activos.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => { onAsignar(m.id); setAbierto(false) }}
+                className="w-full text-left px-3 py-1.5 text-sm text-slate-700 dark:text-ink-100 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+              >
+                {m.nombre}
+              </button>
+            ))
+          })()}
         </div>
       )}
     </div>

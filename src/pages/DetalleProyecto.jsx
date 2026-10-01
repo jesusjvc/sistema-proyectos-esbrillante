@@ -26,7 +26,7 @@ import useEscape from '../hooks/useEscape'
 import MedidorCircular from '../components/MedidorCircular'
 import AdjuntosTarea from '../components/AdjuntosTarea'
 import { MODULOS_CLIENTE } from '../data/modulosCliente'
-import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
+import { EQUIPO_NO_APLICA, infoResponsable, opcionesResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import { esUrl } from '../lib/texto'
 import KanbanBoard from '../components/KanbanBoard'
@@ -1539,14 +1539,7 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
                   <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                    <optgroup label="General">
-                      {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
-                    </optgroup>
-                    {miembros.length > 0 && (
-                      <optgroup label="Persona específica">
-                        {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                      </optgroup>
-                    )}
+                    {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
                   </select>
                 </div>
                 {!form.esCliente && (
@@ -1681,12 +1674,10 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
 // conservan porque no son "roles de proyecto.equipo", tienen su propia lógica en
 // tareaLeCorresponde (server/src/lib/permisos.js): admin=solo admins, karla=solo QA,
 // equipo=sin responsable puntual (le aparece a todo el equipo del proyecto).
-const RESPONSABLES = [
-  { valor: 'equipo', label: 'Sin asignar en particular' },
-  { valor: 'admin', label: 'Admin' },
-  { valor: 'karla', label: 'Karla (QA)' },
-  { valor: 'cliente', label: 'Cliente' },
-]
+// La asignación de tareas ya no usa roles (copy/diseño/programación/redes,
+// admin, karla) — los selects arman la lista con opcionesResponsable(): "Sin
+// asignar en particular" + personas activas. Los valores de rol legados solo
+// se muestran como "(actual)" al editar una tarea que todavía los trae.
 
 function ModalEditarTarea({ tarea, miembros = [], todasLasTareas = [], onGuardar, onCerrar }) {
   useEscape(onCerrar)
@@ -1728,14 +1719,7 @@ function ModalEditarTarea({ tarea, miembros = [], todasLasTareas = [], onGuardar
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
             <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-              <optgroup label="General">
-                {RESPONSABLES.map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
-              </optgroup>
-              {miembros.length > 0 && (
-                <optgroup label="Persona específica">
-                  {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                </optgroup>
-              )}
+              {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
             </select>
           </div>
 
@@ -1928,14 +1912,7 @@ function ModalNuevaTarea({ contexto, miembros = [], todasLasTareas = [], onGuard
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Responsable</label>
                 <select value={form.responsable} onChange={(e) => setForm({ ...form, responsable: e.target.value })} className={inputCls}>
-                  <optgroup label="General">
-                    {RESPONSABLES.filter(r => r.valor !== 'cliente').map((r) => <option key={r.valor} value={r.valor}>{r.label}</option>)}
-                  </optgroup>
-                  {miembros.length > 0 && (
-                    <optgroup label="Persona específica">
-                      {miembros.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                    </optgroup>
-                  )}
+                  {opcionesResponsable(miembros, form.responsable).map((o) => <option key={o.valor} value={o.valor}>{o.label}</option>)}
                 </select>
               </div>
               <div>
