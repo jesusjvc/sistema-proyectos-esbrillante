@@ -15,7 +15,9 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
   const { tema, toggleTema } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
-  const [colapsado, setColapsado] = useState(() => localStorage.getItem(SIDEBAR_COLAPSADO_KEY) === '1')
+  // Colapsado por defecto (optimiza el espacio de trabajo); la preferencia
+  // explícita del usuario (expandirlo) se recuerda entre sesiones.
+  const [colapsado, setColapsado] = useState(() => localStorage.getItem(SIDEBAR_COLAPSADO_KEY) !== '0')
   const [menuMovil, setMenuMovil] = useState(false)
 
   useEffect(() => { setMenuMovil(false) }, [location.pathname])

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowUpDown, CalendarDays, Check, ChevronLeft, ChevronRight, Flag, GripVertical, MessageCircle, Pencil, Trash2, UserX, X } from 'lucide-react'
+import { ArrowUpDown, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Flag, GripVertical, MessageCircle, Pencil, Trash2, UserX, X } from 'lucide-react'
 import { KANBAN_COLUMNAS } from '../data/kanban'
 import { formatFecha } from '../data/storage'
 import { infoResponsable, tareaLeCorresponde } from '../lib/permisos'
@@ -387,6 +387,27 @@ function CheckboxSeleccion({ checked, indeterminate = false, onChange, label, di
   )
 }
 
+// Acceso rápido para marcar la tarea como completada sin pasar por el select
+// de estado — un clic, sin abrir la tarjeta.
+function BotonCompletar({ tarea, onMover, disabled }) {
+  const hecho = tarea.estado === 'completada'
+  return (
+    <button
+      onClick={(event) => { event.stopPropagation(); onMover(tarea.id, { estado: 'completada' }) }}
+      disabled={disabled || hecho}
+      title={hecho ? 'Completada' : 'Marcar como completada'}
+      aria-label={hecho ? `Completada: ${tarea.titulo}` : `Completar ${tarea.titulo}`}
+      className={`flex h-11 w-11 md:h-8 md:w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-default ${
+        hecho
+          ? 'text-emerald-500 dark:text-emerald-400'
+          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:text-ink-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-500/10 disabled:hover:text-slate-300 dark:disabled:hover:text-ink-400 disabled:hover:bg-transparent'
+      }`}
+    >
+      <CheckCircle2 size={16} aria-hidden="true" />
+    </button>
+  )
+}
+
 function ContextoOrdenable({ items, disabled, onDragEnd, children }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -497,13 +518,24 @@ function Detalle({ tarea, equipo, miembrosPorId, miembros, avatares, onAsignar, 
   )
 }
 
+// El orden elegido (prioridad, fecha, responsable...) sobrevive recargas —
+// se guarda por navegador junto con la dirección.
+const ORDEN_TABLA_KEY = 'ordenTablaContinua'
+function leerOrdenGuardado() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(ORDEN_TABLA_KEY))
+    if (guardado && typeof guardado.orden === 'string') return guardado
+  } catch { /* valor corrupto: usar default */ }
+  return { orden: 'flujo', direccion: 'asc' }
+}
+
 export default function TablaTareasContinuas({ tareas, usuario, onMover, onActualizar, onAccionMasiva, onEditar, onEliminar, onComentar, onAsignar, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [detalle, setDetalle] = useState(null)
   const [actualizando, setActualizando] = useState(null)
   const [procesandoMasivo, setProcesandoMasivo] = useState(false)
   const [error, setError] = useState('')
-  const [orden, setOrden] = useState('flujo')
-  const [direccion, setDireccion] = useState('asc')
+  const [orden, setOrden] = useState(() => leerOrdenGuardado().orden)
+  const [direccion, setDireccion] = useState(() => leerOrdenGuardado().direccion)
   const [ordenLocal, setOrdenLocal] = useState(() => listaFlujo(tareas))
   const [seleccionadas, setSeleccionadas] = useState([])
   // Las completadas se ocultan por defecto (igual que en proyectos finitos);
@@ -535,6 +567,17 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
     setOrdenLocal(nuevaLista)
     setSeleccionadas((actuales) => actuales.filter((id) => nuevaLista.some((tarea) => tarea.id === id)))
   }, [tareas])
+
+  useEffect(() => {
+    localStorage.setItem(ORDEN_TABLA_KEY, JSON.stringify({ orden, direccion }))
+  }, [orden, direccion])
+
+  // Clic en cualquier parte de la fila abre el detalle — salvo que el clic
+  // haya sido sobre un control (select, chips, checkbox, asa de arrastre...).
+  function abrirDesdeFila(event, tarea) {
+    if (event.target.closest('button, input, select, a, label, [role="button"]')) return
+    setDetalle(tarea)
+  }
 
   function alternarCompletadas() {
     setMostrarCompletadas((visible) => {
@@ -698,7 +741,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
               {visibles.map((tarea) => (
                 <ElementoOrdenable key={tarea.id} id={tarea.id} disabled={!permiteOrdenar || !puedeOperar(tarea)}>
                   {({ setNodeRef, style, handleProps }) => (
-                    <tr ref={setNodeRef} style={style} className={`transition-colors ${seleccionadas.includes(tarea.id) ? 'bg-brand-50 dark:bg-brand-500/10' : 'hover:bg-brand-50/40 dark:hover:bg-brand-500/5'}`}>
+                    <tr ref={setNodeRef} style={style} onClick={(event) => abrirDesdeFila(event, tarea)} className={`cursor-pointer transition-colors ${seleccionadas.includes(tarea.id) ? 'bg-brand-50 dark:bg-brand-500/10' : 'hover:bg-brand-50/40 dark:hover:bg-brand-500/5'}`}>
                       <td className="py-2 pl-3"><div className="flex items-center gap-1"><CheckboxSeleccion checked={seleccionadas.includes(tarea.id)} onChange={() => alternarSeleccion(tarea.id)} disabled={!puedeOperar(tarea)} label={`Seleccionar ${tarea.titulo}`} /><AsaOrden tarea={tarea} disabled={!permiteOrdenar || !puedeOperar(tarea)} handleProps={handleProps} /></div></td>
                       <td className="px-3 py-3">
                         <button onClick={() => setDetalle(tarea)} className="flex max-w-xl items-start gap-1.5 rounded-sm text-left font-medium text-slate-800 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100 dark:hover:text-brand-300">
@@ -707,7 +750,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
                         </button>
                         {tarea.custom && <span className="mt-0.5 block text-xs text-slate-400 dark:text-ink-400">Personalizada</span>}
                       </td>
-                      <td className="px-3 py-3"><EstadoSelect tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
+                      <td className="px-3 py-3"><div className="flex items-center justify-end gap-1"><BotonCompletar tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /><EstadoSelect tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></div></td>
                       <td className="px-3 py-3"><Responsable tarea={tarea} equipo={equipo} miembrosPorId={miembrosPorId} miembros={miembros} avatares={avatares} onAsignar={onAsignar} disabled={!puedeOperar(tarea)} /></td>
                       <td className="px-3 py-3"><PrioridadRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
                       <td className="px-3 py-3"><FechaRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
@@ -726,7 +769,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
           {visibles.map((tarea) => (
             <ElementoOrdenable key={tarea.id} id={tarea.id} disabled={!permiteOrdenar || !puedeOperar(tarea)}>
               {({ setNodeRef, style, handleProps }) => (
-                <article ref={setNodeRef} style={style} className={`space-y-3 p-4 ${seleccionadas.includes(tarea.id) ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}>
+                <article ref={setNodeRef} style={style} onClick={(event) => abrirDesdeFila(event, tarea)} className={`cursor-pointer space-y-3 p-4 ${seleccionadas.includes(tarea.id) ? 'bg-brand-50 dark:bg-brand-500/10' : ''}`}>
                   <div className="flex items-start gap-2">
                     <div className="flex shrink-0 items-center gap-1 pt-0.5"><CheckboxSeleccion checked={seleccionadas.includes(tarea.id)} onChange={() => alternarSeleccion(tarea.id)} disabled={!puedeOperar(tarea)} label={`Seleccionar ${tarea.titulo}`} /><AsaOrden tarea={tarea} disabled={!permiteOrdenar || !puedeOperar(tarea)} handleProps={handleProps} /></div>
                     <button onClick={() => setDetalle(tarea)} className="flex min-h-11 flex-1 items-start gap-1.5 rounded-sm pt-2 text-left font-medium text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-ink-100">
@@ -735,7 +778,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
                     </button>
                   </div>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                    <EstadoSelect tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} />
+                    <div className="flex items-center gap-1.5"><BotonCompletar tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /><EstadoSelect tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></div>
                     <PrioridadRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} />
                   </div>
                   <div className="flex items-center justify-between gap-3">
