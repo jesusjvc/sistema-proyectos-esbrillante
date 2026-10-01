@@ -67,6 +67,32 @@ export async function obtenerOCrearCarpetaRecursos(proyecto) {
   }
 }
 
+// Lista los archivos (no carpetas) de una carpeta de Drive, más recientes primero.
+export async function listarArchivosCarpeta(carpetaId) {
+  const token = await getToken()
+  const params = new URLSearchParams({
+    q: `'${carpetaId}' in parents and trashed = false`,
+    fields: 'files(id,name,mimeType,webViewLink,modifiedTime)',
+    orderBy: 'modifiedTime desc',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+    pageSize: '100',
+  })
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error(`Drive API error al listar archivos: ${res.status} ${await res.text()}`)
+  const { files } = await res.json()
+  return (files || []).map((f) => ({
+    id: f.id,
+    nombre: f.name,
+    esCarpeta: f.mimeType === 'application/vnd.google-apps.folder',
+    mimeType: f.mimeType,
+    url: f.webViewLink,
+    modificadoEn: f.modifiedTime,
+  }))
+}
+
 // Sube un archivo (buffer en memoria, viene de multer) a una carpeta de Drive.
 // Devuelve { url, nombre } — la subida es multipart simple (metadata + contenido en un solo POST).
 export async function subirArchivo({ carpetaId, nombre, mimeType, buffer }) {

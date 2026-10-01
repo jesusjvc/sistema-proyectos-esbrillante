@@ -14,7 +14,7 @@ import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, driveConfigurado } from '../lib/drive.js'
+import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, listarArchivosCarpeta, driveConfigurado } from '../lib/drive.js'
 import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
@@ -244,9 +244,10 @@ function buildServer(usuario) {
           adminProyecto: z.union([z.string(), z.array(z.string())]).optional().describe('userId (o varios) de quien administra/coordina el proyecto'),
         }).optional().describe('Quiénes participan en el equipo de este proyecto, por rol (userId de un usuario real del sistema — un rol puede tener más de una persona, ej. dos diseñadores). Importante definirlo desde la creación: sin esto, las tareas de rol genérico (responsable=copy/disenador/programador/redes) no le aparecen a nadie en "Mis tareas" hasta que se asigne después.'),
         areas: z.array(z.enum(['web', 'diseno_grafico', 'redes_sociales'])).optional().describe('Área(s) de trabajo a las que pertenece el proyecto — determina a quién le aparece por defecto en su dashboard (cada admin ve por defecto solo los proyectos de su área). Un proyecto integral que cruza varias áreas lleva varias en el arreglo. Si se omite, el proyecto queda visible en cualquier filtro de área.'),
+        driveFolderId: z.string().optional().describe('ID de una carpeta de Drive YA EXISTENTE para usar como carpeta del proyecto (ej. si el cliente ya compartió una carpeta propia) — si se omite, el sistema crea una carpeta nueva automáticamente (requiere Drive configurado en el servidor). Es el ID de la carpeta, no la URL completa. Visible después con ver_proyecto como driveFolderUrl, y listable con listar_archivos_drive_proyecto.'),
       },
     },
-    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo, areas }) => {
+    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo, areas, driveFolderId }) => {
       const slug = generarSlug(clienteNombre)
       const tipoFinal = tipo === 'continuo' ? 'continuo' : 'finito'
       const password = passwordCliente || generarPasswordSimple()
@@ -296,6 +297,7 @@ function buildServer(usuario) {
             condicionesTecnicas: condicionesTecnicas || {},
             equipo: equipoFinal,
             areas: areas || [],
+            driveRespuestasId: driveFolderId || null,
             passwordCliente: password,
             linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
             tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },
@@ -311,7 +313,7 @@ function buildServer(usuario) {
       await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}${plantillaId ? ` — desde plantilla (${tareasFinal.length} tareas)` : ''}`)
 
       let avisoDrive = ''
-      if (driveConfigurado()) {
+      if (!driveFolderId && driveConfigurado()) {
         try {
           const carpetaId = await obtenerOCrearCarpetaProyecto(p)
           await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
@@ -443,8 +445,8 @@ function buildServer(usuario) {
   server.registerTool(
     'editar_proyecto',
     {
-      title: 'Editar descripción, info clave o fecha de entrega del proyecto',
-      description: 'Actualiza la descripción libre del proyecto, su información clave y/o su fecha estimada de entrega. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). infoClave reemplaza por completo la info clave (dominio, grupoWhatsapp, extras) — lee ver_proyecto primero y manda el objeto completo. fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
+      title: 'Editar descripción, info clave, fecha de entrega o carpeta de Drive del proyecto',
+      description: 'Actualiza la descripción libre del proyecto, su información clave, su fecha estimada de entrega y/o su carpeta de Drive asociada. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). infoClave reemplaza por completo la info clave (dominio, grupoWhatsapp, extras) — lee ver_proyecto primero y manda el objeto completo. fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         descripcion: z.string().optional().describe('Nueva descripción del proyecto'),
@@ -459,11 +461,12 @@ function buildServer(usuario) {
           })).optional().describe('Grupos de WhatsApp del proyecto — un proyecto puede tener varios (trabajo en paralelo). Reemplaza la lista completa; el primer grupo queda como principal.'),
           extras: z.array(z.object({ etiqueta: z.string(), valor: z.string() })).optional().describe('Datos libres adicionales (ej. "Redes sociales del cliente", "Hosting")'),
         }).optional().describe('Información clave del proyecto — reemplaza el objeto completo'),
+        driveFolderId: z.string().nullable().optional().describe('ID de la carpeta de Drive del proyecto (no la URL completa). Pasa "" o null para quitar la asociación actual. No crea la carpeta — solo la vincula; para crear una automáticamente, omite este campo al usar crear_proyecto.'),
       },
     },
-    async ({ slug, descripcion, fechaEstimadaEntrega, infoClave }) => {
-      if (descripcion === undefined && fechaEstimadaEntrega === undefined && infoClave === undefined) {
-        return fail('Manda al menos descripcion, fechaEstimadaEntrega o infoClave.')
+    async ({ slug, descripcion, fechaEstimadaEntrega, infoClave, driveFolderId }) => {
+      if (descripcion === undefined && fechaEstimadaEntrega === undefined && infoClave === undefined && driveFolderId === undefined) {
+        return fail('Manda al menos descripcion, fechaEstimadaEntrega, infoClave o driveFolderId.')
       }
       if (infoClave?.grupos !== undefined) {
         const invalidos = infoClave.grupos.filter((g) => !g || !String(g.nombre || '').trim())
@@ -501,10 +504,15 @@ function buildServer(usuario) {
 
       await prisma.proyecto.update({
         where: { id: p.id },
-        data: { proyecto: { ...p.proyecto, ...cambios } },
+        data: {
+          proyecto: { ...p.proyecto, ...cambios },
+          ...(driveFolderId !== undefined ? { driveRespuestasId: driveFolderId || null } : {}),
+        },
       })
 
-      const detalle = Object.keys(cambios).map((c) => c === 'descripcion' ? 'descripción' : c === 'infoClave' ? 'info clave' : `entrega → ${fechaEstimadaEntrega}`).join(', ')
+      const detalleCampos = Object.keys(cambios).map((c) => c === 'descripcion' ? 'descripción' : c === 'infoClave' ? 'info clave' : `entrega → ${fechaEstimadaEntrega}`)
+      if (driveFolderId !== undefined) detalleCampos.push(driveFolderId ? 'carpeta de Drive' : 'carpeta de Drive removida')
+      const detalle = detalleCampos.join(', ')
       await logEntry(p.id, usuario.nombre, 'Proyecto editado', detalle)
       emitirCambio(p.id)
 
@@ -516,7 +524,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. También incluye "descripcion" (y, si viene de una plantilla, "queHacer"/"necesitasAntes"/"queEntregas") cuando alguien escribió detalle ahí — antes ver_proyecto solo mostraba el título y ese detalle era invisible por MCP; se omiten los campos vacíos para no inflar la respuesta. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título). También incluye "salud": la clasificación del proyecto en "atrasado" (tareas de cliente con plazo vencido o del equipo con fecha límite pasada), "estancado" (7+ días sin movimiento) o "avanza", con "motivos" que detallan las tareas exactas implicadas.',      inputSchema: {
+      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. También incluye "descripcion" (y, si viene de una plantilla, "queHacer"/"necesitasAntes"/"queEntregas") cuando alguien escribió detalle ahí — antes ver_proyecto solo mostraba el título y ese detalle era invisible por MCP; se omiten los campos vacíos para no inflar la respuesta. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título). También incluye "salud": la clasificación del proyecto en "atrasado" (tareas de cliente con plazo vencido o del equipo con fecha límite pasada), "estancado" (7+ días sin movimiento) o "avanza", con "motivos" que detallan las tareas exactas implicadas. Si el proyecto tiene una carpeta de Drive asociada, incluye "driveFolderUrl" (se omite el campo si no tiene ninguna) — úsala con listar_archivos_drive_proyecto para ver su contenido, o edítala con editar_proyecto (driveFolderId).',      inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         incluirCompletadas: z.boolean().optional().describe('Solo aplica a proyectos "finito". Si es true, agrega "tareasCompletadas" con las tareas del equipo ya completadas (id, fase, título, responsable, completadaPor, completadaEn). No cambia ningún otro listado — el propósito principal de esta tool sigue siendo mostrar qué falta.'),
       },
@@ -534,6 +542,10 @@ function buildServer(usuario) {
         etiquetas: p.etiquetas,
         descripcion: p.proyecto?.descripcion || null,
         status: p.status,
+        // Carpeta de Drive del proyecto — se omite si no tiene una asociada
+        // (ver crear_proyecto/editar_proyecto con driveFolderId, o
+        // listar_archivos_drive_proyecto para ver su contenido).
+        ...(p.driveRespuestasId ? { driveFolderUrl: `https://drive.google.com/drive/folders/${p.driveRespuestasId}` } : {}),
       }
 
       if (p.tipo === 'continuo') {
@@ -610,6 +622,31 @@ function buildServer(usuario) {
       resumen.salud = calcularSalud(p)
 
       return ok(JSON.stringify(resumen, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'listar_archivos_drive_proyecto',
+    {
+      title: 'Listar archivos de la carpeta de Drive del proyecto',
+      description: 'Lista los archivos (y subcarpetas) de la carpeta de Drive asociada al proyecto — más recientes primero. Requiere que el proyecto ya tenga una carpeta asociada (ver "driveFolderUrl" en ver_proyecto; si no tiene, asígnala con editar_proyecto usando driveFolderId, o deja que crear_proyecto cree una automáticamente). Usa las credenciales propias del servidor, así que funciona aunque la carpeta no esté compartida con tu cuenta de Drive personal — sirve en particular cuando la carpeta es del cliente. No descarga el contenido de los archivos, solo el listado con su link (webViewLink) para abrirlos o pasarlos a WebFetch si hace falta leer su contenido.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+      },
+    },
+    async ({ slug }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (!p.driveRespuestasId) return fail(`El proyecto "${slug}" todavía no tiene una carpeta de Drive asociada. Asígnala con editar_proyecto (driveFolderId) — ver_proyecto mostrará "driveFolderUrl" una vez asignada.`)
+      if (!driveConfigurado()) return fail('Drive no está configurado en el servidor (faltan GOOGLE_SERVICE_ACCOUNT_KEY/DRIVE_RESPUESTAS_ROOT_ID).')
+
+      try {
+        const archivos = await listarArchivosCarpeta(p.driveRespuestasId)
+        return ok(JSON.stringify({ driveFolderUrl: `https://drive.google.com/drive/folders/${p.driveRespuestasId}`, archivos }, null, 2))
+      } catch (err) {
+        console.error('Error listando archivos de Drive:', err)
+        return fail('No se pudo listar la carpeta de Drive — revisa los logs del servidor.')
+      }
     },
   )
 
