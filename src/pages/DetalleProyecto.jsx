@@ -26,7 +26,6 @@ import useEscape from '../hooks/useEscape'
 import MedidorCircular from '../components/MedidorCircular'
 import AdjuntosTarea from '../components/AdjuntosTarea'
 import TarjetaTarea from '../components/TarjetaTarea'
-import { MODULOS_CLIENTE } from '../data/modulosCliente'
 import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import { esUrl } from '../lib/texto'
@@ -38,7 +37,6 @@ import PanelSolicitudes from '../components/PanelSolicitudes'
 import DescripcionProyecto from '../components/DescripcionProyecto'
 import EtiquetasProyecto from '../components/EtiquetasProyecto'
 import FechaEntregaProyecto from '../components/FechaEntregaProyecto'
-import EditorEnriquecido from '../components/EditorEnriquecido'
 import HiloComentarios from '../components/HiloComentarios'
 import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import IconGoogleDrive from '../components/IconGoogleDrive'
@@ -223,11 +221,20 @@ export default function DetalleProyecto() {
   }
 
   async function handleAgregarTarea(datos) {
-    const nueva = await agregarTarea(proyecto.slug, datos)
+    // Los flags no los acepta el POST de tareas — se aplican aparte, y solo
+    // cuando el borrador los tría activados.
+    const { esRutaCritica, soloKarlaOAdmin, ...payload } = datos
+    const nueva = await agregarTarea(proyecto.slug, payload)
+    if (esRutaCritica || soloKarlaOAdmin) {
+      await editarTarea(proyecto.slug, nueva.id, {
+        ...(esRutaCritica ? { esRutaCritica: true } : {}),
+        ...(soloKarlaOAdmin ? { soloKarlaOAdmin: true } : {}),
+      })
+    }
     setModalNueva(null)
     await refresh()
-    // La tarea nace abierta en su tarjeta para afinar prioridad, fecha,
-    // dependencias... ahí mismo (la creación es mínima a propósito).
+    // La tarea nace abierta en su tarjeta viva — el borrador ya llevó
+    // prioridad, fecha, dependencias y ajustes.
     if (nueva?.id) setTarjetaAbierta(nueva.id)
   }
 
@@ -952,15 +959,31 @@ export default function DetalleProyecto() {
         )
       })()}
 
-      {/* ─── Modal: Nueva tarea ─── */}
-      {modalNueva !== null && (
-        <ModalNuevaTarea
-          contexto={modalNueva}
-          miembros={miembros}
-          onGuardar={handleAgregarTarea}
-          onCerrar={() => setModalNueva(null)}
-        />
-      )}
+      {/* ─── Tarjeta en modo creación: la misma tarjeta de tarea, en borrador ─── */}
+      {modalNueva !== null && (() => {
+        const nombreFase = (proyecto.proyecto.fases || []).find((f) => f.numero === modalNueva)?.nombre
+        const columna = KANBAN_COLUMNAS.find((c) => c.estado === modalNueva)
+        const contextoLabel = typeof modalNueva === 'string'
+          ? `Nueva tarjeta — ${columna?.label || modalNueva}`
+          : `Nueva tarea — Fase ${modalNueva}${nombreFase ? ` (${nombreFase})` : ''}`
+        return (
+          <TarjetaTarea
+            modo="nueva"
+            contexto={modalNueva}
+            contextoLabel={contextoLabel}
+            slug={proyecto.slug}
+            puedeEditar
+            esAdmin={esAdminRol}
+            equipo={proyecto.equipo}
+            miembros={miembros}
+            miembrosPorId={miembrosPorId}
+            avatares={avatares}
+            todasLasTareas={proyecto.tareas}
+            onCerrar={() => setModalNueva(null)}
+            onCrear={handleAgregarTarea}
+          />
+        )
+      })()}
 
       {/* ─── Modal: Eliminar proyecto ─── */}
       {modalEliminar && (
@@ -1496,147 +1519,6 @@ function TareaRow({ tarea: t, estado, avatares = {}, equipo, miembrosPorId = {},
     </div>
   )
 }
-
-// Los roles de equipo (copy/diseñador/programador/redes) se dejaron de usar aquí — asignar a
-// una persona específica de la lista completa de abajo los reemplaza. Estos sentinels sí se
-// conservan porque no son "roles de proyecto.equipo", tienen su propia lógica en
-// tareaLeCorresponde (server/src/lib/permisos.js): admin=solo admins, karla=solo QA,
-// equipo=sin responsable puntual (le aparece a todo el equipo del proyecto).
-// La asignación de tareas ya no usa roles (copy/diseño/programación/redes,
-// admin, karla) — los selects arman la lista con opcionesResponsable(): "Sin
-// asignar en particular" + personas activas. Los valores de rol legados solo
-// se muestran como "(actual)" al editar una tarea que todavía los trae.
-
-// Creación mínima a propósito (estilo Trello): título, responsable, columna y
-// descripción. La tarea nace y SE ABRE SU TARJETA (TarjetaTarea) para afinar
-// ahí prioridad, fecha, dependencias y ajustes. Las tareas del cliente sí
-// revelan módulo + instrucciones + plazo aquí, porque definen lo que el
-// cliente verá en su portal desde el primer momento.
-function ModalNuevaTarea({ contexto, miembros = [], onGuardar, onCerrar }) {
-  useEscape(onCerrar)
-  const esContinuo = typeof contexto === 'string'
-  const [form, setForm] = useState({
-    titulo: '',
-    descripcion: '',
-    instruccionesCliente: '',
-    responsable: 'equipo',
-    esCliente: false,
-    modulo: '',
-    plazoHoras: '',
-    columna: esContinuo ? contexto : 'todo',
-  })
-
-  function elegirModulo(valor) {
-    const modulo = valor ? MODULOS_CLIENTE[valor] : null
-    setForm((f) => ({
-      ...f,
-      modulo: valor,
-      titulo: !f.titulo.trim() && modulo ? modulo.generica : f.titulo,
-      instruccionesCliente: modulo ? modulo.plantilla() : f.instruccionesCliente,
-    }))
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!form.titulo.trim()) return
-    onGuardar({
-      fase: esContinuo ? undefined : contexto,
-      columna: esContinuo ? form.columna : undefined,
-      titulo: form.titulo.trim(),
-      descripcion: form.descripcion,
-      instruccionesCliente: form.instruccionesCliente,
-      responsable: form.esCliente ? 'cliente' : form.responsable,
-      esCliente: form.esCliente,
-      modulo: form.esCliente ? (form.modulo || null) : null,
-      plazoHoras: form.plazoHoras ? Number(form.plazoHoras) : null,
-    })
-  }
-
-  const responsableElegido = miembros.find((m) => m.id === form.responsable && m.activo !== false)
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCerrar}>
-      <div className="bg-white dark:bg-ink-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-ink-500">
-          <h3 className="font-semibold text-slate-800 dark:text-ink-100">{esContinuo ? 'Nueva tarjeta' : `Nueva tarea — Fase ${contexto}`}</h3>
-          <button onClick={onCerrar} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-ink-100"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <input
-            value={form.titulo}
-            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-            placeholder="Título de la tarea…"
-            autoFocus
-            className="w-full text-lg font-semibold bg-transparent border-b border-slate-200 dark:border-ink-500 focus:border-brand-400 dark:focus:border-brand-500 text-slate-800 dark:text-ink-100 py-1.5 outline-none placeholder:text-slate-300 dark:placeholder:text-ink-500 transition-colors"
-          />
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {!form.esCliente && (
-              <SelectorResponsableRapido
-                miembros={miembros}
-                onAsignar={(personaId) => setForm((f) => ({ ...f, responsable: personaId }))}
-                size={32}
-                iconSize={14}
-              >
-                {responsableElegido ? <Avatar nombre={responsableElegido.nombre} avatarUrl={responsableElegido.avatarUrl} size={32} /> : null}
-              </SelectorResponsableRapido>
-            )}
-            {esContinuo && !form.esCliente && (
-              <select value={form.columna} onChange={(e) => setForm({ ...form, columna: e.target.value })} className="text-xs border border-slate-200 dark:border-ink-500 rounded-lg px-2 py-1.5 bg-white dark:bg-ink-900 text-slate-600 dark:text-ink-300 outline-none focus:ring-2 focus:ring-brand-400">
-                {KANBAN_COLUMNAS.map((c) => <option key={c.estado} value={c.estado}>{c.label}</option>)}
-              </select>
-            )}
-          </div>
-
-          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
-            <input type="checkbox" checked={form.esCliente} onChange={(e) => setForm({ ...form, esCliente: e.target.checked })} className="accent-brand-500" />
-            Es una tarea del cliente
-          </label>
-
-          {form.esCliente ? (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Módulo (opcional)</label>
-                <select value={form.modulo} onChange={(e) => elegirModulo(e.target.value)} className={inputCls}>
-                  <option value="">Sin módulo</option>
-                  {Object.entries(MODULOS_CLIENTE).map(([valor, m]) => <option key={valor} value={valor}>{m.label}</option>)}
-                </select>
-                {form.modulo && MODULOS_CLIENTE[form.modulo] && (
-                  <p className="text-xs text-slate-400 dark:text-ink-400 mt-1">{MODULOS_CLIENTE[form.modulo].ayuda}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Instrucciones para el cliente *</label>
-                {/* key por módulo: el editor lee el contenido una sola vez al montar */}
-                <EditorEnriquecido key={form.modulo || 'manual'} value={form.instruccionesCliente} onChange={(html) => setForm({ ...form, instruccionesCliente: html })} placeholder="Texto que verá el cliente en su portal..." />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Plazo sugerido (horas)</label>
-                <input type="number" value={form.plazoHoras} onChange={(e) => setForm({ ...form, plazoHoras: e.target.value })} className={inputCls} placeholder="48" min="1" />
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-ink-300 mb-1.5">Descripción (opcional)</label>
-              <EditorEnriquecido value={form.descripcion} onChange={(html) => setForm({ ...form, descripcion: html })} placeholder="Instrucciones para el equipo..." />
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-1">
-            <button type="submit" disabled={!form.titulo.trim()} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
-              Crear tarea
-            </button>
-            <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
-              Cancelar
-            </button>
-          </div>
-          <p className="text-xs text-slate-400 dark:text-ink-400 text-center">Al crear se abre la tarjeta para asignar prioridad, fecha y dependencias.</p>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 const inputCls = 'w-full border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2.5 text-sm text-slate-800 dark:text-ink-100 bg-white dark:bg-ink-900 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-ink-400'
 
 function InfoCard({ titulo, icono, children, fullWidth }) {
