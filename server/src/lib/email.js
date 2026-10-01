@@ -23,7 +23,7 @@ function getTransporter() {
 // Envía un correo transaccional vía Mailtrap (SMTP). No lanza si falla —
 // devuelve { enviado: false, motivo } para que el llamador decida si le
 // importa (la mayoría de los llamadores solo lo intentan "mejor esfuerzo").
-async function enviarEmail({ to, nombreDestino, asunto, texto, html }) {
+async function enviarEmail({ to, nombreDestino, asunto, texto, html, replyTo }) {
   if (!mailtrapConfigurado()) return { enviado: false, motivo: 'Mailtrap no configurado' }
 
   try {
@@ -33,6 +33,7 @@ async function enviarEmail({ to, nombreDestino, asunto, texto, html }) {
       subject: asunto,
       text: texto,
       html: envolverHtmlDeCorreo(html || `<p>${texto}</p>`),
+      ...(replyTo ? { replyTo } : {}),
     })
     return { enviado: true }
   } catch (err) {

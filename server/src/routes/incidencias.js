@@ -10,7 +10,7 @@ const VALIDOS = {
   prioridad: ['urgente', 'normal', 'cuando_se_pueda'],
   cobertura: ['incluido', 'cortesia', 'adicional', 'por_valorar'],
   infraestructura: ['esbrillante', 'externa', 'sin_localizar'],
-  origen: ['whatsapp', 'telefono', 'interno', 'monitoreo'],
+  origen: ['whatsapp', 'telefono', 'interno', 'monitoreo', 'correo'],
   tipo: ['falla', 'actualizacion', 'preventivo', 'consulta'],
 }
 

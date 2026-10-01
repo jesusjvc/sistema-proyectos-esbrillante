@@ -231,7 +231,7 @@ model Incidencia {
   prioridad      String @default("normal") // urgente | normal | cuando_se_pueda
   cobertura      String @default("por_valorar") // incluido | cortesia | adicional | por_valorar
   infraestructura String @default("sin_localizar") // esbrillante | externa | sin_localizar
-  origen         String @default("interno") // whatsapp | telefono | interno | monitoreo
+  origen         String @default("interno") // whatsapp | telefono | interno | monitoreo | correo
   tipo           String @default("falla") // falla | actualizacion | preventivo | consulta
   responsableId  String?
   reportadoPor   String?
@@ -248,10 +248,43 @@ model Incidencia {
   creadoEn    DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
+  correosEntrantes CorreoEntrante[]
+
   @@index([estado, prioridad, creadoEn])
   @@index([clienteId])
   @@index([sitioId])
   @@map("incidencias")
+}
+
+// Correos que llegan a soporte@esbrillante.mx (buzón de Google Workspace que
+// el puente local correo-bridge/ lee por IMAP y manda a
+// /api/integraciones/correo/ingest). Los que cruzan con un cliente generan su
+// ticket y quedan aquí como auditoría; los que no cruzan con nadie quedan
+// "pendiente" esperando que alguien del equipo los asigne (o los descarte)
+// desde la mesa de mantenimiento.
+model CorreoEntrante {
+  id          String @id @default(cuid())
+  // Message-ID del correo (o hash de de+asunto+fecha si no trae) — un
+  // reenvío del mismo correo no debe crear dos tickets.
+  messageId   String @unique
+  de          String
+  nombreDe    String?
+  asunto      String
+  texto       String @default("")
+  fechaCorreo DateTime?
+
+  // pendiente: no se pudo cruzar con un cliente/sitio — espera asignación.
+  // asignada: ya generó (o se le vinculó) un ticket de mantenimiento.
+  // descartada: no aplica (spam, rebote, prueba) — no crea ticket.
+  estado       String      @default("pendiente")
+  notas        String?
+  incidenciaId String?     @unique
+  incidencia   Incidencia? @relation(fields: [incidenciaId], references: [id], onDelete: SetNull)
+
+  creadoEn DateTime @default(now())
+
+  @@index([estado, creadoEn])
+  @@map("correos_entrantes")
 }
 
 model Tarea {

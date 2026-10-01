@@ -1,0 +1,16 @@
+{
+  "name": "foco-correo-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Puente IMAP local: buzón de soporte@ → tickets de Foco",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "imapflow": "^1.0.178",
+    "mailparser": "^3.7.2"
+  }
+}

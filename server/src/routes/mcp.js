@@ -20,8 +20,8 @@ import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, 
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea } from '../lib/tareaHelpers.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
-import { importarClienteCrm, normBusqueda, dominioDesde, crmConfigurado } from '../lib/clientesCrm.js'
-import { listarCustomers, buscarContacts, terminoSeguro } from '../lib/perfexClient.js'
+import { dominioDesde } from '../lib/clientesCrm.js'
+import { resolverClienteTicket } from '../lib/resolverCliente.js'
 
 const router = Router()
 
@@ -1366,51 +1366,9 @@ function buildServer(usuario) {
     }
   }
 
-  // Resuelve un cliente desde cualquier identificador: id local, crmId,
-  // nombre comercial (Foco primero, CRM después — importando si hace falta),
-  // nombre de contacto, correo o teléfono.
-  async function resolverClienteTicket(param) {
-    const directo = await prisma.cliente.findFirst({ where: { OR: [{ id: param }, { crmId: param }] } })
-    if (directo) return { cliente: directo, aviso: '' }
-
-    const nq = normBusqueda(param)
-    if (!nq) return {}
-
-    const locales = await prisma.cliente.findMany()
-    const local = locales.find((c) => normBusqueda(c.nombreComercial) === nq)
-      || locales.find((c) => normBusqueda(c.nombreComercial).includes(nq) || nq.includes(normBusqueda(c.nombreComercial)))
-    if (local) return { cliente: local, aviso: '' }
-
-    if (crmConfigurado()) {
-      // Empresas del CRM (listado cacheado, inmune al WAF) por nombre normalizado
-      let customers = []
-      try { customers = await listarCustomers() } catch { customers = [] }
-      const match = customers.find((c) => normBusqueda(c.company) === nq)
-        || customers.find((c) => normBusqueda(c.company).includes(nq) || nq.includes(normBusqueda(c.company)))
-      if (match) {
-        const { cliente } = await importarClienteCrm(String(match.userid))
-        return { cliente, aviso: `Cliente importado del CRM (crmId ${match.userid}).` }
-      }
-      // Contactos del CRM por nombre/correo/teléfono (con truco de sufijo para teléfonos con espacios)
-      const termino = terminoSeguro(param)
-      let contactos = []
-      try { contactos = await buscarContacts(termino) } catch { contactos = [] }
-      const digitos = param.replace(/\D/g, '')
-      if (digitos.length >= 7 && !contactos.length) {
-        try { contactos = await buscarContacts(digitos.slice(-4)) } catch { contactos = [] }
-        contactos = contactos.filter((c) => String(c.phonenumber || '').replace(/\D/g, '').includes(digitos))
-      }
-      const porDatos = contactos.find((c) =>
-        normBusqueda(`${c.firstname} ${c.lastname}`).includes(nq)
-        || normBusqueda(c.email) === nq)
-        || contactos.find((c) => String(c.phonenumber || '').replace(/\D/g, '').includes(digitos))
-      if (porDatos?.userid) {
-        const { cliente } = await importarClienteCrm(String(porDatos.userid))
-        return { cliente, aviso: `Cliente vinculado por contacto del CRM (crmId ${porDatos.userid}).` }
-      }
-    }
-    return {}
-  }
+  // Resolución de cliente (id/crmId/nombre/contacto/correo/teléfono, con
+  // importación on-demand del CRM) vive en lib/resolverCliente.js — compartida
+  // con la ingesta de correos de soporte.
 
   server.registerTool(
     'listar_tickets',
@@ -1452,15 +1410,16 @@ function buildServer(usuario) {
         sitio: z.string().optional().describe('Dominio del sitio afectado (ej. "banhomerealestate.com") o id del sitio en Foco. Si se omite y el cliente tiene un solo sitio, se usa ese.'),
         descripcion: z.string().optional().describe('Qué reportaron, desde cuándo ocurre, contexto útil'),
         prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional().describe('Default: normal'),
-        origen: z.enum(['whatsapp', 'telefono', 'interno', 'monitoreo']).optional().describe('Canal por donde llegó. Default: interno'),
+        origen: z.enum(['whatsapp', 'telefono', 'interno', 'monitoreo', 'correo']).optional().describe('Canal por donde llegó. Default: interno'),
         tipo: z.enum(['falla', 'actualizacion', 'preventivo', 'consulta']).optional().describe('Default: falla'),
         cobertura: z.enum(['incluido', 'cortesia', 'adicional', 'por_valorar']).optional().describe('Default: la del sitio o por_valorar'),
         responsable: z.string().optional().describe('userId o nombre de la persona del equipo responsable'),
         telefonoOrigen: z.string().optional().describe('Teléfono de donde llegó el reporte (típico de WhatsApp)'),
         fechaLimite: z.string().optional().describe('Fecha límite YYYY-MM-DD'),
+        correoEntranteId: z.string().optional().describe('Id de un correo de la bandeja (ver listar_correos_pendientes) del que nace este ticket — al crearlo, el correo queda marcado como asignado.'),
       },
     },
-    async ({ titulo, cliente: clienteParam, sitio: sitioParam, descripcion, prioridad, origen, tipo, cobertura, responsable, telefonoOrigen, fechaLimite }) => {
+    async ({ titulo, cliente: clienteParam, sitio: sitioParam, descripcion, prioridad, origen, tipo, cobertura, responsable, telefonoOrigen, fechaLimite, correoEntranteId }) => {
       if (!titulo?.trim()) return fail('El título del problema es obligatorio.')
 
       const { cliente, aviso } = await resolverClienteTicket(String(clienteParam).trim())
@@ -1516,7 +1475,15 @@ function buildServer(usuario) {
       })
       emitirCambio('incidencias')
 
-      return ok(`Ticket WEB-${String(ticket.folio).padStart(4, '0')} creado para "${cliente.nombreComercial}" (${sitio.dominio || sitio.nombre}).${aviso ? ' ' + aviso : ''}${responsableId ? ` Responsable asignado.` : ''} Estado: Por hacer.`)
+      let avisoCorreo = ''
+      if (correoEntranteId) {
+        const correo = await prisma.correoEntrante.findUnique({ where: { id: correoEntranteId } })
+        if (!correo) avisoCorreo = ' OJO: el correoEntranteId no existe (el ticket se creó igual).'
+        else if (correo.estado === 'asignada') avisoCorreo = ' OJO: ese correo ya estaba asignado a otro ticket.'
+        else await prisma.correoEntrante.update({ where: { id: correo.id }, data: { estado: 'asignada', incidenciaId: ticket.id } })
+      }
+
+      return ok(`Ticket WEB-${String(ticket.folio).padStart(4, '0')} creado para "${cliente.nombreComercial}" (${sitio.dominio || sitio.nombre}).${aviso ? ' ' + aviso : ''}${avisoCorreo}${responsableId ? ` Responsable asignado.` : ''} Estado: Por hacer.`)
     },
   )
 
@@ -1572,6 +1539,33 @@ function buildServer(usuario) {
       const actualizado = await prisma.incidencia.update({ where: { id: actual.id }, data, include: INCLUDE_TICKET })
       emitirCambio('incidencias')
       return ok(`Ticket WEB-${String(actualizado.folio).padStart(4, '0')} actualizado: ${JSON.stringify(ticketResumen(actualizado))}`)
+    },
+  )
+
+  server.registerTool(
+    'listar_correos_pendientes',
+    {
+      title: 'Listar correos de soporte sin asignar',
+      description: 'Lista los correos que llegaron a soporte@esbrillante.mx y no se pudieron cruzar con un cliente/sitio (la bandeja "Correos sin asignar" de la mesa de mantenimiento). Cada uno trae remitente, asunto, texto y el motivo por el que quedó pendiente; se asignan con crear_ticket pasando correoEntranteId.',
+      inputSchema: {},
+    },
+    async () => {
+      const pendientes = await prisma.correoEntrante.findMany({
+        where: { estado: 'pendiente' },
+        orderBy: { creadoEn: 'asc' },
+        include: { incidencia: { select: { folio: true } } },
+      })
+      if (!pendientes.length) return ok('No hay correos sin asignar — la bandeja está limpia.')
+      return ok(JSON.stringify(pendientes.map((c) => ({
+        id: c.id,
+        de: c.de,
+        nombreDe: c.nombreDe,
+        asunto: c.asunto,
+        texto: c.texto.slice(0, 500),
+        notas: c.notas,
+        recibido: c.creadoEn,
+        fechaCorreo: c.fechaCorreo,
+      })), null, 2))
     },
   )
 

@@ -6,13 +6,13 @@ import { useEventosGlobal } from '../hooks/useEventos'
 import { formatFecha } from '../data/storage'
 import { normalizarTexto } from '../lib/texto'
 import {
-  actualizarIncidencia, actualizarIncidenciasMasivo, buscarClientesCrm, crearIncidencia, crearSitio,
-  getCliente, getClientes, getIncidencias, getMiembros,
+  actualizarIncidencia, actualizarIncidenciasMasivo, asignarCorreo, buscarClientesCrm, crearIncidencia, crearSitio,
+  descartarCorreo, getCliente, getClientes, getCorreosPendientes, getIncidencias, getMiembros,
   registrarClienteCrm, vincularClienteCrm,
 } from '../data/api'
 import {
   AlertCircle, ArrowUpDown,
-  Building2, CalendarDays, Check, ChevronDown, Columns3, ExternalLink, Filter, LayoutList, Plus, Search, SlidersHorizontal,
+  Building2, CalendarDays, Check, ChevronDown, Columns3, ExternalLink, Filter, LayoutList, Mail, Plus, Search, SlidersHorizontal,
   UserRound, UserPlus, UserX, Wrench, X,
 } from 'lucide-react'
 
@@ -54,6 +54,7 @@ const ORIGENES = [
   ['whatsapp', 'WhatsApp'],
   ['telefono', 'Teléfono'],
   ['monitoreo', 'Monitoreo'],
+  ['correo', 'Correo'],
 ]
 
 const PRIORIDAD_ORDEN = { urgente: 0, normal: 1, cuando_se_pueda: 2 }
@@ -191,13 +192,18 @@ export default function Mantenimiento() {
   const [errorAccion, setErrorAccion] = useState('')
   const [vista, setVista] = useState(() => localStorage.getItem('mantenimientoVista') || 'lista')
   const [panel, setPanel] = useState(null)
+  const [correos, setCorreos] = useState([])
+  const [correoActivo, setCorreoActivo] = useState(null)
 
   async function cargar() {
     try {
-      const [tickets, clientesData, miembrosData] = await Promise.all([getIncidencias(), getClientes(), getMiembros()])
+      const [tickets, clientesData, miembrosData, correosData] = await Promise.all([
+        getIncidencias(), getClientes(), getMiembros(), getCorreosPendientes().catch(() => []),
+      ])
       setIncidencias(tickets)
       setClientes(clientesData)
       setMiembros(miembrosData.filter((miembro) => miembro.activo !== false))
+      setCorreos(correosData)
       setError('')
     } catch (err) {
       setError(err.message || 'No pudimos cargar mantenimiento')
@@ -251,6 +257,30 @@ export default function Mantenimiento() {
     urgentes: incidencias.filter((ticket) => ticket.estado !== 'done' && ticket.prioridad === 'urgente').length,
     sinAsignar: incidencias.filter((ticket) => ticket.estado !== 'done' && !ticket.responsableId).length,
     revision: incidencias.filter((ticket) => ticket.estado === 'revision').length,
+    correos: correos.length,
+  }
+
+  // El correo nace de la bandeja: se crea el ticket con el modal normal
+  // (prellenado) y al guardarse se vincula aquí — eso manda el acuse con folio.
+  async function vincularCorreoActivo(ticket) {
+    if (!correoActivo) return
+    try {
+      await asignarCorreo(correoActivo.id, { incidenciaId: ticket.id })
+      setCorreos((actuales) => actuales.filter((correo) => correo.id !== correoActivo.id))
+    } catch (err) {
+      setErrorAccion(err.message || 'El ticket se creó, pero no pudimos marcar el correo como asignado')
+    } finally {
+      setCorreoActivo(null)
+    }
+  }
+
+  async function descartarCorreoPendiente(correo) {
+    try {
+      await descartarCorreo(correo.id)
+      setCorreos((actuales) => actuales.filter((item) => item.id !== correo.id))
+    } catch (err) {
+      setErrorAccion(err.message || 'No pudimos descartar el correo')
+    }
   }
 
   const filtrosActivos = Number(prioridad !== 'todas') + Number(responsable !== 'todos')
@@ -287,6 +317,7 @@ export default function Mantenimiento() {
             <Resumen label="Urgentes" valor={stats.urgentes} color="bg-red-500" />
             <Resumen label="Sin asignar" valor={stats.sinAsignar} color="bg-amber-500" />
             <Resumen label="En revisión" valor={stats.revision} color="bg-blue-500" />
+            <Resumen label="Correos sin asignar" valor={stats.correos} color="bg-violet-500" />
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -325,6 +356,28 @@ export default function Mantenimiento() {
 
         <div className="flex-1 min-h-0 overflow-auto bg-slate-50 dark:bg-ink-950">
           {errorAccion && <div role="alert" className="m-4 rounded-lg bg-rose-100 px-3 py-2 text-sm text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">{errorAccion}</div>}
+          {correos.length > 0 && (
+            <section className="mx-4 mt-4 rounded-xl border border-violet-300/70 dark:border-violet-400/25 bg-violet-50 dark:bg-violet-500/10" aria-label="Correos sin asignar">
+              <header className="flex items-center gap-2 px-4 py-2.5 border-b border-violet-200/70 dark:border-violet-400/25">
+                <Mail size={15} className="text-violet-700 dark:text-violet-300" />
+                <h2 className="text-sm font-semibold text-violet-900 dark:text-violet-200">Correos sin asignar</h2>
+                <span className="text-xs tabular-nums text-violet-700 dark:text-violet-300">{correos.length}</span>
+                <p className="ml-auto hidden md:block text-xs text-violet-700/70 dark:text-violet-300/70">Llegaron a soporte@esbrillante.mx sin cruzar con ningún cliente</p>
+              </header>
+              <ul className="divide-y divide-violet-200/70 dark:divide-violet-400/25">
+                {correos.map((correo) => (
+                  <li key={correo.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-800 dark:text-ink-100 truncate"><span className="text-slate-500 dark:text-ink-300">{correo.de}</span> — {correo.asunto}</p>
+                      <p className="text-xs text-slate-500 dark:text-ink-400 truncate">{antiguedad(correo.fechaCorreo || correo.creadoEn)}{correo.notas ? ` · ${correo.notas}` : ''}</p>
+                    </div>
+                    <button onClick={() => { setCorreoActivo(correo); setPanel('nuevo') }} className="h-9 shrink-0 px-3 rounded-lg bg-brand-500 hover:bg-brand-600 text-slate-900 text-xs font-semibold transition-colors">Crear ticket</button>
+                    <button onClick={() => descartarCorreoPendiente(correo)} disabled={correoActivo?.id === correo.id} className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-violet-100 dark:hover:bg-violet-500/20 dark:hover:text-rose-300 transition-colors" aria-label={`Descartar correo de ${correo.de}`}><X size={15} /></button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {error ? (
             <EstadoMensaje icon={<AlertCircle size={22} />} titulo="No pudimos cargar los tickets" detalle={error} accion="Reintentar" onAccion={cargar} />
           ) : cargando ? (
@@ -342,7 +395,7 @@ export default function Mantenimiento() {
         )}
       </div>
 
-      {panel === 'nuevo' && <PanelNuevo clientes={clientes} miembros={miembros} user={user} onCerrar={() => setPanel(null)} onClienteNuevo={(cliente) => setClientes((actuales) => [...actuales, cliente])} onCreado={(ticket) => { setIncidencias((actuales) => [ticket, ...actuales]); setPanel(ticket) }} />}
+      {panel === 'nuevo' && <PanelNuevo clientes={clientes} miembros={miembros} user={user} prellenado={correoActivo} onCerrar={() => { setPanel(null); setCorreoActivo(null) }} onClienteNuevo={(cliente) => setClientes((actuales) => [...actuales, cliente])} onCreado={(ticket) => { setIncidencias((actuales) => [ticket, ...actuales]); setPanel(ticket); vincularCorreoActivo(ticket) }} />}
       {panel && panel !== 'nuevo' && <PanelDetalle ticket={panel} miembros={miembros} onCerrar={() => setPanel(null)} onGuardar={actualizar} />}
     </Layout>
   )
@@ -786,8 +839,10 @@ function BuscadorCliente({ clientes, value, onSelect, onImportado }) {
   )
 }
 
-function PanelNuevo({ clientes, miembros, user, onCerrar, onCreado, onClienteNuevo }) {
-  const [form, setForm] = useState({ clienteId: '', sitioId: '', titulo: '', descripcion: '', tipo: 'falla', origen: 'interno', prioridad: 'normal', cobertura: 'por_valorar', infraestructura: 'sin_localizar', responsableId: '', fechaLimite: '' })
+function PanelNuevo({ clientes, miembros, user, prellenado, onCerrar, onCreado, onClienteNuevo }) {
+  // prellenado: correo de la bandeja del que nace el ticket — asunto/texto
+  // copiados y origen "Correo" desde el arranque.
+  const [form, setForm] = useState({ clienteId: '', sitioId: '', titulo: prellenado?.asunto || '', descripcion: prellenado?.texto || '', tipo: 'falla', origen: prellenado ? 'correo' : 'interno', prioridad: 'normal', cobertura: 'por_valorar', infraestructura: 'sin_localizar', responsableId: '', fechaLimite: '' })
   const [sitios, setSitios] = useState([])
   const [nuevoSitio, setNuevoSitio] = useState(false)
   const [sitioForm, setSitioForm] = useState({ nombre: 'Sitio principal', dominio: '', coberturaMantenimiento: 'por_valorar', infraestructura: 'sin_localizar' })
@@ -849,7 +904,7 @@ function PanelNuevo({ clientes, miembros, user, onCerrar, onCreado, onClienteNue
   }
 
   return (
-    <Panel titulo="Nuevo ticket" subtitulo="Registra el problema; la infraestructura puede localizarse después." onCerrar={onCerrar} cambiosPendientes={hayCambios && !guardando} footer={<button form="nuevo-ticket" type="submit" disabled={guardando || !form.clienteId || !form.titulo.trim()} className="w-full h-11 md:h-10 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 rounded-lg text-sm font-semibold transition-colors">{guardando ? 'Creando ticket...' : 'Crear ticket'}</button>}>
+    <Panel titulo="Nuevo ticket" subtitulo={prellenado ? `Ticket desde el correo de ${prellenado.de}` : 'Registra el problema; la infraestructura puede localizarse después.'} onCerrar={onCerrar} cambiosPendientes={hayCambios && !guardando} footer={<button form="nuevo-ticket" type="submit" disabled={guardando || !form.clienteId || !form.titulo.trim()} className="w-full h-11 md:h-10 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 rounded-lg text-sm font-semibold transition-colors">{guardando ? 'Creando ticket...' : 'Crear ticket'}</button>}>
       <form id="nuevo-ticket" onSubmit={guardar} className="space-y-5">
         {error && <MensajeError>{error}</MensajeError>}
 

@@ -53,6 +53,10 @@ export const getIncidencias = () => req('GET', '/api/incidencias')
 export const crearIncidencia = (data) => req('POST', '/api/incidencias', data)
 export const actualizarIncidencia = (id, data) => req('PUT', `/api/incidencias/${id}`, data)
 export const actualizarIncidenciasMasivo = (data) => req('POST', '/api/incidencias/masivo', data)
+// Correos de soporte sin cliente identificado (bandeja de la mesa).
+export const getCorreosPendientes = () => req('GET', '/api/integraciones/correo/pendientes')
+export const asignarCorreo = (id, data) => req('POST', `/api/integraciones/correo/${id}/asignar`, data)
+export const descartarCorreo = (id) => req('POST', `/api/integraciones/correo/${id}/descartar`)
 export const getClientes = () => req('GET', '/api/clientes')
 export const getCliente = (id) => req('GET', `/api/clientes/${id}`)
 // El CRM es la fuente obligatoria de clientes: buscar en el CRM,
