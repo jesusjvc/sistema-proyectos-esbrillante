@@ -455,10 +455,11 @@ function buildServer(usuario) {
           dominio: z.string().nullable().optional().describe('Dominio del proyecto (ej. midominio.com)'),
           grupoWhatsapp: z.string().nullable().optional().describe('Grupo de WhatsApp único (forma legado — usa grupos si hay varios)'),
           grupos: z.array(z.object({
-            nombre: z.string().describe('Nombre exacto del grupo en WhatsApp'),
+            nombre: z.string().describe('Nombre exacto del grupo en WhatsApp o del espacio en Google Chat'),
             etiqueta: z.string().optional().describe('Etiqueta corta del enfoque (ej. "Diseños", "Prototipos", "Copywriting")'),
             nota: z.string().optional().describe('Nota del enfoque de ese grupo'),
-          })).optional().describe('Grupos de WhatsApp del proyecto — un proyecto puede tener varios (trabajo en paralelo). Reemplaza la lista completa; el primer grupo queda como principal.'),
+            canal: z.enum(['whatsapp', 'google-chat']).optional().describe('Canal del grupo: whatsapp (default, lo sincroniza el puente OpenWA) o google-chat (espacio de Google Chat, lo sincroniza el server)'),
+          })).optional().describe('Grupos de WhatsApp / espacios de Google Chat del proyecto — un proyecto puede tener varios (trabajo en paralelo). Reemplaza la lista completa; el primer grupo queda como principal.'),
           extras: z.array(z.object({ etiqueta: z.string(), valor: z.string() })).optional().describe('Datos libres adicionales (ej. "Redes sociales del cliente", "Hosting")'),
         }).optional().describe('Información clave del proyecto — reemplaza el objeto completo'),
         driveFolderId: z.string().nullable().optional().describe('ID de la carpeta de Drive del proyecto (no la URL completa). Pasa "" o null para quitar la asociación actual. No crea la carpeta — solo la vincula; para crear una automáticamente, omite este campo al usar crear_proyecto.'),
@@ -494,6 +495,7 @@ function buildServer(usuario) {
                   nombre: String(g.nombre).trim().slice(0, 200),
                   etiqueta: String(g.etiqueta || '').trim().slice(0, 80),
                   nota: String(g.nota || '').trim().slice(0, 500),
+                  canal: g.canal === 'google-chat' ? 'google-chat' : 'whatsapp',
                 })),
                 grupoWhatsapp: infoClave.grupoWhatsapp ?? infoClave.grupos[0]?.nombre ?? null,
               }
