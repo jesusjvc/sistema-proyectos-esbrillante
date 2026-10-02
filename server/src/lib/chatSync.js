@@ -43,8 +43,13 @@ export async function sincronizarGoogleChat() {
         where: { proyectoId: destino.proyecto.id, grupo: destino.grupo },
         orderBy: { fechaMensaje: 'desc' },
       })
-      const desde = ultimo ? new Date(new Date(ultimo.fechaMensaje).getTime() + 1000).toISOString() : undefined
-      const mensajes = await chatMensajes(destino.espacioId, { desde })
+      // Piso de la ventana: lo último guardado o, en la primera sincronización,
+      // la retención (la API devuelve los mensajes MÁS VIEJOS primero — sin
+      // piso, la primera vuelta traería historia de años atrás).
+      const piso = ultimo
+        ? new Date(new Date(ultimo.fechaMensaje).getTime() + 1000)
+        : new Date(Date.now() - (DIAS_RETENCION + 1) * 24 * 3600_000)
+      const mensajes = await chatMensajes(destino.espacioId, { desde: piso.toISOString() })
       const miembros = await chatMiembros(destino.espacioId)
 
       const filas = mensajes
