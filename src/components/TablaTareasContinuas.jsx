@@ -529,7 +529,7 @@ function leerOrdenGuardado() {
   return { orden: 'flujo', direccion: 'asc' }
 }
 
-export default function TablaTareasContinuas({ tareas, usuario, onMover, onActualizar, onAccionMasiva, onEditar, onEliminar, onComentar, onAsignar, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
+export default function TablaTareasContinuas({ tareas, usuario, revelarCompletadas = false, onMover, onActualizar, onAccionMasiva, onEditar, onEliminar, onComentar, onAsignar, avatares = {}, equipo, miembrosPorId = {}, miembros = [] }) {
   const [detalle, setDetalle] = useState(null)
   const [actualizando, setActualizando] = useState(null)
   const [procesandoMasivo, setProcesandoMasivo] = useState(false)
@@ -539,10 +539,11 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
   const [ordenLocal, setOrdenLocal] = useState(() => listaFlujo(tareas))
   const [seleccionadas, setSeleccionadas] = useState([])
   // Las completadas se ocultan por defecto (igual que en proyectos finitos);
-  // el toggle de la barra superior las trae de vuelta.
+  // el toggle de la barra superior las trae de vuelta — y una búsqueda activa
+  // las revela (revelarCompletadas) para que encontrar no dependa del filtro.
   const [mostrarCompletadas, setMostrarCompletadas] = useState(false)
   const completadasCount = ordenLocal.filter((tarea) => tarea.estado === 'completada').length
-  const baseVisibles = mostrarCompletadas ? ordenLocal : ordenLocal.filter((tarea) => tarea.estado !== 'completada')
+  const baseVisibles = mostrarCompletadas || revelarCompletadas ? ordenLocal : ordenLocal.filter((tarea) => tarea.estado !== 'completada')
   const estadoOrden = Object.fromEntries(KANBAN_COLUMNAS.map((columna, index) => [columna.estado, index]))
   const visibles = [...baseVisibles].sort((a, b) => {
     if (orden === 'flujo') return 0
@@ -690,7 +691,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
   if (!visibles.length) {
     return (
       <div className="bg-white dark:bg-ink-800 border border-slate-200 dark:border-ink-500 rounded-xl p-10 text-center text-sm text-slate-500 dark:text-ink-300">
-        {completadasCount ? (
+        {revelarCompletadas ? 'Sin resultados para la búsqueda.' : completadasCount ? (
           <>
             Todas las tareas están completadas —{' '}
             <button onClick={() => setMostrarCompletadas(true)} className="font-medium text-brand-800 hover:underline dark:text-brand-300">
@@ -725,7 +726,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
 
       <ContextoOrdenable items={visibles.map((tarea) => tarea.id)} disabled={!permiteOrdenar} onDragEnd={reordenar}>
         <div className="hidden max-h-[60vh] overflow-auto rounded-xl border border-slate-200 bg-white dark:border-ink-500 dark:bg-ink-800 md:block">
-          <table className="w-full min-w-[800px] border-collapse text-sm">
+          <table className="w-full min-w-[880px] border-collapse text-sm">
             <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500 dark:border-ink-500 dark:bg-ink-900 dark:text-ink-300">
               <tr>
                 <th className="w-20 py-3 pl-3"><CheckboxSeleccion checked={todasSeleccionadas} indeterminate={seleccionParcial} onChange={alternarTodas} disabled={!seleccionables.length} label="Seleccionar todas las tareas disponibles" /></th>
@@ -734,7 +735,7 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
                 <Encabezado campo="responsable" orden={orden} direccion={direccion} onOrdenar={ordenarPor} className="w-36 text-left">Responsable</Encabezado>
                 <Encabezado campo="prioridad" orden={orden} direccion={direccion} onOrdenar={ordenarPor} className="w-28 text-left">Prioridad</Encabezado>
                 <Encabezado campo="fecha" orden={orden} direccion={direccion} onOrdenar={ordenarPor} className="w-28 text-left">Fecha límite</Encabezado>
-                <Encabezado campo="actividad" orden={orden} direccion={direccion} onOrdenar={ordenarPor} className="w-16 text-center">Actividad</Encabezado>
+                <Encabezado campo="actividad" orden={orden} direccion={direccion} onOrdenar={ordenarPor} className="w-24 text-right">Actividad</Encabezado>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-ink-500">
@@ -750,11 +751,16 @@ export default function TablaTareasContinuas({ tareas, usuario, onMover, onActua
                         </button>
                         {tarea.custom && <span className="mt-0.5 block text-xs text-slate-400 dark:text-ink-400">Personalizada</span>}
                       </td>
-                      <td className="px-3 py-3"><div className="flex items-center justify-end gap-1"><BotonCompletar tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /><EstadoSelect tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></div></td>
-                      <td className="px-3 py-3"><Responsable tarea={tarea} equipo={equipo} miembrosPorId={miembrosPorId} miembros={miembros} avatares={avatares} onAsignar={onAsignar} disabled={!puedeOperar(tarea)} /></td>
-                      <td className="px-3 py-3"><PrioridadRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
-                      <td className="px-3 py-3"><FechaRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
-                      <td className="px-3 py-3 text-center text-xs text-slate-500 dark:text-ink-300"><span className="inline-flex items-center gap-1"><MessageCircle size={14} /> {tarea.comentarios?.length || 0}</span></td>
+                      <td className="px-3 py-3 whitespace-nowrap"><EstadoSelect tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
+                      <td className="px-3 py-3 whitespace-nowrap"><Responsable tarea={tarea} equipo={equipo} miembrosPorId={miembrosPorId} miembros={miembros} avatares={avatares} onAsignar={onAsignar} disabled={!puedeOperar(tarea)} /></td>
+                      <td className="px-3 py-3 whitespace-nowrap"><PrioridadRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
+                      <td className="px-3 py-3 whitespace-nowrap"><FechaRapida tarea={tarea} onActualizar={actualizar} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} /></td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-ink-300"><MessageCircle size={14} /> {tarea.comentarios?.length || 0}</span>
+                            <BotonCompletar tarea={tarea} onMover={mover} disabled={!puedeOperar(tarea) || actualizando === tarea.id || procesandoMasivo} />
+                          </div>
+                        </td>
                     </tr>
                   )}
                 </ElementoOrdenable>

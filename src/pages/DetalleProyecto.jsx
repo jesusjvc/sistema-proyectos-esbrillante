@@ -345,6 +345,28 @@ export default function DetalleProyecto() {
     return (aCompleta ? 1 : 0) - (bCompleta ? 1 : 0)
   })
   const qBuscarTarea = normalizarTexto(buscarTarea)
+  // Buscador compartido entre finitos y continuos — el mismo input y el mismo
+  // criterio (título, sin acentos). En continuos además revela completadas.
+  const tareasContinuas = qBuscarTarea
+    ? proyecto.tareas.filter((t) => normalizarTexto(t.titulo).includes(qBuscarTarea))
+    : proyecto.tareas
+  const buscadorTareas = (
+    <div className="relative max-w-sm flex-1 min-w-[10rem]">
+      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-ink-400" />
+      <input
+        type="text"
+        value={buscarTarea}
+        onChange={(e) => setBuscarTarea(e.target.value)}
+        placeholder="Buscar una tarea (incluye completadas)..."
+        className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 dark:border-ink-500 rounded-lg bg-white dark:bg-ink-800 text-slate-800 dark:text-ink-100 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-ink-400"
+      />
+      {buscarTarea && (
+        <button onClick={() => setBuscarTarea('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-200">
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  )
   const columnasCount = esContinuo ? contarPorColumna(proyecto) : null
   const totalSinOmitir = proyecto.tareas.filter((t) => t.estado !== 'omitida').length
   const avancePorcentajeContinuo = esContinuo && totalSinOmitir
@@ -702,6 +724,7 @@ export default function DetalleProyecto() {
                 <Columns3 size={15} /> Kanban
               </button>
             </div>
+            {buscadorTareas}
             <button
               onClick={() => setModalNueva('todo')}
               className="flex min-h-11 md:min-h-10 items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-slate-900 text-sm font-semibold px-3.5 py-2 rounded-lg transition-colors"
@@ -711,7 +734,8 @@ export default function DetalleProyecto() {
           </div>
           {vistaContinuo === 'tabla' ? (
             <TablaTareasContinuas
-              tareas={proyecto.tareas}
+              tareas={tareasContinuas}
+              revelarCompletadas={!!qBuscarTarea}
               usuario={user}
               avatares={avatares}
               equipo={proyecto.equipo}
@@ -727,7 +751,7 @@ export default function DetalleProyecto() {
             />
           ) : (
             <KanbanBoard
-              tareas={proyecto.tareas}
+              tareas={tareasContinuas}
               avatares={avatares}
               equipo={proyecto.equipo}
               miembrosPorId={miembrosPorId}
@@ -744,21 +768,7 @@ export default function DetalleProyecto() {
 
       {tab === 'tareas' && !esContinuo && (
         <div className="space-y-3">
-          <div className="relative max-w-sm">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-ink-400" />
-            <input
-              type="text"
-              value={buscarTarea}
-              onChange={(e) => setBuscarTarea(e.target.value)}
-              placeholder="Buscar una tarea (incluye completadas)..."
-              className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 dark:border-ink-500 rounded-lg bg-white dark:bg-ink-800 text-slate-800 dark:text-ink-100 outline-none focus:ring-2 focus:ring-brand-400 dark:focus:ring-brand-500/40 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-ink-400"
-            />
-            {buscarTarea && (
-              <button onClick={() => setBuscarTarea('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-ink-400 hover:text-slate-600 dark:hover:text-ink-200">
-                <X size={14} />
-              </button>
-            )}
-          </div>
+          {buscadorTareas}
           {tareasPorFaseOrdenado.map((fase, i) => {
             const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
             const total = fase.tareas.length
