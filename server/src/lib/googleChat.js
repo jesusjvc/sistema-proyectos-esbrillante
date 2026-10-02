@@ -77,7 +77,7 @@ export async function chatEspacios() {
 }
 
 export async function chatMensajes(spaceId, { desde } = {}) {
-  const params = new URLSearchParams({ pageSize: '200', inlineMedia: 'false' })
+  const params = new URLSearchParams({ pageSize: '200' })
   if (desde) params.set('filter', `createTime > "${desde}"`)
   // spaceId ya es el nombre completo del recurso ('spaces/XXX') — no lleva
   // prefijo adicional (el /spaces/ duplicado daba 404).
