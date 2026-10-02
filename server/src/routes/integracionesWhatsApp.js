@@ -23,10 +23,15 @@ function gruposDe(proyecto) {
   const ic = proyecto.proyecto?.infoClave || {}
   const propios = (ic.grupos || [])
     .filter((g) => g && typeof g.nombre === 'string' && g.nombre.trim())
-    .map((g) => ({ nombre: g.nombre.trim(), etiqueta: (g.etiqueta || '').trim(), nota: (g.nota || '').trim() }))
+    .map((g) => ({
+      nombre: g.nombre.trim(),
+      etiqueta: (g.etiqueta || '').trim(),
+      nota: (g.nota || '').trim(),
+      canal: g.canal === 'google-chat' ? 'google-chat' : 'whatsapp',
+    }))
   if (propios.length) return propios
   const legado = typeof ic.grupoWhatsapp === 'string' ? ic.grupoWhatsapp.trim() : ''
-  return legado ? [{ nombre: legado, etiqueta: '', nota: '' }] : []
+  return legado ? [{ nombre: legado, etiqueta: '', nota: '', canal: 'whatsapp' }] : []
 }
 
 // GET /api/integraciones/whatsapp/grupos — qué grupos rastrear (el puente
@@ -35,14 +40,16 @@ router.get('/grupos', requireAuthOrApiKey, async (req, res) => {
   try {
     const proyectos = await prisma.proyecto.findMany({ where: { status: 'activo' } })
     const grupos = proyectos.flatMap((p) =>
-      gruposDe(p).map((g) => ({
-        proyectoId: p.id,
-        slug: p.slug,
-        cliente: p.cliente?.nombreComercial || p.slug,
-        grupo: g.nombre,
-        ...(g.etiqueta ? { etiqueta: g.etiqueta } : {}),
-        ...(g.nota ? { nota: g.nota } : {}),
-      })),
+      gruposDe(p)
+        .filter((g) => g.canal === 'whatsapp')
+        .map((g) => ({
+          proyectoId: p.id,
+          slug: p.slug,
+          cliente: p.cliente?.nombreComercial || p.slug,
+          grupo: g.nombre,
+          ...(g.etiqueta ? { etiqueta: g.etiqueta } : {}),
+          ...(g.nota ? { nota: g.nota } : {}),
+        })),
     )
     res.json(grupos)
   } catch (err) {
@@ -116,4 +123,5 @@ router.post('/mensajes', requireAuthOrApiKey, async (req, res) => {
   }
 })
 
+export { gruposDe }
 export default router

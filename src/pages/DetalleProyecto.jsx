@@ -1929,6 +1929,7 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
           nombre: g.nombre.trim(),
           etiqueta: g.etiqueta.trim(),
           nota: g.nota.trim(),
+          canal: g.canal || 'whatsapp',
         })),
       extras: (form.extras || []).filter((e) => e.etiqueta.trim() && e.valor.trim()),
     })
@@ -1941,18 +1942,22 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
         <input value={form.dominio || ''} onChange={(e) => setForm({ ...form, dominio: e.target.value })} placeholder="Dominio (midominio.com)" className={inputCls} />
 
       <div>
-        <p className="text-xs font-medium text-slate-500 dark:text-ink-300 mb-1">Grupos de WhatsApp (nombre exacto + etiqueta del enfoque)</p>
+        <p className="text-xs font-medium text-slate-500 dark:text-ink-300 mb-1">Grupos de WhatsApp / espacios de Google Chat (nombre exacto + etiqueta del enfoque)</p>
         <div className="space-y-1.5">
           {(form.grupos || []).map((g, i) => (
             <div key={i} className="flex gap-1.5">
-              <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre del grupo en WhatsApp" className={inputCls + ' flex-1 min-w-0'} />
+              <select value={g.canal || 'whatsapp'} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, canal: e.target.value } : x) })} className={inputCls + ' w-32 shrink-0'} title="Canal del grupo">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="google-chat">Google Chat</option>
+              </select>
+              <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre exacto del grupo/espacio" className={inputCls + ' flex-1 min-w-0'} />
               <input value={g.etiqueta} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Diseños)" className={inputCls + ' w-28 shrink-0'} />
               <input value={g.nota} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nota: e.target.value } : x) })} placeholder="Nota del enfoque (opcional)" className={inputCls + ' w-44 shrink-0'} />
               <button onClick={() => setForm({ ...form, grupos: form.grupos.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
             </div>
           ))}
           <button
-            onClick={() => setForm({ ...form, grupos: [...(form.grupos || []), { nombre: '', etiqueta: '', nota: '' }] })}
+            onClick={() => setForm({ ...form, grupos: [...(form.grupos || []), { nombre: '', etiqueta: '', nota: '', canal: 'whatsapp' }] })}
             className="text-xs text-brand-700 dark:text-brand-400 hover:underline"
           >
             + Agregar grupo
@@ -1992,9 +1997,9 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
             </div>
           )}
           {gruposDeInfoClave(infoClave).map((g) => (
-            <div key={g.nombre} className="flex items-center gap-2 text-sm">
+            <div key={g.nombre + (g.canal || '')} className="flex items-center gap-2 text-sm">
               <dt className="text-slate-400 dark:text-ink-400 w-36 shrink-0 truncate">
-                Grupo WhatsApp{g.etiqueta ? ` — ${g.etiqueta}` : ''}
+                {g.canal === 'google-chat' ? 'Chat — ' : 'Grupo WhatsApp'}{g.etiqueta ? ` — ${g.etiqueta}` : ''}
               </dt>
               <dd className="font-medium text-slate-800 dark:text-ink-100 truncate" title={g.nota || undefined}>
                 <ValorConEnlace valor={g.nombre} />
@@ -2024,7 +2029,7 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
 function gruposDeInfoClave(infoClave) {
   // Grupos en su forma nueva (grupos[]) con caída al string legado.
   if (infoClave?.grupos?.length) return infoClave.grupos
-  if (infoClave?.grupoWhatsapp) return [{ nombre: infoClave.grupoWhatsapp, etiqueta: '', nota: '' }]
+  if (infoClave?.grupoWhatsapp) return [{ nombre: infoClave.grupoWhatsapp, etiqueta: '', nota: '', canal: 'whatsapp' }]
   return []
 }
 
@@ -2033,7 +2038,7 @@ function InfoClaveCompacta({ infoClave }) {
   const items = [
     infoClave.dominio && { etiqueta: 'Dominio', valor: infoClave.dominio },
     ...gruposDeInfoClave(infoClave).map((g) => ({
-      etiqueta: `WA · ${g.etiqueta || 'Grupo'}`,
+      etiqueta: `${g.canal === 'google-chat' ? 'GC' : 'WA'} · ${g.etiqueta || 'Grupo'}`,
       valor: g.nombre,
       titulo: [g.nombre, g.nota].filter(Boolean).join(' — '),
     })),

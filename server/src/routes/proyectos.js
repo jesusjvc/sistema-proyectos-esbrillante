@@ -433,6 +433,7 @@ router.put('/:slug/info-clave', requireAuth, async (req, res) => {
           nombre: g.nombre.trim().slice(0, 200),
           etiqueta: (g.etiqueta || '').trim().slice(0, 80),
           nota: (g.nota || '').trim().slice(0, 500),
+          canal: g.canal === 'google-chat' ? 'google-chat' : 'whatsapp',
         }))
         .filter((g) => g.nombre)
         .slice(0, 10)

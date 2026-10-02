@@ -76,3 +76,11 @@ revisarRecordatoriosVencidos().catch((err) => console.error('Error revisando rec
 setInterval(() => {
   revisarRecordatoriosVencidos().catch((err) => console.error('Error revisando recordatorios:', err))
 }, 60 * 60 * 1000)
+
+// Google Chat: sincroniza cada hora los mensajes nuevos de los espacios
+// registrados en la Info clave de proyectos activos (canal 'google-chat').
+// Idempotente (cursor por createTime en la BD) y no tumba el server si falla.
+sincronizarGoogleChat().catch((err) => console.error('Error sincronizando Google Chat:', err))
+setInterval(() => {
+  sincronizarGoogleChat().catch((err) => console.error('Error sincronizando Google Chat:', err))
+}, 60 * 60 * 1000)
