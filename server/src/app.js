@@ -20,6 +20,7 @@ import wellKnownRouter from './routes/wellKnown.js'
 import prototiposRouter from './routes/prototipos.js'
 import plantillasRouter from './routes/plantillas.js'
 import { revisarRecordatoriosVencidos } from './lib/recordatorios.js'
+import { sincronizarGoogleChat } from './lib/chatSync.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
