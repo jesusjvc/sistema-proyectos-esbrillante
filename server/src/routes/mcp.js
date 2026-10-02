@@ -16,6 +16,7 @@ import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, listarArchivosCarpeta, driveConfigurado } from '../lib/drive.js'
 import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
+import { chatEspacios, chatEnviar } from '../lib/googleChat.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea } from '../lib/tareaHelpers.js'
@@ -783,6 +784,44 @@ function buildServer(usuario) {
           mensajes: [...mensajes].sort((a, b) => (a.grupo === b.grupo ? new Date(a.fecha) - new Date(b.fecha) : a.grupo.localeCompare(b.grupo))),
         })),
       }, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'enviar_chat',
+    {
+      title: 'Enviar mensaje al espacio de Google Chat',
+      description: 'Envía un mensaje al espacio de Google Chat registrado en la Info clave del proyecto (canal google-chat), como el usuario del Workspace configurado — aparece como enviado por esa cuenta. Útil para coordinar con el equipo (pedir fechas de entrega, avisar avances, solicitar información): el mensaje llega al espacio donde ya conversa el equipo, no es un correo. Si el proyecto no tiene espacio de Google Chat registrado, falla diciéndolo.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        texto: z.string().describe('Mensaje a enviar (texto plano, máx. 4000 caracteres)'),
+      },
+    },
+    async ({ slug, texto }) => {
+      const limpio = String(texto || '').trim()
+      if (!limpio) return fail('El mensaje no puede estar vacío.')
+
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const gruposChat = (p.proyecto?.infoClave?.grupos || []).filter((g) => g && g.canal === 'google-chat' && g.nombre)
+      if (!gruposChat.length) {
+        return fail(`El proyecto "${slug}" no tiene espacios de Google Chat en su Info clave — agrégalo con editar_proyecto (grupos[] con canal "google-chat").`)
+      }
+
+      const espacios = await chatEspacios()
+      const destino = gruposChat
+        .map((g) => ({ g, espacio: espacios.find((e) => (e.nombre || '').trim().toLowerCase() === g.nombre.trim().toLowerCase()) }))
+        .find((x) => x.espacio)
+      if (!destino) {
+        return fail(`El espacio "${gruposChat[0].nombre}" no aparece entre los espacios accesibles — revisa el nombre en la Info clave.`)
+      }
+
+      const enviado = await chatEnviar(destino.espacio.id, limpio)
+      await logEntry(p.id, usuario.nombre, 'Mensaje enviado a Google Chat', `${destino.g.nombre}: ${limpio.slice(0, 80)}`)
+      emitirCambio(p.id)
+
+      return ok(`Mensaje enviado al espacio "${destino.g.nombre}" (${p.cliente?.nombreComercial || slug}).`)
     },
   )
 

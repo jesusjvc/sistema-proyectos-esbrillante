@@ -101,4 +101,40 @@ export async function chatMiembros(spaceId) {
   return mapa
 }
 
+// ── Envío como usuario del Workspace (mismo mecanismo de delegación).
+//
+// Requiere además el scope de ESCRITURA en la delegación de dominio:
+//   https://www.googleapis.com/auth/chat.messages
+// Usa un JWT aparte del de lectura: si ese scope aún no está autorizado,
+// el envío falla solo él — la sincronización de lectura sigue funcionando.
+
+const CHAT_SCOPE_ESCRITURA = 'https://www.googleapis.com/auth/chat.messages'
+let chatSendClient = null
+async function chatSendToken() {
+  if (!chatSendClient) {
+    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
+    chatSendClient = new JWT({
+      email: credentials.client_email,
+      key: credentials.private_key,
+      scopes: [CHAT_SCOPE_ESCRITURA],
+      subject: process.env.GOOGLE_CHAT_IMPERSONATE_USER,
+    })
+  }
+  const { token } = await chatSendClient.getAccessToken()
+  return token
+}
+
+// Envía un mensaje a un espacio (spaceId = nombre completo 'spaces/XXX').
+// Los mensajes aparecen como enviados por GOOGLE_CHAT_IMPERSONATE_USER.
+export async function chatEnviar(espacioId, texto) {
+  const token = await chatSendToken()
+  const res = await fetch(`${CHAT_API}/${espacioId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: String(texto).slice(0, 4000) }),
+  })
+  if (!res.ok) throw new Error(`Chat API ${res.status} al enviar: ${(await res.text()).slice(0, 200)}`)
+  return res.json()
+}
+
 export { googleChatConfigurado, enviarGoogleChat, chatDwdConfigurado }
