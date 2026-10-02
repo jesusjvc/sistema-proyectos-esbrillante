@@ -77,9 +77,11 @@ export async function chatEspacios() {
 }
 
 export async function chatMensajes(spaceId, { desde } = {}) {
-  const params = new URLSearchParams({ pageSize: '200', orderBy: `createTime ASC`, inlineMedia: 'false' })
+  const params = new URLSearchParams({ pageSize: '200', inlineMedia: 'false' })
   if (desde) params.set('filter', `createTime > "${desde}"`)
-  const data = await chatGet(`/spaces/${spaceId}/messages?${params}`)
+  // spaceId ya es el nombre completo del recurso ('spaces/XXX') — no lleva
+  // prefijo adicional (el /spaces/ duplicado daba 404).
+  const data = await chatGet(`/${spaceId}/messages?${params}`)
   return (data.messages || []).map((m) => ({
     id: m.name,
     // Id crudo del autor ('users/xxx') — el que sincroniza lo resuelve a
@@ -91,7 +93,7 @@ export async function chatMensajes(spaceId, { desde } = {}) {
 }
 
 export async function chatMiembros(spaceId) {
-  const data = await chatGet(`/spaces/${spaceId}/members?pageSize=100`)
+  const data = await chatGet(`/${spaceId}/members?pageSize=100`)
   const mapa = {}
   for (const m of data.memberships || []) {
     if (m.member?.name && m.member?.displayName) mapa[m.member.name] = m.member.displayName
