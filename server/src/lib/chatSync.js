@@ -50,7 +50,11 @@ export async function sincronizarGoogleChat() {
         ? new Date(new Date(ultimo.fechaMensaje).getTime() + 1000)
         : new Date(Date.now() - (DIAS_RETENCION + 1) * 24 * 3600_000)
       const mensajes = await chatMensajes(destino.espacioId, { desde: piso.toISOString() })
-      const miembros = await chatMiembros(destino.espacioId)
+      // Miembros como mejor esfuerzo: requieren un scope aparte
+      // (chat.members.readonly) que la delegación puede no incluir — sin él,
+      // los autores caen al displayName del mensaje o al id crudo, pero los
+      // mensajes sí se sincronizan.
+      const miembros = await chatMiembros(destino.espacioId).catch(() => ({}))
 
       const filas = mensajes
         .filter((m) => m.texto && new Date(m.fecha) > (ultimo ? new Date(ultimo.fechaMensaje) : new Date(0)))

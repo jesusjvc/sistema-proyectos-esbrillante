@@ -84,9 +84,9 @@ export async function chatMensajes(spaceId, { desde } = {}) {
   const data = await chatGet(`/${spaceId}/messages?${params}`)
   return (data.messages || []).map((m) => ({
     id: m.name,
-    // Id crudo del autor ('users/xxx') — el que sincroniza lo resuelve a
-    // nombre con los miembros del espacio.
-    autor: m.sender?.name || m.author || 'Desconocido',
+    // displayName viene en el propio mensaje cuando Google lo expone; el id
+    // crudo ('users/xxx') lo resuelve el sync con los miembros del espacio.
+    autor: m.sender?.displayName || m.sender?.name || m.author || 'Desconocido',
     texto: (m.argumentText || m.text || '').trim(),
     fecha: m.createTime,
   })).filter((m) => m.texto)
