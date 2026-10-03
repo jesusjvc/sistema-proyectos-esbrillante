@@ -38,3 +38,6 @@ docs/desing.pen
 
 # Estado del puente de WhatsApp (runtime)
 whatsapp-bridge/estado.json
+
+# Cache local de gentle-ai (skill-registry) — específico de cada máquina/usuario
+.atl/
