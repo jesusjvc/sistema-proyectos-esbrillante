@@ -1947,15 +1947,17 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
         <div className="space-y-2">
           {(form.grupos || []).map((g, i) => (
             <div key={i} className="space-y-1.5 rounded-lg border border-slate-200 dark:border-ink-500 p-2">
-              <div className="flex gap-1.5">
-                <select value={g.canal || 'whatsapp'} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, canal: e.target.value } : x) })} className={inputCls + ' w-36 shrink-0'} title="Canal del grupo">
+              <div className="flex flex-col sm:flex-row gap-1.5">
+                <select value={g.canal || 'whatsapp'} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, canal: e.target.value } : x) })} className={inputCls + ' sm:w-36 sm:shrink-0'} title="Canal del grupo">
                   <option value="whatsapp">WhatsApp</option>
                   <option value="google-chat">Google Chat</option>
                 </select>
-                <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre exacto del grupo/espacio" className={inputCls + ' flex-1 min-w-0'} />
-                <button onClick={() => setForm({ ...form, grupos: form.grupos.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+                <div className="flex gap-1.5">
+                  <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre exacto del grupo/espacio" className={inputCls + ' flex-1 min-w-0'} />
+                  <button onClick={() => setForm({ ...form, grupos: form.grupos.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+                </div>
               </div>
-              <div className="flex gap-1.5">
+              <div className="flex flex-col sm:flex-row gap-1.5">
                 <input value={g.etiqueta} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Diseños)" className={inputCls + ' flex-1 min-w-0'} />
                 <input value={g.nota} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nota: e.target.value } : x) })} placeholder="Nota del enfoque (opcional)" className={inputCls + ' flex-1 min-w-0'} />
               </div>
@@ -1970,10 +1972,10 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
         </div>
       </div>
         {(form.extras || []).map((extra, i) => (
-          <div key={i} className="flex gap-2">
-            <input value={extra.etiqueta} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Hosting)" className={inputCls + ' w-40 shrink-0'} />
-            <input value={extra.valor} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, valor: e.target.value } : x) })} placeholder="Valor" className={inputCls} />
-            <button onClick={() => setForm({ ...form, extras: form.extras.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+          <div key={i} className="flex flex-col sm:flex-row gap-2">
+            <input value={extra.etiqueta} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Hosting)" className={inputCls + ' sm:w-40 sm:shrink-0'} />
+            <input value={extra.valor} onChange={(e) => setForm({ ...form, extras: form.extras.map((x, j) => j === i ? { ...x, valor: e.target.value } : x) })} placeholder="Valor" className={inputCls + ' flex-1 min-w-0'} />
+            <button onClick={() => setForm({ ...form, extras: form.extras.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0 self-end pb-2 sm:self-auto"><X size={14} /></button>
           </div>
         ))}
         <button
