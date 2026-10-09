@@ -1914,6 +1914,7 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
         nombre: g.nombre || '',
         etiqueta: g.etiqueta || '',
         nota: g.nota || '',
+        canal: g.canal || 'whatsapp',
       })),
       extras: (infoClave.extras || []).map((e) => ({ ...e })),
     })
@@ -1943,17 +1944,21 @@ function InfoClaveEditor({ infoClave, onGuardar }) {
 
       <div>
         <p className="text-xs font-medium text-slate-500 dark:text-ink-300 mb-1">Grupos de WhatsApp / espacios de Google Chat (nombre exacto + etiqueta del enfoque)</p>
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {(form.grupos || []).map((g, i) => (
-            <div key={i} className="flex gap-1.5">
-              <select value={g.canal || 'whatsapp'} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, canal: e.target.value } : x) })} className={inputCls + ' w-32 shrink-0'} title="Canal del grupo">
-                <option value="whatsapp">WhatsApp</option>
-                <option value="google-chat">Google Chat</option>
-              </select>
-              <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre exacto del grupo/espacio" className={inputCls + ' flex-1 min-w-0'} />
-              <input value={g.etiqueta} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Diseños)" className={inputCls + ' w-28 shrink-0'} />
-              <input value={g.nota} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nota: e.target.value } : x) })} placeholder="Nota del enfoque (opcional)" className={inputCls + ' w-44 shrink-0'} />
-              <button onClick={() => setForm({ ...form, grupos: form.grupos.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+            <div key={i} className="space-y-1.5 rounded-lg border border-slate-200 dark:border-ink-500 p-2">
+              <div className="flex gap-1.5">
+                <select value={g.canal || 'whatsapp'} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, canal: e.target.value } : x) })} className={inputCls + ' w-36 shrink-0'} title="Canal del grupo">
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="google-chat">Google Chat</option>
+                </select>
+                <input value={g.nombre} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} placeholder="Nombre exacto del grupo/espacio" className={inputCls + ' flex-1 min-w-0'} />
+                <button onClick={() => setForm({ ...form, grupos: form.grupos.filter((_, j) => j !== i) })} className="text-slate-400 hover:text-red-500 px-1 shrink-0"><X size={14} /></button>
+              </div>
+              <div className="flex gap-1.5">
+                <input value={g.etiqueta} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, etiqueta: e.target.value } : x) })} placeholder="Etiqueta (ej. Diseños)" className={inputCls + ' flex-1 min-w-0'} />
+                <input value={g.nota} onChange={(e) => setForm({ ...form, grupos: form.grupos.map((x, j) => j === i ? { ...x, nota: e.target.value } : x) })} placeholder="Nota del enfoque (opcional)" className={inputCls + ' flex-1 min-w-0'} />
+              </div>
             </div>
           ))}
           <button
