@@ -19,7 +19,7 @@ import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
 import { chatEspacios, chatEnviar } from '../lib/googleChat.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
-import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea } from '../lib/tareaHelpers.js'
+import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea, asegurarResponsableValido } from '../lib/tareaHelpers.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { dominioDesde } from '../lib/clientesCrm.js'
 import { resolverClienteTicket } from '../lib/resolverCliente.js'
@@ -113,6 +113,38 @@ function validarDependencias(p, dependeDeTareaIds, tareaId = null) {
     return `No se encontraron estas tareas en el proyecto "${p.slug}": ${invalidos.join(', ')}.`
   }
   return null
+}
+
+// Sentinels fijos de `responsable` que no son una persona concreta — distintos de los roles por
+// proyecto (copy/disenador/programador/redes), que ya no se asignan desde MCP: ahora toda
+// asignación a una persona se hace por nombre y se resuelve a su userId.
+const RESPONSABLES_FIJOS = ['equipo', 'karla', 'admin']
+
+// Resuelve el `responsable` que llega de un tool MCP: puede ser uno de los sentinels fijos
+// ("equipo"/"karla"/"admin") o el nombre de un compañero activo del equipo (coincidencia parcial,
+// igual que "mencionar" en comentar_actividad) — se resuelve a su userId antes de guardar, así el
+// resto del código (asegurarResponsableValido, tareaLeCorresponde, destinatariosDeTarea) sigue
+// tratándolo como una asignación directa a una persona sin saber nada de nombres.
+async function resolverResponsable(responsable) {
+  if (responsable === undefined) return { value: undefined }
+  const normalizado = responsable.trim().toLowerCase()
+  if (!normalizado) {
+    return { error: 'El responsable no puede quedar en blanco. Usa "equipo" para dejarla sin asignar en particular, o el nombre de un compañero.' }
+  }
+  if (RESPONSABLES_FIJOS.includes(normalizado)) return { value: normalizado }
+
+  const activos = await prisma.user.findMany({ where: { activo: true }, select: { id: true, nombre: true } })
+  const exacto = activos.find((u) => (u.nombre || '').trim().toLowerCase() === normalizado)
+  if (exacto) return { value: exacto.id }
+
+  const coincidencias = activos.filter((u) => (u.nombre || '').toLowerCase().includes(normalizado))
+  if (coincidencias.length === 0) {
+    return { error: `No encontré a ningún compañero activo con el nombre "${responsable}". Usa "equipo" para dejarla sin asignar en particular, o revisa el nombre.` }
+  }
+  if (coincidencias.length > 1) {
+    return { error: `"${responsable}" coincide con varias personas (${coincidencias.map((u) => u.nombre).join(', ')}) — sé más específico.` }
+  }
+  return { value: coincidencias[0].id }
 }
 
 // Decide en qué fase y en qué posición (orden) cae una tarea nueva (o una
@@ -527,7 +559,7 @@ function buildServer(usuario) {
     'ver_proyecto',
     {
       title: 'Ver estado de un proyecto',
-      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad si en realidad son de un rol puntual (copy/disenador/programador). En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. También incluye "descripcion" (y, si viene de una plantilla, "queHacer"/"necesitasAntes"/"queEntregas") cuando alguien escribió detalle ahí — antes ver_proyecto solo mostraba el título y ese detalle era invisible por MCP; se omiten los campos vacíos para no inflar la respuesta. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título). También incluye "salud": la clasificación del proyecto en "atrasado" (tareas de cliente con plazo vencido o del equipo con fecha límite pasada), "estancado" (7+ días sin movimiento) o "avanza", con "motivos" que detallan las tareas exactas implicadas. Si el proyecto tiene una carpeta de Drive asociada, incluye "driveFolderUrl" (se omite el campo si no tiene ninguna) — úsala con listar_archivos_drive_proyecto para ver su contenido, o edítala con editar_proyecto (driveFolderId).',      inputSchema: {
+      description: 'Devuelve status, las tareas en proceso y pendientes (del equipo y del cliente), las respuestas recientes que el cliente ya envió desde su portal, y las solicitudes de cambio pendientes que el cliente levantó por su cuenta (texto y/o link de archivo en ambos casos — los archivos nunca se transfieren por MCP, solo el link para descargarlos, ej. para leer su contenido con WebFetch). También incluye el slug y urlPortalCliente (la URL completa del portal del cliente, ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}") — no hace falta construirla manualmente. En proyectos "finito" incluye fase actual y % de avance; en proyectos "continuo" incluye en su lugar "columnas" con el tablero Kanban (tarjetas agrupadas en todo/doing/revision/done, ya con todas las tarjetas no omitidas — ahí las completadas ya son visibles). "tareasEnProceso" lista las tareas del equipo marcadas como en proceso (iniciar_actividad) — antes quedaban invisibles aquí, lo que podía atorar faseActual sin que se notara por qué. Cada tarea en tareasEnProceso/tareasPendientesEquipo incluye su "responsable" — si dice "equipo" es porque quedó sin un rol específico asignado (le aparece a cualquiera del equipo del proyecto en "Mis tareas"); vale la pena revisarlas y reasignarlas con editar_actividad a una persona puntual. En proyectos "finito" también incluye "resumenFases": el conteo de tareas por estado en cada fase — útil si faseActual no coincide con lo esperado. Cada tarea listada incluye "frente" cuando la tarea lo tiene (proyectos integrales que combinan varios objetivos, ver registrar_actividad/editar_actividad) — se omite el campo si la tarea no tiene frente asignado. También incluye "descripcion" (y, si viene de una plantilla, "queHacer"/"necesitasAntes"/"queEntregas") cuando alguien escribió detalle ahí — antes ver_proyecto solo mostraba el título y ese detalle era invisible por MCP; se omiten los campos vacíos para no inflar la respuesta. Por default, en proyectos "finito" una tarea del equipo ya completada NO aparece en ningún listado (para enfocarse en qué falta) — pasa incluirCompletadas:true si necesitas referenciar, comentar o reabrir una tarea que ya se completó (ej. para encadenarle una dependencia, o si registrar_actividad/completar_actividad no te devolvió el id y necesitas buscarlo por título). También incluye "salud": la clasificación del proyecto en "atrasado" (tareas de cliente con plazo vencido o del equipo con fecha límite pasada), "estancado" (7+ días sin movimiento) o "avanza", con "motivos" que detallan las tareas exactas implicadas. Si el proyecto tiene una carpeta de Drive asociada, incluye "driveFolderUrl" (se omite el campo si no tiene ninguna) — úsala con listar_archivos_drive_proyecto para ver su contenido, o edítala con editar_proyecto (driveFolderId).',      inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         incluirCompletadas: z.boolean().optional().describe('Solo aplica a proyectos "finito". Si es true, agrega "tareasCompletadas" con las tareas del equipo ya completadas (id, fase, título, responsable, completadaPor, completadaEn). No cambia ningún otro listado — el propósito principal de esta tool sigue siendo mostrar qué falta.'),
       },
@@ -834,7 +866,7 @@ function buildServer(usuario) {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de la actividad'),
         descripcion: z.string().optional().describe('Detalle interno de la actividad. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en el portal; si se manda texto plano se preservan los saltos de línea igual.'),
-        responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin']).optional().describe('A quién le corresponde esta actividad. "copy"/"disenador"/"programador"/"redes" apuntan a quien ocupe ese rol en ESTE proyecto específico (así solo le aparece en "Mis tareas" a la persona correcta, no a todo el equipo). "karla"/"admin" son fijos. Usa "equipo" (default si se omite) solo cuando de verdad le pueda tocar a cualquiera del equipo asignado — abusar de este valor es lo que hace que a la gente le aparezcan en "Mis tareas" actividades que no son lo suyo.'),
+        responsable: z.string().optional().describe('A quién le corresponde esta actividad: el nombre de un compañero activo del equipo (se busca por coincidencia, no hace falta su id) — queda asignada directamente a esa persona y, si todavía no participaba en este proyecto, se agrega sola al equipo. "karla"/"admin" siguen siendo sentinels fijos. Usa "equipo" (default si se omite) solo cuando de verdad le pueda tocar a cualquiera del equipo del proyecto — abusar de este valor es lo que hace que a la gente le aparezcan en "Mis tareas" actividades que no son lo suyo.'),
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo" (usa columna en su lugar).'),
         completada: z.boolean().optional().describe('Obligatorio en proyectos "finito": true si ya se hizo (reportar avance ya ocurrido), false si es trabajo pendiente por hacer/planear. Sin default — decide explícitamente en cada llamada. Se ignora en proyectos "continuo" (usa columna en su lugar).'),
         columna: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Solo para proyectos tipo "continuo": columna del tablero Kanban donde debe caer la tarjeta. Default: "todo". Se ignora si se da antesDeTareaId/despuesDeTareaId (se usa la columna de esa tarjeta de referencia).'),
@@ -847,6 +879,9 @@ function buildServer(usuario) {
     async ({ slug, titulo, descripcion, responsable, fase, completada, columna, frente, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const resueltoResponsable = await resolverResponsable(responsable)
+      if (resueltoResponsable.error) return fail(resueltoResponsable.error)
 
       const errorDeps = validarDependencias(p, dependeDeTareaIds)
       if (errorDeps) return fail(errorDeps)
@@ -864,6 +899,9 @@ function buildServer(usuario) {
       const marcarCompletada = esContinuo ? posicion.estadoFinal === 'completada' : completada === true
       const estadoFinal = esContinuo ? posicion.estadoFinal : (marcarCompletada ? 'completada' : 'pendiente')
 
+      const responsableFinal = resueltoResponsable.value || 'equipo'
+      await asegurarResponsableValido(p, responsableFinal)
+
       const id = randomUUID()
       await prisma.tarea.create({
         data: {
@@ -873,7 +911,7 @@ function buildServer(usuario) {
           orden: posicion.orden,
           titulo,
           descripcion: descripcion || '',
-          responsable: responsable || 'equipo',
+          responsable: responsableFinal,
           frente: frente || null,
           dependencias: dependeDeTareaIds || [],
           custom: true,
@@ -887,8 +925,8 @@ function buildServer(usuario) {
 
       // Si nació con responsable específico (y queda pendiente), avisa por
       // correo a quien la recibió — igual que el alta desde el panel.
-      if (!marcarCompletada && responsable && responsable !== 'equipo') {
-        await notificarAsignacion(p, [{ titulo, responsable }], usuario)
+      if (!marcarCompletada && responsableFinal !== 'equipo') {
+        await notificarAsignacion(p, [{ titulo, responsable: responsableFinal }], usuario)
       }
       emitirCambio(p.id)
 
@@ -1099,7 +1137,7 @@ function buildServer(usuario) {
         tareaId: z.string().describe('ID de la tarea a editar'),
         titulo: z.string().optional().describe('Nuevo título'),
         descripcion: z.string().optional().describe('Nueva descripción interna. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado; si se manda texto plano se preservan los saltos de línea igual.'),
-        responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin']).optional().describe('Reasignar a quién le corresponde esta actividad (ver_proyecto no marca cuáles quedaron en "equipo" genérico, pero son las que más vale la pena revisar y reasignar a un rol específico — "copy"/"disenador"/"programador"/"redes" resuelven a quien ocupe ese rol en este proyecto).'),
+        responsable: z.string().optional().describe('Reasignar a quién le corresponde esta actividad: el nombre de un compañero activo del equipo (se busca por coincidencia) para asignarla directamente a esa persona — si todavía no participaba en este proyecto, se agrega sola al equipo. También acepta "equipo" (sin asignar en particular, lo que vale la pena revisar y reasignar) o los sentinels fijos "karla"/"admin".'),
         instrucciones: z.string().optional().describe('Nuevas instrucciones para el cliente (solo aplica a solicitudes al cliente). Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado; si se manda texto plano se preservan los saltos de línea igual.'),
         plazoHoras: z.number().int().optional().describe('Nuevo plazo en horas'),
         frente: z.string().optional().describe('Agrupador libre para proyectos integrales que combinan varios objetivos sin fases compartidas (ej. "Video", "Sitio web", "Redes") — la vista del proyecto agrupa por este valor. Pasa "" (string vacío) para quitarlo.'),
@@ -1123,7 +1161,12 @@ function buildServer(usuario) {
       const data = {}
       if (titulo !== undefined) data.titulo = titulo
       if (descripcion !== undefined) data.descripcion = descripcion
-      if (responsable !== undefined) data.responsable = responsable
+      if (responsable !== undefined) {
+        const resueltoResponsable = await resolverResponsable(responsable)
+        if (resueltoResponsable.error) return fail(resueltoResponsable.error)
+        await asegurarResponsableValido(p, resueltoResponsable.value)
+        data.responsable = resueltoResponsable.value
+      }
       if (instrucciones !== undefined) data.instruccionesCliente = instrucciones
       if (plazoHoras !== undefined) data.plazoHoras = plazoHoras
       if (frente !== undefined) data.frente = frente || null
@@ -1229,7 +1272,7 @@ function buildServer(usuario) {
         origen: z.enum(['whatsapp', 'telefono', 'interno']).optional().describe('De dónde vino el ticket (default "interno" — detectado por el equipo, no reportado directamente por el cliente)'),
         sitioId: z.string().optional().describe('ID del Sitio (mantenimiento web) al que pertenece este ticket, si aplica'),
         clienteId: z.string().optional().describe('ID del Cliente (diseño u otro trabajo suelto) al que pertenece este ticket, si aplica'),
-        responsable: z.enum(['equipo', 'copy', 'disenador', 'programador', 'redes', 'karla', 'admin']).optional().describe('A quién le corresponde — mismo criterio que registrar_actividad'),
+        responsable: z.string().optional().describe('A quién le corresponde — mismo criterio que registrar_actividad (nombre de un compañero activo, o "equipo"/"karla"/"admin").'),
         columna: z.enum(['todo', 'doing', 'revision', 'done']).optional().describe('Columna del tablero Kanban donde debe caer (default "todo")'),
         prioridad: z.enum(['urgente', 'normal', 'cuando_se_pueda']).optional(),
         fechaLimite: z.string().optional().describe('Fecha límite del equipo, formato YYYY-MM-DD'),
@@ -1239,6 +1282,9 @@ function buildServer(usuario) {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
       if (p.tipo !== 'continuo') return fail(`El proyecto "${slug}" no es de tipo continuo — los tickets sueltos deben caer en un proyecto continuo que sirva de cola (uno por sitio o por cliente).`)
+
+      const resueltoResponsable = await resolverResponsable(responsable)
+      if (resueltoResponsable.error) return fail(resueltoResponsable.error)
 
       const solicitud = await prisma.solicitud.create({
         data: {
@@ -1253,7 +1299,7 @@ function buildServer(usuario) {
         },
       })
 
-      const { tarea } = await aprobarSolicitud(p, solicitud, { columna, responsable, prioridad, fechaLimite }, usuario.nombre)
+      const { tarea } = await aprobarSolicitud(p, solicitud, { columna, responsable: resueltoResponsable.value, prioridad, fechaLimite }, usuario.nombre)
       await logEntry(p.id, usuario.nombre, 'Ticket registrado', `${solicitud.titulo} — origen: ${solicitud.origen}`)
       emitirCambio(p.id)
 
