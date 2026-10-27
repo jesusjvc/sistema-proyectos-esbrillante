@@ -131,14 +131,9 @@ export function tareasWebBase() {
       queEntregas: 'Proyecto creado en el sistema con todos los campos completos',
     }),
 
-    t('w-f1-02', 1, 'Crear carpeta en Google Drive', 'equipo', [], {
-      linkTipo: 'drive',
-      descripcion: 'Crear carpeta del proyecto con estructura estándar.',
-      queHacer: 'Crear la carpeta del proyecto en Google Drive bajo la sección Clientes.\nUsar el nombre del cliente como nombre de carpeta.\n\nEstructura de subcarpetas:\n• Brief\n• Boceto\n• Diseño\n• Entregables\n• Recursos del cliente (logo, fotos, etc.)',
-      necesitasAntes: 'Nombre del cliente confirmado',
-      queEntregas: 'Carpeta creada y compartida con el equipo asignado al proyecto',
-    }),
-
+    // La carpeta de Google Drive ya se crea automáticamente al dar de alta el
+    // proyecto (ver crear_proyecto) — se quitó la tarea manual w-f1-02 que la
+    // duplicaba.
     t('w-f1-03', 1, 'Abrir grupo de WhatsApp del proyecto', 'admin', [], {
       descripcion: 'Crear el grupo con el cliente y el equipo asignado.',
       queHacer: 'Crear el grupo de WhatsApp del proyecto.\nAgregar al grupo:\n• Todos los miembros del equipo asignados\n• El cliente y cualquier intermediario si aplica\n• Jesús siempre\n\nNombre sugerido del grupo: [NOMBRE CLIENTE] — EsBrillante',
