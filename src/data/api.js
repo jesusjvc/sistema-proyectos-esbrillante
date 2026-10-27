@@ -138,6 +138,7 @@ export const eliminarMiembro = (id) => req('DELETE', `/api/miembros/${id}`)
 
 // ─── Cliente ───────────────────────────────────────────────────────────────
 export const loginCliente = (slug, password) => req('POST', '/api/cliente/login', { slug, password })
+export const accesoDirectoCliente = (slug, token) => req('POST', `/api/cliente/${slug}/acceso-directo`, { token })
 export const getProyectoCliente = (slug) => req('GET', `/api/cliente/${slug}`)
 export const logoutCliente = () => req('POST', '/api/cliente/logout')
 // titulo es obligatorio; descripcion y archivo son opcionales

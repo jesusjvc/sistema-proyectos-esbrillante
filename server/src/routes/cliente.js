@@ -48,6 +48,35 @@ router.post('/login', async (req, res) => {
   }
 })
 
+// POST /api/cliente/:slug/acceso-directo — login sin contraseña vía enlace privado
+// (urlAccesoDirecto de crear_proyecto/ver_proyecto). Mismo efecto que /login: deja
+// la misma cookie de sesión de 30 días; la contraseña normal sigue funcionando igual.
+router.post('/:slug/acceso-directo', async (req, res) => {
+  const { token } = req.body
+  if (!token) return res.status(400).json({ error: 'Falta token' })
+
+  try {
+    const p = await getProyecto(req.params.slug)
+    if (!p || !p.clienteAccessToken || p.clienteAccessToken !== token) {
+      return res.status(401).json({ error: 'Enlace inválido' })
+    }
+
+    const jwtToken = firmarToken({ tipo: 'cliente', proyectoId: p.id, slug: p.slug }, { expiresIn: '30d' })
+
+    res.cookie('clienteToken', jwtToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    })
+
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
 // GET /api/cliente/:slug
 router.get('/:slug', requireClienteAcceso, async (req, res) => {
   try {
@@ -248,7 +277,7 @@ async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
 }
 
 function proyectoPublico(p) {
-  const { passwordCliente, ...rest } = p
+  const { passwordCliente, clienteAccessToken, ...rest } = p
   return rest
 }
 

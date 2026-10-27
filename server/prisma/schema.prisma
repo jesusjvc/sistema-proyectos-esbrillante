@@ -88,6 +88,11 @@ model Proyecto {
   vistoAdminEn        DateTime?
   tiempos             Json     @default("{}")
   passwordCliente     String
+  // Token largo para el enlace de acceso directo (sin contraseña) — opcional,
+  // nulo en proyectos creados antes de este campo. Texto plano como
+  // passwordCliente: mismo modelo de confianza (enlace privado), no una
+  // credencial que haya que hashear.
+  clienteAccessToken  String?   @unique
   // Una o varias áreas (web | diseno_grafico | redes_sociales) — un proyecto
   // integral tiene varias. Vacío = visible en cualquier filtro de área.
   areas               String[] @default([])

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import { z } from 'zod'
-import { generarPasswordSimple } from '../lib/passwords.js'
+import { generarPasswordSimple, generarAccessToken } from '../lib/passwords.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
@@ -30,6 +30,12 @@ const PORTAL_CLIENTE_BASE_URL = 'https://proyectosweb.esbrillante.mx/cliente'
 
 function urlPortalCliente(slug) {
   return `${PORTAL_CLIENTE_BASE_URL}/${slug}`
+}
+
+// Enlace privado de acceso directo (sin contraseña) — solo quien lo tenga entra.
+// La contraseña normal sigue funcionando igual; este enlace es un atajo adicional.
+function urlAccesoDirecto(slug, token) {
+  return `${PORTAL_CLIENTE_BASE_URL}/${slug}?token=${token}`
 }
 
 // El editor de descripción de tareas (EditorEnriquecido) guarda HTML — un agente por MCP lee
@@ -284,6 +290,7 @@ function buildServer(usuario) {
       const slug = generarSlug(clienteNombre)
       const tipoFinal = tipo === 'continuo' ? 'continuo' : 'finito'
       const password = passwordCliente || generarPasswordSimple()
+      const accessToken = generarAccessToken()
       const paqueteFinal = paquete || 'Personalizado'
 
       let equipoFinal = {}
@@ -332,6 +339,7 @@ function buildServer(usuario) {
             areas: areas || [],
             driveRespuestasId: driveFolderId || null,
             passwordCliente: password,
+            clienteAccessToken: accessToken,
             linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
             tiempos: { inicio: anticipoConfirmado ? new Date().toISOString() : null, cierre: null, pausas: [] },
           },
@@ -362,7 +370,7 @@ function buildServer(usuario) {
       const resumenTareas = tareasFinal.length
         ? `\nTareas creadas desde la plantilla (${tareasFinal.length}): ${JSON.stringify(tareasFinal.map((t) => ({ id: t.id, titulo: t.titulo, fase: t.fase, responsable: t.responsable })))}\nUsa editar_actividad con estos IDs si necesitas reasignar alguna a una persona específica.`
         : ''
-      return ok(`Proyecto "${clienteNombre}" creado (tipo: ${tipoFinal}). slug: "${p.slug}". Contraseña del portal del cliente: "${password}". urlPortalCliente: "${urlPortalCliente(p.slug)}".${avisoAnticipo}${avisoDrive}${resumenTareas}`)
+      return ok(`Proyecto "${clienteNombre}" creado (tipo: ${tipoFinal}). slug: "${p.slug}". Contraseña del portal del cliente: "${password}". urlPortalCliente: "${urlPortalCliente(p.slug)}". urlAccesoDirecto (enlace privado, entra sin pedir contraseña): "${urlAccesoDirecto(p.slug, accessToken)}".${avisoAnticipo}${avisoDrive}${resumenTareas}`)
     },
   )
 
@@ -568,9 +576,18 @@ function buildServer(usuario) {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
+      // Backfill perezoso: proyectos creados antes de este campo no tienen
+      // token todavía — se genera y guarda la primera vez que se consulta.
+      let accessToken = p.clienteAccessToken
+      if (!accessToken) {
+        accessToken = generarAccessToken()
+        await prisma.proyecto.update({ where: { id: p.id }, data: { clienteAccessToken: accessToken } })
+      }
+
       const resumen = {
         slug: p.slug,
         urlPortalCliente: urlPortalCliente(p.slug),
+        urlAccesoDirecto: urlAccesoDirecto(p.slug, accessToken),
         tipo: p.tipo,
         cliente: p.cliente?.nombreComercial || '(sin nombre)',
         paquete: p.proyecto?.paquete || '(sin paquete)',

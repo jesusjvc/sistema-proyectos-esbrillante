@@ -2,7 +2,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireAdmin, requireAdminOrApiKey, requireAuthOrApiKey } from '../middleware/auth.js'
 import { generarSlug } from '../lib/slug.js'
-import { generarPasswordSimple } from '../lib/passwords.js'
+import { generarPasswordSimple, generarAccessToken } from '../lib/passwords.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { validarYNormalizarEquipo } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
@@ -86,6 +86,7 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
           equipo,
           areas: areas || [],
           passwordCliente: passwordCliente || generarPasswordSimple(),
+          clienteAccessToken: generarAccessToken(),
           linksCliente: { drive: '', brief: '', boceto: '', diseno: '' },
           tiempos: {
             inicio: proyecto.anticipoConfirmado ? new Date().toISOString() : null,
@@ -469,6 +470,24 @@ router.post('/:slug/regenerar-password', requireAuth, async (req, res) => {
     await logEntry(p.id, req.user.nombre, 'Contraseña de cliente regenerada')
     emitirCambio(p.id)
     res.json({ ok: true, passwordCliente })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/proyectos/:slug/regenerar-token-acceso — invalida el enlace de acceso
+// directo anterior (si alguien más lo obtuvo, deja de servirle) y entrega uno nuevo.
+router.post('/:slug/regenerar-token-acceso', requireAuth, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    const clienteAccessToken = generarAccessToken()
+    await prisma.proyecto.update({ where: { id: p.id }, data: { clienteAccessToken } })
+    await logEntry(p.id, req.user.nombre, 'Enlace de acceso directo del cliente regenerado')
+    emitirCambio(p.id)
+    res.json({ ok: true, clienteAccessToken })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })

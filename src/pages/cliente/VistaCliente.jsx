@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getProyectoCliente, loginCliente, completarTareaCliente, crearSolicitudCliente } from '../../data/api'
+import { getProyectoCliente, loginCliente, accesoDirectoCliente, completarTareaCliente, crearSolicitudCliente } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha, tareaVencida, tiempoTranscurrido } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
 import { useEventosProyecto } from '../../hooks/useEventos'
@@ -25,6 +25,10 @@ export default function VistaCliente() {
 
   async function cargar() {
     try {
+      const token = new URLSearchParams(window.location.search).get('token')
+      if (token) {
+        try { await accesoDirectoCliente(id, token) } catch { /* enlace inválido/expirado: sigue el flujo normal */ }
+      }
       const p = await getProyectoCliente(id)
       setProyecto(p)
       setEstado('ok')
