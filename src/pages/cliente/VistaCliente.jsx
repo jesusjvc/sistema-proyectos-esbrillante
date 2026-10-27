@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getProyectoCliente, loginCliente, accesoDirectoCliente, completarTareaCliente, crearSolicitudCliente } from '../../data/api'
 import { calcularAvance, getFaseActual, formatFecha, tareaVencida, tiempoTranscurrido } from '../../data/storage'
 import { FASES_WEB } from '../../data/plantillas'
+import { CAMPOS_REGISTRANTE_DOMINIO } from '../../data/modulosCliente'
 import { useEventosProyecto } from '../../hooks/useEventos'
 import { useTheme } from '../../context/ThemeContext'
 import TextoEnriquecido from '../../components/TextoEnriquecido'
@@ -625,18 +626,26 @@ function GrupoActividad({ titulo, tareas, estado, children }) {
   )
 }
 
+const inputClsCliente = 'w-full text-base bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-500 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-ink-400'
+
 function TareaClienteCard({ tarea: t, onCompletar }) {
+  const esFormulario = t.modulo === 'registrante_dominio'
   const [expandida, setExpandida] = useState(true)
   const [texto, setTexto] = useState('')
   const [archivo, setArchivo] = useState(null)
+  const [datos, setDatos] = useState(() => Object.fromEntries(CAMPOS_REGISTRANTE_DOMINIO.map((c) => [c.key, c.default || ''])))
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
   async function enviar() {
     setError('')
+    if (esFormulario) {
+      const faltante = CAMPOS_REGISTRANTE_DOMINIO.find((c) => c.required && !datos[c.key]?.trim())
+      if (faltante) return setError(`Falta "${faltante.label}"`)
+    }
     setEnviando(true)
     try {
-      await onCompletar({ texto: texto.trim() || undefined, archivo: archivo || undefined })
+      await onCompletar(esFormulario ? { datos } : { texto: texto.trim() || undefined, archivo: archivo || undefined })
     } catch {
       setError('No se pudo enviar tu respuesta. Intenta de nuevo.')
     } finally {
@@ -692,28 +701,46 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             </a>
           )}
 
-          <textarea
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Escribe tu respuesta aquí (opcional si solo vas a adjuntar un archivo)..."
-            rows={3}
-            className="w-full text-base bg-white dark:bg-ink-900 border border-slate-200 dark:border-ink-500 text-slate-800 dark:text-ink-100 rounded-lg px-3 py-2.5 mb-3 outline-none focus:ring-2 focus:ring-brand-400 placeholder:text-slate-400 dark:placeholder:text-ink-400 resize-none"
-          />
-
-          {archivo ? (
-            <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2 mb-3">
-              <Paperclip size={12} className="text-slate-400 shrink-0" />
-              <span className="flex-1 truncate text-slate-600 dark:text-ink-300">{archivo.name}</span>
-              <button onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
-                <X size={13} />
-              </button>
+          {esFormulario ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              {CAMPOS_REGISTRANTE_DOMINIO.map((c) => (
+                <div key={c.key} className={c.key === 'direccion' ? 'sm:col-span-2' : ''}>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-ink-300 mb-1">{c.label}{c.required && ' *'}</label>
+                  <input
+                    type={c.key === 'correo' ? 'email' : 'text'}
+                    value={datos[c.key]}
+                    onChange={(e) => setDatos({ ...datos, [c.key]: e.target.value })}
+                    className={inputClsCliente}
+                  />
+                </div>
+              ))}
             </div>
           ) : (
-            <label className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 cursor-pointer w-fit mb-3">
-              <Paperclip size={12} />
-              Adjuntar un archivo
-              <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
-            </label>
+            <>
+              <textarea
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                placeholder="Escribe tu respuesta aquí (opcional si solo vas a adjuntar un archivo)..."
+                rows={3}
+                className={`${inputClsCliente} mb-3 resize-none`}
+              />
+
+              {archivo ? (
+                <div className="flex items-center gap-2 text-sm bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 rounded-lg px-3 py-2 mb-3">
+                  <Paperclip size={12} className="text-slate-400 shrink-0" />
+                  <span className="flex-1 truncate text-slate-600 dark:text-ink-300">{archivo.name}</span>
+                  <button onClick={() => setArchivo(null)} className="text-slate-400 hover:text-red-500 shrink-0">
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-1.5 text-sm text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 cursor-pointer w-fit mb-3">
+                  <Paperclip size={12} />
+                  Adjuntar un archivo
+                  <input type="file" className="hidden" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
+                </label>
+              )}
+            </>
           )}
 
           {error && <p className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</p>}
@@ -726,7 +753,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             ✓ Enviar respuesta
           </button>
-          <p className="text-sm text-slate-400 dark:text-ink-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>
+          {!esFormulario && <p className="text-sm text-slate-400 dark:text-ink-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>}
         </div>
       )}
     </div>

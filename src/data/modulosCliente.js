@@ -1,10 +1,27 @@
 // Plantillas de los módulos de solicitud estructurada al cliente:
 // 'dominio' (datos para registrar el dominio), 'recursos' (fotos/logo/textos
-// con subcarpeta de Drive) y 'vobo' (aceptación formal del proyecto).
+// con subcarpeta de Drive), 'vobo' (aceptación formal del proyecto) y
+// 'registrante_dominio' (datos de registrante WHOIS, como formulario real).
 //
 // ESPEJO de server/src/lib/modulosCliente.js — frontend y backend se
 // despliegan como apps separadas en Coolify, así que la definición vive dos
 // veces a propósito. Mantener ambas sincronizadas.
+
+// Campos del formulario de registrante (módulo 'registrante_dominio'). Los
+// renderiza TareaClienteCard en VistaCliente.jsx.
+export const CAMPOS_REGISTRANTE_DOMINIO = [
+  { key: 'nombre', label: 'Nombre(s)', required: true },
+  { key: 'apellido', label: 'Apellido(s)', required: true },
+  { key: 'empresa', label: 'Empresa (opcional)', required: false },
+  { key: 'direccion', label: 'Dirección', required: true },
+  { key: 'pais', label: 'País', required: true, default: 'México' },
+  { key: 'ciudad', label: 'Ciudad', required: true },
+  { key: 'estado', label: 'Estado', required: true },
+  { key: 'codigoPostal', label: 'Código postal', required: true },
+  { key: 'correo', label: 'Correo', required: true },
+  { key: 'codigoTelefono', label: 'Código de país del teléfono', required: true, default: '+52' },
+  { key: 'telefono', label: 'Teléfono', required: true },
+]
 
 export const MODULOS_CLIENTE = {
   dominio: {
@@ -42,6 +59,15 @@ export const MODULOS_CLIENTE = {
       <p><strong>¡Tu proyecto está terminado!</strong> 🎉</p>
       <p>Revisa el resultado y, si todo está como lo acordamos, danos tu <strong>VoBo</strong> para cerrar esta etapa. Puedes escribir "VoBo" o tus comentarios si algo falta.</p>
       <p>Tu respuesta queda registrada como la <strong>aceptación formal del proyecto</strong>.</p>
+    `,
+  },
+  registrante_dominio: {
+    label: 'Datos de registrante del dominio',
+    generica: 'Pedir los datos de registrante (WHOIS) para registrar el dominio',
+    ayuda: 'Formulario real (no texto libre) con los datos de registrante para el WHOIS del dominio. Al responder, quedan en respuestaDatos de la tarea y se agregan a Info clave del proyecto.',
+    plantilla: () => `
+      <p>Para <strong>registrar el dominio</strong> necesitamos los datos del registrante (quedan asociados al dominio, como en cualquier registro WHOIS).</p>
+      <p>Llena el formulario con los datos exactos — si pones el nombre de una empresa, algunos registradores hacen pública esa información vía WHOIS/RDAP.</p>
     `,
   },
 }

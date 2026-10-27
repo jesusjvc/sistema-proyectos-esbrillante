@@ -162,11 +162,13 @@ export async function crearSolicitudCliente(slug, { titulo, descripcion, archivo
   return res.json()
 }
 
-// texto y/o archivo son opcionales — completar sin ninguno equivale al "Ya lo hice" simple
-export async function completarTareaCliente(slug, tareaId, { texto, archivo } = {}) {
+// texto y/o archivo son opcionales — completar sin ninguno equivale al "Ya lo hice" simple.
+// datos es el objeto del formulario de un módulo estructurado (ej. registrante_dominio).
+export async function completarTareaCliente(slug, tareaId, { texto, archivo, datos } = {}) {
   const form = new FormData()
   if (texto) form.append('respuestaTexto', texto)
   if (archivo) form.append('archivo', archivo)
+  if (datos) form.append('respuestaDatos', JSON.stringify(datos))
 
   const res = await fetch(`${BASE}/api/cliente/${slug}/tareas/${tareaId}/completar`, {
     method: 'POST',

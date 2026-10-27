@@ -8,7 +8,7 @@ import { emitirCambio } from '../lib/eventos.js'
 import { enviarEmail } from '../lib/email.js'
 import { enviarGoogleChat } from '../lib/googleChat.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
-import { extraerDominio } from '../lib/modulosCliente.js'
+import { extraerDominio, camposFaltantes, resumenRegistranteDominio } from '../lib/modulosCliente.js'
 import { notificarInformacionLista } from '../lib/notificaciones.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
@@ -94,14 +94,33 @@ router.get('/:slug', requireClienteAcceso, async (req, res) => {
 // Acepta multipart/form-data opcional: campo "respuestaTexto" y/o archivo "archivo"
 router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.single('archivo'), async (req, res) => {
   const { slug, tareaId } = req.params
-  const respuestaTexto = req.body?.respuestaTexto?.trim() || null
+  let respuestaTexto = req.body?.respuestaTexto?.trim() || null
 
   try {
     const p = await getProyecto(slug)
     if (!p || p.id !== req.clienteProyectoId) return res.status(403).json({ error: 'Sin acceso' })
 
+    const tareaActual = p.tareas.find((t) => t.id === tareaId)
+    if (!tareaActual) return res.status(404).json({ error: 'Tarea no encontrada' })
+
+    // Módulos con formulario (hoy solo registrante_dominio): el cliente manda
+    // los campos como JSON en el campo de texto respuestaDatos, no un párrafo.
+    let respuestaDatos = null
+    if (tareaActual.modulo === 'registrante_dominio') {
+      try {
+        respuestaDatos = req.body?.respuestaDatos ? JSON.parse(req.body.respuestaDatos) : null
+      } catch {
+        return res.status(400).json({ error: 'Formato de respuesta inválido' })
+      }
+      const faltantes = camposFaltantes('registrante_dominio', respuestaDatos)
+      if (faltantes.length) return res.status(400).json({ error: `Faltan campos: ${faltantes.join(', ')}` })
+      // Texto legible derivado, para las vistas que todavía solo muestran texto.
+      respuestaTexto = resumenRegistranteDominio(respuestaDatos)
+    }
+
     const data = { estado: 'completada', completadaPor: 'Cliente', completadaEn: new Date() }
     if (respuestaTexto) data.respuestaTexto = respuestaTexto
+    if (respuestaDatos) data.respuestaDatos = respuestaDatos
 
     if (req.file) {
       if (!driveConfigurado()) return res.status(503).json({ error: 'La subida de archivos todavía no está configurada. Por ahora, comparte el archivo por otro medio.' })
@@ -131,6 +150,16 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
     } else if (tarea.modulo === 'vobo') {
       await prisma.logEntry.create({
         data: { proyectoId: p.id, usuario: 'Sistema', accion: 'VoBo del proyecto recibido', detalle: respuestaTexto ? `El cliente respondió: ${respuestaTexto.slice(0, 120)}` : 'El cliente dio VoBo sin comentarios' },
+      })
+    } else if (tarea.modulo === 'registrante_dominio' && respuestaDatos) {
+      // Deja los datos también en Info clave, visibles sin tener que abrir la
+      // tarea — el objeto completo ya vive en tarea.respuestaDatos.
+      const extras = [...(p.proyecto?.infoClave?.extras || []), { etiqueta: 'Datos de registrante del dominio', valor: respuestaTexto }]
+      const infoClave = { ...(p.proyecto?.infoClave || {}), extras }
+      await prisma.proyecto.update({ where: { id: p.id }, data: { proyecto: { ...p.proyecto, infoClave } } })
+      p.proyecto = { ...p.proyecto, infoClave }
+      await prisma.logEntry.create({
+        data: { proyectoId: p.id, usuario: 'Sistema', accion: 'Datos de registrante del dominio recibidos', detalle: respuestaTexto },
       })
     }
 

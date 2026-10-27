@@ -647,7 +647,7 @@ function buildServer(usuario) {
       resumen.notasStatus = (p.notas || []).map((n) => ({ autor: n.autor, texto: n.texto, creadoEn: n.creadoEn }))
       resumen.infoClave = p.proyecto?.infoClave || null
       resumen.respuestasClienteRecientes = p.tareas
-        .filter((t) => t.esCliente && t.estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl))
+        .filter((t) => t.esCliente && t.estado === 'completada' && (t.respuestaTexto || t.respuestaArchivoUrl || t.respuestaDatos))
         .sort((a, b) => new Date(b.completadaEn) - new Date(a.completadaEn))
         .slice(0, 10)
         .map((t) => ({
@@ -656,6 +656,9 @@ function buildServer(usuario) {
           respuestaTexto: t.respuestaTexto || null,
           archivoUrl: t.respuestaArchivoUrl || null,
           archivoNombre: t.respuestaArchivoNombre || null,
+          // Respuesta de un módulo con formulario (ej. registrante_dominio) —
+          // objeto con los campos exactos que llenó el cliente, no texto libre.
+          ...(t.respuestaDatos ? { respuestaDatos: t.respuestaDatos } : {}),
           respondidoEn: t.completadaEn,
         }))
       resumen.solicitudesPendientes = p.solicitudes
@@ -858,7 +861,12 @@ function buildServer(usuario) {
         return fail(`El proyecto "${slug}" no tiene espacios de Google Chat en su Info clave — agrégalo con editar_proyecto (grupos[] con canal "google-chat").`)
       }
 
-      const espacios = await chatEspacios()
+      let espacios
+      try {
+        espacios = await chatEspacios()
+      } catch (err) {
+        return fail(`No se pudo consultar los espacios de Google Chat: ${err instanceof Error ? err.message : String(err)}`)
+      }
       const destino = gruposChat
         .map((g) => ({ g, espacio: espacios.find((e) => (e.nombre || '').trim().toLowerCase() === g.nombre.trim().toLowerCase()) }))
         .find((x) => x.espacio)
@@ -866,7 +874,11 @@ function buildServer(usuario) {
         return fail(`El espacio "${gruposChat[0].nombre}" no aparece entre los espacios accesibles — revisa el nombre en la Info clave.`)
       }
 
-      const enviado = await chatEnviar(destino.espacio.id, limpio)
+      try {
+        await chatEnviar(destino.espacio.id, limpio)
+      } catch (err) {
+        return fail(`No se pudo enviar el mensaje a Google Chat: ${err instanceof Error ? err.message : String(err)}`)
+      }
       await logEntry(p.id, usuario.nombre, 'Mensaje enviado a Google Chat', `${destino.g.nombre}: ${limpio.slice(0, 80)}`)
       emitirCambio(p.id)
 
@@ -943,7 +955,8 @@ function buildServer(usuario) {
       // Si nació con responsable específico (y queda pendiente), avisa por
       // correo a quien la recibió — igual que el alta desde el panel.
       if (!marcarCompletada && responsableFinal !== 'equipo') {
-        await notificarAsignacion(p, [{ titulo, responsable: responsableFinal }], usuario)
+        notificarAsignacion(p, [{ titulo, responsable: responsableFinal }], usuario)
+          .catch((err) => console.error('Error notificando asignación:', err))
       }
       emitirCambio(p.id)
 
@@ -956,12 +969,12 @@ function buildServer(usuario) {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). MÓDULOS: con el parámetro modulo la solicitud se vuelve estructurada — "dominio" (pide los datos para registrar el dominio; al responder el cliente, el dominio queda registrado en la Info clave del proyecto), "recursos" (pide fotos/logo/textos y crea la subcarpeta "Recursos" en el Drive del proyecto, adjuntando el enlace en la tarjeta para que suba ahí) y "vobo" (aceptación formal del proyecto; su respuesta queda registrada como VoBo). Con modulo puedes omitir instrucciones y se usa la plantilla del módulo. Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero, usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) SIN módulo, usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
+      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). MÓDULOS: con el parámetro modulo la solicitud se vuelve estructurada — "dominio" (pide los datos para registrar el dominio EN TEXTO LIBRE; al responder el cliente, el dominio queda registrado en la Info clave del proyecto), "recursos" (pide fotos/logo/textos y crea la subcarpeta "Recursos" en el Drive del proyecto, adjuntando el enlace en la tarjeta para que suba ahí), "vobo" (aceptación formal del proyecto; su respuesta queda registrada como VoBo), y "registrante_dominio" (FORMULARIO real con los datos de registrante WHOIS — nombre, apellido, empresa opcional, dirección, país, ciudad, estado, código postal, correo, código de país del teléfono y teléfono —, no texto libre; al responder, los campos exactos quedan en respuestaDatos de la tarea, visibles vía ver_proyecto en respuestasClienteRecientes, y se agregan también a Info clave del proyecto. Úsalo cuando ya sepas el nombre del dominio y necesites iniciar el registro con el registrador; usa "dominio" antes si todavía hace falta confirmar qué dominio quiere el cliente). Con modulo puedes omitir instrucciones y se usa la plantilla del módulo. Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero, usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) SIN módulo, usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
         instrucciones: z.string().optional().describe('Instrucciones claras para el cliente. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en su portal. Si se omite y se pasa modulo, se usa la plantilla del módulo.'),
-        modulo: z.enum(['dominio', 'recursos', 'vobo']).optional().describe('Convierte la solicitud en estructurada: dominio (datos para registrar/conectar el dominio, al responder queda en Info clave), recursos (fotos/logo/textos con subcarpeta de Drive lista para subir) o vobo (aceptación formal del proyecto).'),
+        modulo: z.enum(['dominio', 'recursos', 'vobo', 'registrante_dominio']).optional().describe('Convierte la solicitud en estructurada: dominio (datos para registrar/conectar el dominio, al responder queda en Info clave), recursos (fotos/logo/textos con subcarpeta de Drive lista para subir), vobo (aceptación formal del proyecto), o registrante_dominio (formulario real con los datos de registrante WHOIS — nombre, dirección, correo, teléfono — en vez de texto libre; al responder queda en respuestaDatos de la tarea y se agrega a Info clave).'),
         plazoHoras: z.number().int().optional().describe('Plazo sugerido en horas'),
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo".'),
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta solicitud'),
@@ -978,10 +991,10 @@ function buildServer(usuario) {
       if (errorDeps) return fail(errorDeps)
 
       const moduloValido = modulo && MODULOS_CLIENTE[modulo] ? modulo : null
-      if (modulo && !moduloValido) return fail(`Módulo inválido: "${modulo}". Valores: dominio, recursos, vobo.`)
+      if (modulo && !moduloValido) return fail(`Módulo inválido: "${modulo}". Valores: dominio, recursos, vobo, registrante_dominio.`)
       let instruccionesFinal = instrucciones?.trim() || null
       if (!instruccionesFinal && !moduloValido) {
-        return fail('Falta "instrucciones": describe qué necesita el cliente, o pasa un modulo (dominio, recursos, vobo) para usar su plantilla.')
+        return fail('Falta "instrucciones": describe qué necesita el cliente, o pasa un modulo (dominio, recursos, vobo, registrante_dominio) para usar su plantilla.')
       }
 
       const esContinuo = p.tipo === 'continuo'
@@ -999,9 +1012,14 @@ function buildServer(usuario) {
         if (!driveFolderUrl) avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
       } else if (pedirArchivos) {
         if (driveConfigurado()) {
-          const carpetaId = await obtenerOCrearCarpetaProyecto(p)
-          if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
-          driveFolderUrl = `https://drive.google.com/drive/folders/${carpetaId}`
+          try {
+            const carpetaId = await obtenerOCrearCarpetaProyecto(p)
+            if (!p.driveRespuestasId) await prisma.proyecto.update({ where: { id: p.id }, data: { driveRespuestasId: carpetaId } })
+            driveFolderUrl = `https://drive.google.com/drive/folders/${carpetaId}`
+          } catch (err) {
+            console.error('Error creando carpeta de Drive para la solicitud:', err)
+            avisoDrive = ' (No se pudo crear la carpeta de Drive — revisa los logs del servidor; la solicitud se creó sin el link.)'
+          }
         } else {
           avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
         }
@@ -1219,7 +1237,8 @@ function buildServer(usuario) {
       if (data.responsable && data.responsable !== tarea.responsable) {
         await notificarDestinatarios(p, tareaActualizada, usuario, 'tarea_reasignada', `${usuario.nombre} te asignó "${tarea.titulo}"`)
         // Además del aviso in-app, correo a quien la recibió.
-        await notificarAsignacion(p, [tareaActualizada], usuario)
+        notificarAsignacion(p, [tareaActualizada], usuario)
+          .catch((err) => console.error('Error notificando asignación:', err))
       }
       emitirCambio(p.id)
 

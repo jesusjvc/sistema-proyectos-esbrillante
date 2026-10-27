@@ -351,6 +351,9 @@ model Tarea {
   respuestaTexto       String?
   respuestaArchivoUrl  String?
   respuestaArchivoNombre String?
+  // Respuesta estructurada de un módulo con formulario (hoy solo
+  // registrante_dominio) — genérico para reusar en futuros módulos.
+  respuestaDatos       Json?
   driveFolderUrl       String?
 
   comentarios Comentario[]

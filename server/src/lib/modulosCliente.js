@@ -1,10 +1,28 @@
 // Plantillas de los módulos de solicitud estructurada al cliente:
 // 'dominio' (datos para registrar el dominio), 'recursos' (fotos/logo/textos
-// con subcarpeta de Drive) y 'vobo' (aceptación formal del proyecto).
+// con subcarpeta de Drive), 'vobo' (aceptación formal del proyecto) y
+// 'registrante_dominio' (datos de registrante WHOIS, como formulario real).
 //
 // ESPEJO de src/data/modulosCliente.js (frontend) — frontend y backend se
 // despliegan como apps separadas en Coolify, así que la definición vive dos
 // veces a propósito. Mantener ambas sincronizadas.
+
+// Campos del formulario de registrante (módulo 'registrante_dominio'). Lo usa
+// el frontend para renderizar los inputs y el backend para validar que las
+// respuestas requeridas vengan completas antes de guardar respuestaDatos.
+export const CAMPOS_REGISTRANTE_DOMINIO = [
+  { key: 'nombre', label: 'Nombre(s)', required: true },
+  { key: 'apellido', label: 'Apellido(s)', required: true },
+  { key: 'empresa', label: 'Empresa (opcional)', required: false },
+  { key: 'direccion', label: 'Dirección', required: true },
+  { key: 'pais', label: 'País', required: true, default: 'México' },
+  { key: 'ciudad', label: 'Ciudad', required: true },
+  { key: 'estado', label: 'Estado', required: true },
+  { key: 'codigoPostal', label: 'Código postal', required: true },
+  { key: 'correo', label: 'Correo', required: true },
+  { key: 'codigoTelefono', label: 'Código de país del teléfono', required: true, default: '+52' },
+  { key: 'telefono', label: 'Teléfono', required: true },
+]
 
 export const MODULOS_CLIENTE = {
   dominio: {
@@ -48,6 +66,17 @@ export const MODULOS_CLIENTE = {
       <p>Tu respuesta queda registrada como la <strong>aceptación formal del proyecto</strong>.</p>
     `,
   },
+  registrante_dominio: {
+    label: 'Datos de registrante del dominio',
+    generica: 'Pedir los datos de registrante (WHOIS) para registrar el dominio',
+    // Formulario real (ver CAMPOS_REGISTRANTE_DOMINIO), no texto libre. Al
+    // completarla el server guarda respuestaDatos estructurado y lo agrega
+    // también a infoClave.extras del proyecto.
+    plantilla: () => `
+      <p>Para <strong>registrar el dominio</strong> necesitamos los datos del registrante (quedan asociados al dominio, como en cualquier registro WHOIS).</p>
+      <p>Llena el formulario con los datos exactos — si pones el nombre de una empresa, algunos registradores hacen pública esa información vía WHOIS/RDAP.</p>
+    `,
+  },
 }
 
 export function extraerDominio(texto) {
@@ -57,4 +86,21 @@ export function extraerDominio(texto) {
 
 export function moduloDe(valor) {
   return MODULOS_CLIENTE[valor] || null
+}
+
+// Campos faltantes de un módulo con formulario (hoy solo registrante_dominio).
+// Devuelve [] si no falta nada o si el módulo no tiene formulario definido.
+export function camposFaltantes(modulo, datos) {
+  const campos = modulo === 'registrante_dominio' ? CAMPOS_REGISTRANTE_DOMINIO : null
+  if (!campos) return []
+  return campos.filter((c) => c.required && !String(datos?.[c.key] || '').trim()).map((c) => c.label)
+}
+
+// Texto corto legible para respuestaTexto / notificaciones, a partir del
+// objeto estructurado — así las vistas que solo muestran texto no quedan vacías.
+export function resumenRegistranteDominio(datos) {
+  const d = datos || {}
+  const nombre = [d.nombre, d.apellido].filter(Boolean).join(' ')
+  const partes = [nombre, d.empresa, d.direccion, [d.ciudad, d.estado, d.codigoPostal].filter(Boolean).join(', '), d.pais, d.correo, [d.codigoTelefono, d.telefono].filter(Boolean).join(' ')]
+  return partes.filter(Boolean).join(' — ')
 }
