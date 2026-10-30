@@ -25,25 +25,28 @@ migración), cualquier otro archivo, reiniciar servicios, hacer push o tocar
 
 ## Checklist
 
-- [x] 0. Documento de seguimiento creado (este archivo).
-- [ ] 1. Guard de sesión desconectada en `whatsapp-bridge/index.js` — estado
-      persistente en `alertas.json`, notifica al caer, re-notifica cada 12h
-      mientras siga caída, limpia el flag al recuperarse.
-- [ ] 2. Indicador de sincronización estancada — cálculo on-demand
-      (`ok`/`revisar`/`sin_datos`) por grupo, basado en `MAX(fechaMensaje)`
-      vs. 48h, consumido por la tool de la tarea 4.
-- [ ] 3. Alerta automática visible — endpoint `POST
+- [x] 0. Documento de seguimiento creado (este archivo). Commit `52ba097`.
+- [x] 1. Guard de sesión desconectada en `whatsapp-bridge/index.js` — estado
+      persistente en `alertas.json` (runtime, no commiteado, igual que
+      `estado.json`), notifica al caer, re-notifica cada 12h mientras siga
+      caída, limpia el flag al recuperarse. Commit `ff3480f`.
+- [x] 2. Indicador de sincronización estancada — cálculo on-demand
+      (`ok`/`revisar`/`sin_datos`) por grupo vía `estadoGrupoWhatsapp()` en
+      `mcp.js`, basado en el último `fechaMensaje` vs. 48h. Commit `17707dd`.
+- [x] 3. Alerta automática visible — endpoint `POST
       /api/integraciones/whatsapp/alerta` en `integracionesWhatsApp.js` que
       crea una nota interna (mismo mecanismo que `nota_interna`:
       `prisma.logEntry.create` + `emitirCambio`) en los proyectos afectados;
-      el bridge lo llama al detectar la sesión caída.
-- [ ] 4. Tool MCP `listar_grupos_whatsapp` en `mcp.js` — grupos vinculados al
-      proyecto con último mensaje y estado (tarea 2).
-- [ ] 5. Tool MCP `vincular_grupo_whatsapp` en `mcp.js` — vincula/desvincula
+      el bridge lo llama al detectar la sesión caída. Commit `40cfa29`.
+- [x] 4. Tool MCP `listar_grupos_whatsapp` en `mcp.js` — grupos vinculados al
+      proyecto con último mensaje y estado (tarea 2). Commit `17707dd`.
+- [x] 5. Tool MCP `vincular_grupo_whatsapp` en `mcp.js` — vincula/desvincula
       un grupo sin mandar la lista completa de `infoClave.grupos[]`.
-- [ ] 6. Filtro opcional `grupo` en `ver_mensajes_whatsapp`.
-- [ ] 7. `ultimaActividad()` en `salud.js` considera mensajes de WhatsApp;
+      Commit `17707dd`.
+- [x] 6. Filtro opcional `grupo` en `ver_mensajes_whatsapp`. Commit `17707dd`.
+- [x] 7. `ultimaActividad()` en `salud.js` considera mensajes de WhatsApp;
       `ver_salud_proyectos` incluye `mensajesWhatsapp` en su query.
+      Commit `87c714e`.
 
 ## Criterios de aceptación
 
@@ -65,4 +68,15 @@ migración), cualquier otro archivo, reiniciar servicios, hacer push o tocar
 
 ## Progreso y commits
 
-(se completa a medida que avanza cada tarea)
+Todas las tareas (0-7) completadas en `feature/whatsapp-sync-guard-mcp`:
+
+1. `52ba097` — docs: plan de tareas para guard de sincronización whatsapp
+2. `ff3480f` — feat: guard de sesión de WhatsApp desconectada en el puente
+3. `40cfa29` — feat: endpoint de alerta automática de sincronización de whatsapp
+4. `87c714e` — feat: considerar mensajes de whatsapp como señal de actividad en salud de proyectos
+5. `17707dd` — feat: tools MCP para listar, vincular y filtrar grupos de whatsapp
+   (incluye un fix incidental de consistencia en `solicitar_al_cliente`,
+   detectado por el hook de revisión del repo — ver reporte final)
+
+Verificación: `node --check` limpio en los 4 archivos `.js` tocados y
+`npx prisma validate` sin tocar el schema (ver reporte final de la sesión).
