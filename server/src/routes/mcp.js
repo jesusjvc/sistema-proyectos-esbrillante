@@ -719,6 +719,9 @@ function buildServer(usuario) {
         include: {
           tareas: { include: { comentarios: { orderBy: { creadoEn: 'desc' }, take: 1 } } },
           log: { orderBy: { fecha: 'desc' }, take: 1 },
+          // Último mensaje de WhatsApp — calcularSalud() lo considera como
+          // señal de actividad junto con log/tareas/comentarios.
+          mensajesWhatsapp: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
         },
         orderBy: { creadoEn: 'desc' },
       })
