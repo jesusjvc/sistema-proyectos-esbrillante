@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { getPrototipos, getProyectos, actualizarPrototipo, eliminarPrototipo } from '../data/api'
+import { formatFechaHora } from '../data/storage'
 import { ESTADO_CONFIG, ESTADO_OPCIONES } from '../data/prototipos'
 import ModalNuevoPrototipo from '../components/ModalNuevoPrototipo'
 import { ExternalLink, Download, Trash2, Plus, MessageCircle } from 'lucide-react'
@@ -117,7 +118,7 @@ export default function Prototipos() {
                             {p.nombre_original}
                             {p.tipo === 'pagina_web' && <span className="ml-1.5 text-[10px] font-bold uppercase text-slate-400">· página web</span>}
                           </div>
-                          <div className="text-xs text-slate-400">v{p.version} · {p.fecha_actualizacion.slice(0, 10)}</div>
+                          <div className="text-xs text-slate-400">v{p.version} · {formatFechaHora(p.fecha_actualizacion)}</div>
                         </div>
                         {p.comentariosPendientes > 0 && (
                           <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
@@ -161,6 +162,7 @@ export default function Prototipos() {
       {modalNuevo && (
         <ModalNuevoPrototipo
           proyectos={proyectos}
+          todosLosPrototipos={prototipos}
           onCreado={() => { setModalNuevo(false); cargar() }}
           onCerrar={() => setModalNuevo(false)}
         />

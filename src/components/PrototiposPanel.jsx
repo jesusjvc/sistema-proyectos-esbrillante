@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getPrototipos, actualizarPrototipo, eliminarPrototipo } from '../data/api'
+import { formatFechaHora } from '../data/storage'
 import { ESTADO_CONFIG, ESTADO_OPCIONES } from '../data/prototipos'
 import ModalNuevoPrototipo from './ModalNuevoPrototipo'
 import { useAuth } from '../context/AuthContext'
@@ -72,7 +73,7 @@ export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
                     {p.nombre_original}
                     {p.tipo === 'pagina_web' && <span className="ml-1.5 text-[10px] font-bold uppercase text-slate-400 dark:text-ink-400">· página web</span>}
                   </div>
-                  <div className="text-xs text-slate-400 dark:text-ink-400">v{p.version} · {p.fecha_actualizacion.slice(0, 10)}</div>
+                  <div className="text-xs text-slate-400 dark:text-ink-400">v{p.version} · {formatFechaHora(p.fecha_actualizacion)}</div>
                 </div>
                 {p.comentariosPendientes > 0 && (
                   <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300">
@@ -103,6 +104,7 @@ export default function PrototiposPanel({ proyectoSlug, proyectoNombre }) {
         <ModalNuevoPrototipo
           proyectoSlug={proyectoSlug}
           proyectoNombre={proyectoNombre}
+          todosLosPrototipos={prototipos}
           onCreado={() => { setModalNuevo(false); cargar() }}
           onCerrar={() => setModalNuevo(false)}
         />

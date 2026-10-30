@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { crearPrototipo } from '../data/api'
+import { formatFechaHora } from '../data/storage'
 import useEscape from '../hooks/useEscape'
 import { X } from 'lucide-react'
 
@@ -9,8 +10,9 @@ const inputCls = 'w-full border border-slate-200 dark:border-ink-500 rounded-lg 
  * Modal para publicar un prototipo o página web.
  * - proyectos (opcional): si se pasa, muestra un selector de proyecto (vista global /admin/prototipos).
  * - proyectoSlug/proyectoNombre (opcional): si no hay `proyectos`, el proyecto queda fijo (pestaña dentro de un proyecto).
+ * - todosLosPrototipos (opcional): lista de prototipos ya publicados, para avisar si el proyecto elegido ya tiene otros.
  */
-export default function ModalNuevoPrototipo({ proyectos, proyectoSlug: proyectoFijo, proyectoNombre: proyectoFijoNombre, onCreado, onCerrar }) {
+export default function ModalNuevoPrototipo({ proyectos, proyectoSlug: proyectoFijo, proyectoNombre: proyectoFijoNombre, todosLosPrototipos, onCreado, onCerrar }) {
   useEscape(onCerrar)
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState('prototipo')
@@ -21,6 +23,13 @@ export default function ModalNuevoPrototipo({ proyectos, proyectoSlug: proyectoF
   const [proyectoSlug, setProyectoSlug] = useState(proyectoFijo || '')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+  const [confirmoDuplicados, setConfirmoDuplicados] = useState(false)
+
+  const prototiposExistentes = (todosLosPrototipos || []).filter((p) => proyectoSlug && p.proyectoSlug === proyectoSlug)
+
+  // Si cambia el proyecto seleccionado, el aviso de duplicados ya no corresponde
+  // al proyecto nuevo — no queda "pre-confirmado" un riesgo que no se revisó.
+  useEffect(() => { setConfirmoDuplicados(false) }, [proyectoSlug])
 
   function cargarArchivo(file) {
     if (!file) return
@@ -133,8 +142,26 @@ export default function ModalNuevoPrototipo({ proyectos, proyectoSlug: proyectoF
             </div>
           )}
 
+          {prototiposExistentes.length > 0 && (
+            <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-900 rounded-lg px-3 py-2.5 space-y-2">
+              <p className="font-medium">
+                Ya hay {prototiposExistentes.length} prototipo{prototiposExistentes.length === 1 ? '' : 's'} publicado{prototiposExistentes.length === 1 ? '' : 's'} para este proyecto:
+              </p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {prototiposExistentes.map((p) => (
+                  <li key={p.slug}>{p.nombre_original} <span className="text-amber-600 dark:text-amber-400">· {formatFechaHora(p.fecha_actualizacion)}</span></li>
+                ))}
+              </ul>
+              <p>Esto no reemplaza los anteriores. Si alguno ya no sirve, hay que eliminarlo manualmente desde el listado.</p>
+              <label className="flex items-start gap-2 pt-1 cursor-pointer">
+                <input type="checkbox" checked={confirmoDuplicados} onChange={(e) => setConfirmoDuplicados(e.target.checked)} className="mt-0.5" />
+                <span>Ya revisé los anteriores y quiero publicar este de todas formas</span>
+              </label>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={!listo || enviando} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+            <button type="submit" disabled={!listo || enviando || (prototiposExistentes.length > 0 && !confirmoDuplicados)} className="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 py-2.5 rounded-lg text-sm font-semibold transition-colors">
               {enviando ? 'Publicando…' : 'Publicar'}
             </button>
             <button type="button" onClick={onCerrar} className="px-5 border border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-600 rounded-lg text-sm transition-colors">
