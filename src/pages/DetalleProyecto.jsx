@@ -272,8 +272,12 @@ export default function DetalleProyecto() {
   }
 
   async function handleEliminarTarea(tareaId) {
-    await eliminarTarea(proyecto.slug, tareaId)
-    await refresh()
+    try {
+      await eliminarTarea(proyecto.slug, tareaId)
+      await refresh()
+    } catch (err) {
+      alert(err.message || 'No se pudo eliminar la tarea')
+    }
   }
 
   async function togglePausa() {
