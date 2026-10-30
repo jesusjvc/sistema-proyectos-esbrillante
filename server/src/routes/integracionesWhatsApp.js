@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import prisma from '../lib/prisma.js'
 import { requireAuthOrApiKey } from '../middleware/auth.js'
+import { emitirCambio } from '../lib/eventos.js'
 
 const router = Router()
 
@@ -117,6 +118,47 @@ router.post('/mensajes', requireAuthOrApiKey, async (req, res) => {
       proyectos: destinos.map(({ proyecto }) => proyecto.slug),
       purgados: purgados.count,
     })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/integraciones/whatsapp/alerta — el puente la llama cuando detecta
+// la sesión de OpenWA desconectada, para dejar constancia visible en el
+// panel admin. Reusa exactamente el mismo mecanismo que la tool MCP
+// nota_interna (prisma.logEntry.create + emitirCambio), no un modelo nuevo.
+// { motivo: string, proyectoIds?: string[] } — sin proyectoIds, afecta a
+// todos los proyectos activos con al menos un grupo de WhatsApp (mismo
+// filtro que GET /grupos).
+router.post('/alerta', requireAuthOrApiKey, async (req, res) => {
+  const { motivo, proyectoIds } = req.body
+  const texto = typeof motivo === 'string' ? motivo.trim() : ''
+  if (!texto) return res.status(400).json({ error: 'Falta el motivo' })
+
+  try {
+    let proyectos
+    if (Array.isArray(proyectoIds) && proyectoIds.length) {
+      proyectos = await prisma.proyecto.findMany({ where: { id: { in: proyectoIds } } })
+    } else {
+      const activos = await prisma.proyecto.findMany({ where: { status: 'activo' } })
+      proyectos = activos.filter((p) => gruposDe(p).some((g) => g.canal === 'whatsapp'))
+    }
+    if (!proyectos.length) {
+      return res.status(404).json({ error: 'No hay proyectos afectados para registrar la alerta' })
+    }
+
+    await prisma.logEntry.createMany({
+      data: proyectos.map((p) => ({
+        proyectoId: p.id,
+        usuario: 'Puente WhatsApp (automático)',
+        accion: 'Alerta automática',
+        detalle: texto.slice(0, 2000),
+      })),
+    })
+    for (const p of proyectos) emitirCambio(p.id)
+
+    res.json({ ok: true, proyectos: proyectos.map((p) => p.slug) })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })
