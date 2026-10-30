@@ -19,6 +19,7 @@ const FOCO_URL = (process.env.FOCO_URL || '').replace(/\/$/, '')
 const FOCO_API_KEY = process.env.FOCO_API_KEY || ''
 const INTERVALO_MINUTOS = Math.max(Number(process.env.INTERVALO_MINUTOS) || 60, 5)
 const ESTADO_PATH = fileURLToPath(new URL('./estado.json', import.meta.url))
+const ALERTAS_PATH = fileURLToPath(new URL('./alertas.json', import.meta.url))
 
 if (!OPENWA_URL || !OPENWA_API_KEY || !FOCO_URL || !FOCO_API_KEY) {
   console.error('Faltan variables en el .env — copia .env.example y llena OPENWA_*/FOCO_*.')
@@ -41,6 +42,61 @@ function guardarUltimo(chatId, ts) {
     estado[chatId] = ts
     writeFileSync(ESTADO_PATH, JSON.stringify(estado, null, 2))
   }
+}
+
+// ── Guard de sesión desconectada: estado persistente (sobrevive reinicios
+// del proceso) para no espamear una nota interna por proyecto cada vuelta
+// mientras la sesión de OpenWA siga caída — solo notifica al iniciar la
+// caída y, como mucho, cada HORAS_RENOTIFICAR mientras no se recupere.
+const HORAS_RENOTIFICAR = 12
+let alertas = { activa: false, desde: null, ultimaNotificacion: null }
+function cargarAlertas() {
+  try {
+    if (existsSync(ALERTAS_PATH)) {
+      alertas = { activa: false, desde: null, ultimaNotificacion: null, ...JSON.parse(readFileSync(ALERTAS_PATH, 'utf8')) }
+    }
+  } catch (err) {
+    console.error('No se pudo leer alertas.json:', err.message)
+    alertas = { activa: false, desde: null, ultimaNotificacion: null }
+  }
+}
+function guardarAlertas() {
+  writeFileSync(ALERTAS_PATH, JSON.stringify(alertas, null, 2))
+}
+
+async function notificarAlertaFoco(motivo) {
+  try {
+    await postFoco('/api/integraciones/whatsapp/alerta', { motivo })
+  } catch (err) {
+    console.error('No se pudo avisar la alerta a Foco:', err.message)
+  }
+}
+
+// Marca (o re-marca) la sesión como desconectada y dispara la nota interna
+// en Foco — solo la primera vez que cae, y luego como mucho cada 12h.
+async function marcarSesionDesconectada(motivo) {
+  const ahora = Date.now()
+  if (!alertas.activa) {
+    alertas = { activa: true, desde: new Date(ahora).toISOString(), ultimaNotificacion: new Date(ahora).toISOString() }
+    guardarAlertas()
+    await notificarAlertaFoco(`⚠️ Sesión de WhatsApp (OpenWA) desconectada — los grupos vinculados a este proyecto dejaron de sincronizar mensajes nuevos desde ${alertas.desde}. Motivo: ${motivo}`)
+    return
+  }
+  const pasaronHoras = !alertas.ultimaNotificacion
+    || (ahora - new Date(alertas.ultimaNotificacion).getTime()) >= HORAS_RENOTIFICAR * 3600_000
+  if (pasaronHoras) {
+    alertas.ultimaNotificacion = new Date(ahora).toISOString()
+    guardarAlertas()
+    await notificarAlertaFoco(`⚠️ Sesión de WhatsApp (OpenWA) sigue desconectada desde ${alertas.desde} — los grupos vinculados a este proyecto siguen sin sincronizar mensajes nuevos. Motivo: ${motivo}`)
+  }
+}
+
+// Limpia el flag cuando la sesión vuelve a estar conectada tras una caída.
+async function marcarSesionRecuperada() {
+  if (!alertas.activa) return
+  console.log(`Sesión de WhatsApp recuperada (había caído desde ${alertas.desde}).`)
+  alertas = { activa: false, desde: null, ultimaNotificacion: null }
+  guardarAlertas()
 }
 
 async function get(url, headers = {}) {
@@ -73,20 +129,35 @@ async function sincronizar() {
     return
   }
 
-  // 2. Resolver la sesión de WhatsApp en OpenWA.
+  // 2. Resolver la sesión de WhatsApp en OpenWA — y el guard de sesión
+  // desconectada: cualquier caso en el que no haya una sesión usable y
+  // conectada dispara (o mantiene) la alerta en vez de solo loguearlo.
   const sesiones = await openwa('/sessions')
   const lista = Array.isArray(sesiones) ? sesiones : sesiones.sessions || sesiones.data || []
+  const ESTADOS_SESION_OK = ['connected', 'ready']
+  const sesionConectada = (s) => !!s && ESTADOS_SESION_OK.includes(String(s.status || '').toLowerCase())
+
+  let sesion = null
+  let motivoDesconexion = null
   if (!lista.length) {
-    console.log('OpenWA no tiene sesiones — escanea el QR en su dashboard.')
+    motivoDesconexion = 'OpenWA no tiene sesiones — escanea el QR en su dashboard.'
+  } else {
+    sesion = OPENWA_SESION
+      ? lista.find((s) => s.id === OPENWA_SESION || s.name === OPENWA_SESION)
+      : lista.find((s) => sesionConectada(s)) || lista[0]
+    if (!sesion) {
+      motivoDesconexion = `No encontré la sesión "${OPENWA_SESION}" — sesiones disponibles: ${lista.map((s) => s.name || s.id).join(', ')}`
+    } else if (!sesionConectada(sesion)) {
+      motivoDesconexion = `La sesión de WhatsApp "${sesion.name || sesion.id}" no está conectada (status: ${sesion.status || 'desconocido'})`
+    }
+  }
+
+  if (motivoDesconexion) {
+    console.log(motivoDesconexion)
+    await marcarSesionDesconectada(motivoDesconexion)
     return
   }
-  const sesion = OPENWA_SESION
-    ? lista.find((s) => s.id === OPENWA_SESION || s.name === OPENWA_SESION)
-    : lista.find((s) => s.status === 'connected' || s.status === 'CONNECTED') || lista[0]
-  if (!sesion) {
-    console.log(`No encontré la sesión "${OPENWA_SESION}" — sesiones disponibles:`, lista.map((s) => s.name || s.id).join(', '))
-    return
-  }
+  await marcarSesionRecuperada()
   const sesionId = sesion.id || sesion.name
 
   // 3. Chats de la sesión → chatId de cada grupo rastreado.
@@ -152,6 +223,7 @@ async function sincronizar() {
 
 // ── Loop
 cargarEstado()
+cargarAlertas()
 async function vuelta() {
   try {
     await sincronizar()
