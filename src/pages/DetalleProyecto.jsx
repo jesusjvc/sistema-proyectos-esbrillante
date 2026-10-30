@@ -276,6 +276,18 @@ export default function DetalleProyecto() {
       await eliminarTarea(proyecto.slug, tareaId)
       await refresh()
     } catch (err) {
+      if (err.dependientes?.length) {
+        const titulos = err.dependientes.map((d) => d.titulo).join(', ')
+        const confirmaCascada = confirm(`${err.message}\n\n¿También eliminar estas tareas dependientes?\n${titulos}`)
+        if (!confirmaCascada) return
+        try {
+          await eliminarTarea(proyecto.slug, tareaId, { cascada: true })
+          await refresh()
+        } catch (err2) {
+          alert(err2.message || 'No se pudo eliminar la tarea')
+        }
+        return
+      }
       alert(err.message || 'No se pudo eliminar la tarea')
     }
   }

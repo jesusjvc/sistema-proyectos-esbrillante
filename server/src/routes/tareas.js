@@ -31,6 +31,24 @@ async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
+// Cierre transitivo: si A depende de tareaId y B depende de A, ambas cuentan
+// como dependientes aunque B no mencione a tareaId directamente.
+function dependientesTransitivos(tareaId, todasLasTareas) {
+  const vistos = new Set()
+  const cola = [tareaId]
+  while (cola.length) {
+    const actual = cola.shift()
+    for (const t of todasLasTareas) {
+      if (t.id === tareaId || vistos.has(t.id)) continue
+      if (t.dependencias.includes(actual)) {
+        vistos.add(t.id)
+        cola.push(t.id)
+      }
+    }
+  }
+  return todasLasTareas.filter((t) => vistos.has(t.id))
+}
+
 // Avisa a quienes les toca la tarea (según destinatariosDeTarea) de una acción que
 // alguien más acaba de hacer sobre ella. crearNotificacion ya excluye al actor.
 async function notificarDestinatarios(p, tarea, actor, tipo, mensaje) {
@@ -537,20 +555,26 @@ router.post('/', requireAuth, async (req, res) => {
     const nueva = await crearTareaCustom(p, { fase, columna, titulo, descripcion, instruccionesCliente: instrucciones, responsable, esCliente, plazoHoras, dependencias, prioridad, fechaLimite, modulo: moduloValido })
 
     // Módulo "recursos": prepara la subcarpeta de Drive y adjunta el enlace
-    // en la tarea — el portal del cliente muestra el botón de subida.
-    if (moduloValido === 'recursos') {
-      const conDrive = driveConfigurado()
-      const urlDrive = conDrive ? await obtenerOCrearCarpetaRecursos(p) : null
-      if (urlDrive) {
-        await prisma.tarea.update({
-          where: { id: nueva.id },
-          data: {
-            driveFolderUrl: urlDrive,
-            instruccionesCliente: MODULOS_CLIENTE.recursos.plantilla({ conDrive: true, urlDrive }),
-          },
-        })
-        nueva.driveFolderUrl = urlDrive
-        nueva.instruccionesCliente = MODULOS_CLIENTE.recursos.plantilla({ conDrive: true, urlDrive })
+    // en la tarea — el portal del cliente muestra el botón de subida. La
+    // tarea ya quedó creada arriba, así que un fallo de Drive acá es "mejor
+    // esfuerzo": se loguea y se sigue, en vez de devolver 500 por una tarea
+    // que en realidad sí se creó (y arriesgar que el cliente la duplique).
+    if (moduloValido === 'recursos' && driveConfigurado()) {
+      try {
+        const urlDrive = await obtenerOCrearCarpetaRecursos(p)
+        if (urlDrive) {
+          await prisma.tarea.update({
+            where: { id: nueva.id },
+            data: {
+              driveFolderUrl: urlDrive,
+              instruccionesCliente: MODULOS_CLIENTE.recursos.plantilla({ conDrive: true, urlDrive }),
+            },
+          })
+          nueva.driveFolderUrl = urlDrive
+          nueva.instruccionesCliente = MODULOS_CLIENTE.recursos.plantilla({ conDrive: true, urlDrive })
+        }
+      } catch (err) {
+        console.error('Error creando carpeta de Drive para tarea de recursos:', err)
       }
     }
 
@@ -573,6 +597,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.delete('/:tareaId', requireAuth, async (req, res) => {
   const { slug, tareaId } = req.params
   const usuario = req.user.nombre
+  const cascada = req.body?.cascada === true
 
   try {
     const p = await getProyecto(slug)
@@ -584,8 +609,36 @@ router.delete('/:tareaId', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para eliminar esta tarea' })
     }
     if (!tarea.custom) return res.status(400).json({ error: 'Solo se pueden eliminar tareas personalizadas' })
-    const dependiente = p.tareas.find((item) => item.id !== tareaId && item.dependencias.includes(tareaId))
-    if (dependiente) return res.status(400).json({ error: `No se puede eliminar porque "${dependiente.titulo}" depende de esta tarea` })
+
+    const dependientes = dependientesTransitivos(tareaId, p.tareas)
+    // La cascada no puede saltarse las mismas reglas que protegen el borrado
+    // directo: si algún dependiente transitivo no es personalizado o el
+    // usuario no tiene permiso sobre él, no se ofrece ni se ejecuta cascada.
+    const dependienteBloqueado = dependientes.find((d) => !d.custom || !tareaLeCorresponde(d, p.equipo, req.user))
+    if (dependienteBloqueado) {
+      return res.status(403).json({ error: `No se puede eliminar en cascada: "${dependienteBloqueado.titulo}" no es una tarea personalizada o no tienes permiso sobre ella` })
+    }
+    if (dependientes.length && !cascada) {
+      const mensaje = dependientes.length === 1
+        ? `No se puede eliminar porque "${dependientes[0].titulo}" depende de esta tarea`
+        : `No se puede eliminar porque ${dependientes.length} tareas dependen de esta tarea`
+      return res.status(400).json({ error: mensaje, dependientes: dependientes.map((d) => ({ id: d.id, titulo: d.titulo })) })
+    }
+
+    if (dependientes.length) {
+      // Cascada confirmada por el usuario: se borra la tarea original más todos
+      // sus dependientes transitivos en una sola transacción, para no dejar
+      // tareas con `dependencias` apuntando a un id que ya no existe.
+      const todasLasBorradas = [tarea, ...dependientes]
+      await prisma.$transaction(async (tx) => {
+        await tx.tarea.deleteMany({ where: { id: { in: todasLasBorradas.map((t) => t.id) } } })
+        for (const t of todasLasBorradas) {
+          await tx.logEntry.create({ data: { proyectoId: p.id, usuario, accion: 'Tarea eliminada', detalle: t.titulo } })
+        }
+      })
+      emitirCambio(p.id)
+      return res.json({ ok: true, eliminadas: todasLasBorradas.map((t) => t.titulo) })
+    }
 
     await prisma.tarea.delete({ where: { id: tareaId } })
     await logEntry(p.id, usuario, 'Tarea eliminada', tarea.titulo)

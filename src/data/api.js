@@ -10,6 +10,10 @@ async function req(method, path, body) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     const error = new Error(err.error || `Error ${res.status}`)
+    // Se copia el resto del payload (ej. `dependientes`) para que el llamador
+    // pueda leerlo sin reparsear la respuesta; Object.assign no pisa `message`
+    // porque `err` no tiene esa clave.
+    Object.assign(error, err)
     error.status = res.status
     throw error
   }
@@ -82,7 +86,8 @@ export const agregarNota = (slug, data) => req('POST', `/api/proyectos/${slug}/n
 export const actualizarInfoClave = (slug, infoClave) => req('PUT', `/api/proyectos/${slug}/info-clave`, infoClave)
 export const agregarFase = (slug, nombre) => req('POST', `/api/proyectos/${slug}/fases`, { nombre })
 export const eliminarFase = (slug, numero) => req('DELETE', `/api/proyectos/${slug}/fases/${numero}`)
-export const eliminarTarea = (slug, tareaId) => req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`)
+export const eliminarTarea = (slug, tareaId, { cascada } = {}) =>
+  req('DELETE', `/api/proyectos/${slug}/tareas/${tareaId}`, cascada ? { cascada: true } : undefined)
 export const adjuntarArchivoTarea = (slug, tareaId, archivo) => {
   const form = new FormData()
   form.append('archivo', archivo)
