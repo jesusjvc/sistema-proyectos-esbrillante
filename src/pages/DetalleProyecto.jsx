@@ -1183,6 +1183,20 @@ export default function DetalleProyecto() {
               <ExternalLink size={13} className="text-slate-400 dark:text-ink-400" />
             </a>
           </div>
+          <button
+            onClick={() => {
+              if (!proyecto.clienteAccessToken) return
+              navigator.clipboard.writeText(`${window.location.origin}/cliente/${proyecto.slug}?token=${proyecto.clienteAccessToken}`)
+              setCopiado('linkDirecto')
+              setTimeout(() => setCopiado(false), 2000)
+            }}
+            disabled={!proyecto.clienteAccessToken}
+            className="w-full flex items-center justify-between gap-2 bg-slate-50 dark:bg-ink-900 border border-slate-200 dark:border-ink-500 hover:border-brand-300 dark:hover:border-brand-600 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1.5 rounded-md transition-colors text-left"
+            title={proyecto.clienteAccessToken ? 'Copiar link de acceso directo (entra sin pedir contraseña)' : 'Token de acceso aún no disponible — recargá la página'}
+          >
+            <span className="text-xs text-slate-700 dark:text-ink-300 truncate">Link de acceso directo</span>
+            {copiado === 'linkDirecto' ? <Check size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Copy size={13} className="text-slate-400 dark:text-ink-400 shrink-0" />}
+          </button>
           <div className="flex items-stretch gap-1.5">
             <button
               onClick={() => {
