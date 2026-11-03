@@ -104,3 +104,57 @@ export function resumenRegistranteDominio(datos) {
   const partes = [nombre, d.empresa, d.direccion, [d.ciudad, d.estado, d.codigoPostal].filter(Boolean).join(', '), d.pais, d.correo, [d.codigoTelefono, d.telefono].filter(Boolean).join(' ')]
   return partes.filter(Boolean).join(' — ')
 }
+
+// Preguntas libres (solicitar_al_cliente con el parámetro "preguntas"): a
+// diferencia de los módulos de arriba, el conjunto de preguntas lo define
+// quien crea la solicitud, no una plantilla fija — por eso viven en
+// Tarea.preguntas en vez de en MODULOS_CLIENTE. Las respuestas del cliente
+// quedan en Tarea.respuestaDatos, keyed por el id de cada pregunta.
+
+// Valida la FORMA de las preguntas al crear la solicitud (antes de guardar).
+// Devuelve un mensaje de error, o null si está todo bien.
+export function validarFormaPreguntas(preguntas) {
+  if (!Array.isArray(preguntas) || !preguntas.length) return 'La lista de preguntas no puede estar vacía.'
+  for (const p of preguntas) {
+    if (!p.texto?.trim()) return 'Cada pregunta necesita "texto".'
+    if (p.tipo === 'opcion_multiple' && (!Array.isArray(p.opciones) || p.opciones.length < 2)) {
+      return `La pregunta "${p.texto}" es de opción múltiple y necesita al menos 2 "opciones".`
+    }
+  }
+  return null
+}
+
+// Valida las RESPUESTAS del cliente contra la definición de preguntas al
+// completar la tarea. Devuelve un array de errores (vacío si todo bien) —
+// mismo patrón que camposFaltantes.
+export function erroresRespuestasPreguntas(preguntas, respuestas) {
+  const r = respuestas || {}
+  const errores = []
+  for (const p of preguntas || []) {
+    const v = r[p.id]
+    const vacia = p.tipo === 'opcion_multiple' ? !Array.isArray(v) || !v.length : !String(v || '').trim()
+    if (vacia) {
+      if (p.requerida !== false) errores.push(`Falta responder: "${p.texto}"`)
+      continue
+    }
+    if (p.tipo === 'cerrada' && v !== 'si' && v !== 'no') errores.push(`"${p.texto}": la respuesta debe ser "si" o "no"`)
+    if (p.tipo === 'opcion_multiple') {
+      const invalidas = v.filter((x) => !p.opciones.includes(x))
+      if (invalidas.length) errores.push(`"${p.texto}": "${invalidas.join(', ')}" no está entre las opciones`)
+    }
+  }
+  return errores
+}
+
+// Texto legible "pregunta: respuesta" para respuestaTexto / notificaciones.
+export function resumenPreguntas(preguntas, respuestas) {
+  const r = respuestas || {}
+  return (preguntas || [])
+    .map((p) => {
+      const v = r[p.id]
+      const valor = p.tipo === 'opcion_multiple' ? (Array.isArray(v) ? v.join(', ') : '') : (v || '')
+      return valor ? `${p.texto}: ${valor}` : null
+    })
+    .filter(Boolean)
+    .join(' — ')
+}

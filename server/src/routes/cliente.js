@@ -8,7 +8,7 @@ import { emitirCambio } from '../lib/eventos.js'
 import { enviarEmail } from '../lib/email.js'
 import { enviarGoogleChat } from '../lib/googleChat.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
-import { extraerDominio, camposFaltantes, resumenRegistranteDominio } from '../lib/modulosCliente.js'
+import { extraerDominio, camposFaltantes, resumenRegistranteDominio, erroresRespuestasPreguntas, resumenPreguntas } from '../lib/modulosCliente.js'
 import { notificarInformacionLista } from '../lib/notificaciones.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
@@ -116,6 +116,15 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
       if (faltantes.length) return res.status(400).json({ error: `Faltan campos: ${faltantes.join(', ')}` })
       // Texto legible derivado, para las vistas que todavía solo muestran texto.
       respuestaTexto = resumenRegistranteDominio(respuestaDatos)
+    } else if (Array.isArray(tareaActual.preguntas) && tareaActual.preguntas.length) {
+      try {
+        respuestaDatos = req.body?.respuestaDatos ? JSON.parse(req.body.respuestaDatos) : null
+      } catch {
+        return res.status(400).json({ error: 'Formato de respuesta inválido' })
+      }
+      const errores = erroresRespuestasPreguntas(tareaActual.preguntas, respuestaDatos)
+      if (errores.length) return res.status(400).json({ error: errores.join('; ') })
+      respuestaTexto = resumenPreguntas(tareaActual.preguntas, respuestaDatos)
     }
 
     const data = { estado: 'completada', completadaPor: 'Cliente', completadaEn: new Date() }

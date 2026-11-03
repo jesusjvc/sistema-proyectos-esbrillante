@@ -630,10 +630,12 @@ const inputClsCliente = 'w-full text-base bg-white dark:bg-ink-900 border border
 
 function TareaClienteCard({ tarea: t, onCompletar }) {
   const esFormulario = t.modulo === 'registrante_dominio'
+  const preguntas = Array.isArray(t.preguntas) && t.preguntas.length ? t.preguntas : null
   const [expandida, setExpandida] = useState(true)
   const [texto, setTexto] = useState('')
   const [archivo, setArchivo] = useState(null)
   const [datos, setDatos] = useState(() => Object.fromEntries(CAMPOS_REGISTRANTE_DOMINIO.map((c) => [c.key, c.default || ''])))
+  const [respuestasPreguntas, setRespuestasPreguntas] = useState(() => Object.fromEntries((preguntas || []).map((p) => [p.id, p.tipo === 'opcion_multiple' ? [] : ''])))
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
@@ -642,10 +644,13 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
     if (esFormulario) {
       const faltante = CAMPOS_REGISTRANTE_DOMINIO.find((c) => c.required && !datos[c.key]?.trim())
       if (faltante) return setError(`Falta "${faltante.label}"`)
+    } else if (preguntas) {
+      const faltante = preguntas.find((p) => p.requerida !== false && (p.tipo === 'opcion_multiple' ? !respuestasPreguntas[p.id]?.length : !respuestasPreguntas[p.id]?.trim()))
+      if (faltante) return setError(`Falta responder: "${faltante.texto}"`)
     }
     setEnviando(true)
     try {
-      await onCompletar(esFormulario ? { datos } : { texto: texto.trim() || undefined, archivo: archivo || undefined })
+      await onCompletar(esFormulario ? { datos } : preguntas ? { datos: respuestasPreguntas } : { texto: texto.trim() || undefined, archivo: archivo || undefined })
     } catch {
       setError('No se pudo enviar tu respuesta. Intenta de nuevo.')
     } finally {
@@ -715,6 +720,57 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
                 </div>
               ))}
             </div>
+          ) : preguntas ? (
+            <div className="space-y-4 mb-3">
+              {preguntas.map((p) => (
+                <div key={p.id}>
+                  <label className="block text-sm font-medium text-slate-600 dark:text-ink-300 mb-1.5">{p.texto}{p.requerida !== false && ' *'}</label>
+                  {p.tipo === 'abierta' && (
+                    <textarea
+                      value={respuestasPreguntas[p.id] || ''}
+                      onChange={(e) => setRespuestasPreguntas({ ...respuestasPreguntas, [p.id]: e.target.value })}
+                      rows={2}
+                      className={`${inputClsCliente} resize-none`}
+                    />
+                  )}
+                  {p.tipo === 'cerrada' && (
+                    <div className="flex gap-2">
+                      {['si', 'no'].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setRespuestasPreguntas({ ...respuestasPreguntas, [p.id]: v })}
+                          className={`px-4 py-1.5 rounded-md text-sm font-medium border transition-colors ${respuestasPreguntas[p.id] === v ? 'bg-brand-500 border-brand-500 text-slate-900' : 'bg-slate-50 dark:bg-ink-900 border-slate-200 dark:border-ink-500 text-slate-600 dark:text-ink-300'}`}
+                        >
+                          {v === 'si' ? 'Sí' : 'No'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {p.tipo === 'opcion_multiple' && (
+                    <div className="space-y-1.5">
+                      {p.opciones.map((op) => {
+                        const marcada = (respuestasPreguntas[p.id] || []).includes(op)
+                        return (
+                          <label key={op} className="flex items-center gap-2 text-sm text-slate-700 dark:text-ink-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={marcada}
+                              onChange={() => {
+                                const actuales = respuestasPreguntas[p.id] || []
+                                setRespuestasPreguntas({ ...respuestasPreguntas, [p.id]: marcada ? actuales.filter((x) => x !== op) : [...actuales, op] })
+                              }}
+                              className="accent-brand-500"
+                            />
+                            {op}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           ) : (
             <>
               <textarea
@@ -753,7 +809,7 @@ function TareaClienteCard({ tarea: t, onCompletar }) {
             {enviando && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
             ✓ Enviar respuesta
           </button>
-          {!esFormulario && <p className="text-sm text-slate-400 dark:text-ink-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>}
+          {!esFormulario && !preguntas && <p className="text-sm text-slate-400 dark:text-ink-400 text-center mt-2">Puedes escribir, adjuntar un archivo, o ambos</p>}
         </div>
       )}
     </div>
