@@ -15,7 +15,7 @@ import { generarSlug } from '../lib/slug.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, listarArchivosCarpeta, driveConfigurado } from '../lib/drive.js'
-import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
+import { MODULOS_CLIENTE, validarFormaPreguntas } from '../lib/modulosCliente.js'
 import { chatEspacios, chatEnviar } from '../lib/googleChat.js'
 import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
@@ -23,6 +23,7 @@ import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { dominioDesde } from '../lib/clientesCrm.js'
 import { resolverClienteTicket } from '../lib/resolverCliente.js'
+import { gruposDe } from './integracionesWhatsApp.js'
 
 const router = Router()
 
@@ -96,6 +97,23 @@ async function getProyecto(slug) {
 
 async function logEntry(proyectoId, usuario, accion, detalle = '') {
   return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
+}
+
+// Indicador de sincronización por grupo de WhatsApp, calculado on-demand
+// sobre los mensajes ya recibidos (no consulta OpenWA en vivo): "ok" si el
+// último mensaje llegó dentro de HORAS_SIN_SINCRONIZAR, "revisar" si pasó más
+// tiempo (puede ser inactividad real del grupo o que la sincronización esté
+// fallando — ej. la sesión de OpenWA caída), "sin_datos" si nunca llegó uno.
+const HORAS_SIN_SINCRONIZAR = 48
+async function estadoGrupoWhatsapp(proyectoId, nombreGrupo, ahora = Date.now()) {
+  const ultimo = await prisma.mensajeWhatsApp.findFirst({
+    where: { proyectoId, grupo: nombreGrupo },
+    orderBy: { fechaMensaje: 'desc' },
+    select: { fechaMensaje: true },
+  })
+  if (!ultimo) return { ultimoMensaje: null, estado: 'sin_datos' }
+  const estado = (ahora - ultimo.fechaMensaje.getTime()) <= HORAS_SIN_SINCRONIZAR * 3600_000 ? 'ok' : 'revisar'
+  return { ultimoMensaje: ultimo.fechaMensaje.toISOString(), estado }
 }
 
 // Mismo helper que server/src/routes/tareas.js — avisa a quienes les toca la
@@ -642,7 +660,7 @@ function buildServer(usuario) {
       resumen.tareasPendientesCliente = p.tareas
         .filter((t) => t.esCliente && t.estado === 'pendiente')
         .sort((a, b) => a.orden - b.orden)
-        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, ...(t.modulo ? { modulo: t.modulo } : {}), instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras }))
+        .map((t) => ({ id: t.id, fase: t.fase, ...(t.frente ? { frente: t.frente } : {}), titulo: t.titulo, ...(t.modulo ? { modulo: t.modulo } : {}), ...(t.preguntas ? { preguntas: t.preguntas } : {}), instrucciones: t.instruccionesCliente, plazoHoras: t.plazoHoras }))
       // Notas de status recientes (tab "Status") + info clave del proyecto.
       resumen.notasStatus = (p.notas || []).map((n) => ({ autor: n.autor, texto: n.texto, creadoEn: n.creadoEn }))
       resumen.infoClave = p.proyecto?.infoClave || null
@@ -719,6 +737,9 @@ function buildServer(usuario) {
         include: {
           tareas: { include: { comentarios: { orderBy: { creadoEn: 'desc' }, take: 1 } } },
           log: { orderBy: { fecha: 'desc' }, take: 1 },
+          // Último mensaje de WhatsApp — calcularSalud() lo considera como
+          // señal de actividad junto con log/tareas/comentarios.
+          mensajesWhatsapp: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
         },
         orderBy: { creadoEn: 'desc' },
       })
@@ -792,19 +813,21 @@ function buildServer(usuario) {
     'ver_mensajes_whatsapp',
     {
       title: 'Ver mensajes de WhatsApp',
-      description: 'Mensajes de WhatsApp de los grupos de proyecto (capturados por el puente OpenWA local), con retención de 7 días. Sin slug: los mensajes de las últimas 48 h agrupados por proyecto — el punto de partida para resumir la actividad del día y detectar datos valiosos (decisiones, accesos, redes del cliente) para registrarlos en la Info clave o como nota de status. Con slug: mensajes de ese proyecto en la ventana de dias indicada (máx. 7).',
+      description: 'Mensajes de WhatsApp de los grupos de proyecto (capturados por el puente OpenWA local), con retención de 7 días. Sin slug: los mensajes de las últimas 48 h agrupados por proyecto — el punto de partida para resumir la actividad del día y detectar datos valiosos (decisiones, accesos, redes del cliente) para registrarlos en la Info clave o como nota de status. Con slug: mensajes de ese proyecto en la ventana de dias indicada (máx. 7). Con grupo: filtra además a un solo grupo del proyecto (nombre exacto, sin distinguir mayúsculas) — útil cuando el proyecto tiene varios grupos y solo te importa uno.',
       inputSchema: {
         slug: z.string().optional().describe('Slug o ID del proyecto — si se omite, devuelve los mensajes recientes de todos los proyectos con actividad'),
         dias: z.number().int().optional().describe('Ventana en días hacia atrás. Default 2, máximo 7 (retención).'),
+        grupo: z.string().optional().describe('Nombre exacto del grupo de WhatsApp — filtra a ese grupo dentro del/los proyecto(s) consultado(s).'),
       },
     },
-    async ({ slug, dias }) => {
+    async ({ slug, dias, grupo }) => {
       const ventana = Math.min(Math.max(dias ?? 2, 1), 7)
       const desde = new Date(Date.now() - ventana * 24 * 3600_000)
 
       const where = {
         fechaMensaje: { gte: desde },
         ...(slug ? { proyecto: { OR: [{ slug }, { id: slug }] } } : {}),
+        ...(grupo ? { grupo: { equals: grupo, mode: 'insensitive' } } : {}),
       }
       const mensajes = await prisma.mensajeWhatsApp.findMany({
         where,
@@ -836,6 +859,97 @@ function buildServer(usuario) {
           mensajes: [...mensajes].sort((a, b) => (a.grupo === b.grupo ? new Date(a.fecha) - new Date(b.fecha) : a.grupo.localeCompare(b.grupo))),
         })),
       }, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'listar_grupos_whatsapp',
+    {
+      title: 'Listar grupos de WhatsApp vinculados a un proyecto',
+      description: 'Lista los grupos de WhatsApp vinculados al proyecto (infoClave.grupos[] con canal "whatsapp") con la fecha de su último mensaje sincronizado y un indicador: "ok" (hubo mensaje en las últimas 48 h), "revisar" (pasaron más de 48 h desde el último mensaje — puede ser inactividad real del grupo o que la sincronización esté fallando, ej. la sesión de OpenWA caída) o "sin_datos" (nunca llegó un mensaje de ese grupo). Cálculo puro sobre los mensajes ya recibidos — no consulta OpenWA en vivo.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+      },
+    },
+    async ({ slug }) => {
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const grupos = gruposDe(p).filter((g) => g.canal === 'whatsapp')
+      if (!grupos.length) return fail(`El proyecto "${slug}" no tiene grupos de WhatsApp vinculados — agrégalo con editar_proyecto (infoClave.grupos) o con vincular_grupo_whatsapp.`)
+
+      const ahora = Date.now()
+      const resultado = []
+      for (const g of grupos) {
+        const { ultimoMensaje, estado } = await estadoGrupoWhatsapp(p.id, g.nombre, ahora)
+        resultado.push({ nombre: g.nombre, ...(g.etiqueta ? { etiqueta: g.etiqueta } : {}), ultimoMensaje, estado })
+      }
+
+      return ok(JSON.stringify({ slug: p.slug, grupos: resultado }, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'vincular_grupo_whatsapp',
+    {
+      title: 'Vincular o desvincular un grupo de WhatsApp al proyecto',
+      description: 'Agrega o quita una entrada de infoClave.grupos[] del proyecto sin tener que mandar la lista completa (a diferencia de editar_proyecto, que reemplaza todo el objeto infoClave). Con accion "vincular": agrega el grupo, o si ya existe uno con el mismo nombre exacto (sin distinguir mayúsculas) actualiza su etiqueta/nota en vez de duplicarlo. Con accion "desvincular": quita el grupo por nombre exacto.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        accion: z.enum(['vincular', 'desvincular']).describe('"vincular" agrega/actualiza, "desvincular" quita'),
+        nombre: z.string().describe('Nombre exacto del grupo en WhatsApp'),
+        etiqueta: z.string().optional().describe('Etiqueta corta del enfoque (ej. "Diseños") — solo aplica al vincular'),
+        nota: z.string().optional().describe('Nota del enfoque de ese grupo — solo aplica al vincular'),
+      },
+    },
+    async ({ slug, accion, nombre, etiqueta, nota }) => {
+      const nombreLimpio = String(nombre || '').trim()
+      if (!nombreLimpio) return fail('Falta el nombre exacto del grupo.')
+
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+
+      const actuales = p.proyecto?.infoClave?.grupos || []
+      const idx = actuales.findIndex((g) => g && String(g.nombre || '').trim().toLowerCase() === nombreLimpio.toLowerCase())
+
+      let nuevos
+      let detalle
+      if (accion === 'vincular') {
+        const previo = idx >= 0 ? actuales[idx] : null
+        const entrada = {
+          nombre: nombreLimpio.slice(0, 200),
+          etiqueta: String(etiqueta ?? previo?.etiqueta ?? '').trim().slice(0, 80),
+          nota: String(nota ?? previo?.nota ?? '').trim().slice(0, 500),
+          canal: previo?.canal === 'google-chat' ? 'google-chat' : 'whatsapp',
+        }
+        nuevos = idx >= 0 ? actuales.map((g, i) => (i === idx ? entrada : g)) : [...actuales, entrada]
+        detalle = idx >= 0 ? `grupo "${nombreLimpio}" actualizado` : `grupo "${nombreLimpio}" vinculado`
+      } else {
+        if (idx < 0) return fail(`El proyecto "${slug}" no tiene un grupo llamado "${nombreLimpio}".`)
+        nuevos = actuales.filter((_, i) => i !== idx)
+        detalle = `grupo "${nombreLimpio}" desvinculado`
+      }
+
+      await prisma.proyecto.update({
+        where: { id: p.id },
+        data: {
+          proyecto: {
+            ...p.proyecto,
+            infoClave: {
+              ...(p.proyecto?.infoClave || {}),
+              grupos: nuevos,
+              // Primer grupo como grupoWhatsapp (forma legada) — mismo
+              // criterio que editar_proyecto para no dejar dos fuentes de verdad.
+              grupoWhatsapp: nuevos[0]?.nombre ?? null,
+            },
+          },
+        },
+      })
+
+      await logEntry(p.id, usuario.nombre, 'Grupo de WhatsApp', detalle)
+      emitirCambio(p.id)
+
+      return ok(`Proyecto "${slug}": ${detalle}.`)
     },
   )
 
@@ -969,12 +1083,18 @@ function buildServer(usuario) {
     'solicitar_al_cliente',
     {
       title: 'Solicitar algo al cliente',
-      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). MÓDULOS: con el parámetro modulo la solicitud se vuelve estructurada — "dominio" (pide los datos para registrar el dominio EN TEXTO LIBRE; al responder el cliente, el dominio queda registrado en la Info clave del proyecto), "recursos" (pide fotos/logo/textos y crea la subcarpeta "Recursos" en el Drive del proyecto, adjuntando el enlace en la tarjeta para que suba ahí), "vobo" (aceptación formal del proyecto; su respuesta queda registrada como VoBo), y "registrante_dominio" (FORMULARIO real con los datos de registrante WHOIS — nombre, apellido, empresa opcional, dirección, país, ciudad, estado, código postal, correo, código de país del teléfono y teléfono —, no texto libre; al responder, los campos exactos quedan en respuestaDatos de la tarea, visibles vía ver_proyecto en respuestasClienteRecientes, y se agregan también a Info clave del proyecto. Úsalo cuando ya sepas el nombre del dominio y necesites iniciar el registro con el registrador; usa "dominio" antes si todavía hace falta confirmar qué dominio quiere el cliente). Con modulo puedes omitir instrucciones y se usa la plantilla del módulo. Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero, usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) SIN módulo, usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
+      description: 'Crea una tarea pendiente para el cliente. Por defecto aparece de inmediato en su portal dentro de "Necesitamos tu respuesta" (esto no cambia entre proyectos "finito" y "continuo" — las tareas del cliente no viven en el tablero Kanban). MÓDULOS: con el parámetro modulo la solicitud se vuelve estructurada — "dominio" (pide los datos para registrar el dominio EN TEXTO LIBRE; al responder el cliente, el dominio queda registrado en la Info clave del proyecto), "recursos" (pide fotos/logo/textos y crea la subcarpeta "Recursos" en el Drive del proyecto, adjuntando el enlace en la tarjeta para que suba ahí), "vobo" (aceptación formal del proyecto; su respuesta queda registrada como VoBo), y "registrante_dominio" (FORMULARIO real con los datos de registrante WHOIS — nombre, apellido, empresa opcional, dirección, país, ciudad, estado, código postal, correo, código de país del teléfono y teléfono —, no texto libre; al responder, los campos exactos quedan en respuestaDatos de la tarea, visibles vía ver_proyecto en respuestasClienteRecientes, y se agregan también a Info clave del proyecto. Úsalo cuando ya sepas el nombre del dominio y necesites iniciar el registro con el registrador; usa "dominio" antes si todavía hace falta confirmar qué dominio quiere el cliente). PREGUNTAS LIBRES: en vez de un módulo fijo, usa el parámetro preguntas para armar tu propio formulario con preguntas abiertas (texto libre), cerradas (Sí/No) u opción múltiple (el cliente puede marcar varias opciones a la vez, checkboxes) — no se puede combinar con modulo. Al responder, las respuestas quedan estructuradas en respuestaDatos de la tarea (clave = id de cada pregunta, que se devuelve en la respuesta de esta tool) y un resumen legible "pregunta: respuesta" en respuestaTexto, ambos visibles vía ver_proyecto. No se escribe nada en Info clave (a diferencia de los módulos) — es de uso libre, sin interpretación automática. Con modulo o preguntas puedes omitir instrucciones y se usa la plantilla del módulo o un encabezado genérico. Si el orden importa (ej. debe pedirse antes de otra tarea del checklist), usa antesDeTareaId/despuesDeTareaId. Si la solicitud no debe estar disponible para el cliente hasta que el equipo termine algo primero, usa dependeDeTareaIds — la tarea queda oculta para el cliente hasta que esas tareas se marquen completadas. Si la solicitud implica que el cliente suba archivo(s) SIN módulo, usa pedirArchivos: true para que se genere automáticamente el link de la carpeta de Drive del proyecto. La respuesta incluye el "id" de la tarea creada, por si otra actividad debe depender de ella.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         titulo: z.string().describe('Título breve de lo que se necesita'),
-        instrucciones: z.string().optional().describe('Instrucciones claras para el cliente. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en su portal. Si se omite y se pasa modulo, se usa la plantilla del módulo.'),
-        modulo: z.enum(['dominio', 'recursos', 'vobo', 'registrante_dominio']).optional().describe('Convierte la solicitud en estructurada: dominio (datos para registrar/conectar el dominio, al responder queda en Info clave), recursos (fotos/logo/textos con subcarpeta de Drive lista para subir), vobo (aceptación formal del proyecto), o registrante_dominio (formulario real con los datos de registrante WHOIS — nombre, dirección, correo, teléfono — en vez de texto libre; al responder queda en respuestaDatos de la tarea y se agrega a Info clave).'),
+        instrucciones: z.string().optional().describe('Instrucciones claras para el cliente. Admite HTML mínimo si ayuda a la claridad (<p>, <strong>, <em>, <ul>/<ol>/<li>) — se renderiza formateado en su portal. Si se omite y se pasa modulo o preguntas, se usa la plantilla del módulo o un encabezado genérico.'),
+        modulo: z.enum(['dominio', 'recursos', 'vobo', 'registrante_dominio']).optional().describe('Convierte la solicitud en estructurada: dominio (datos para registrar/conectar el dominio, al responder queda en Info clave), recursos (fotos/logo/textos con subcarpeta de Drive lista para subir), vobo (aceptación formal del proyecto), o registrante_dominio (formulario real con los datos de registrante WHOIS — nombre, dirección, correo, teléfono — en vez de texto libre; al responder queda en respuestaDatos de la tarea y se agrega a Info clave). No se puede combinar con preguntas.'),
+        preguntas: z.array(z.object({
+          texto: z.string().describe('Texto de la pregunta, tal cual se le muestra al cliente'),
+          tipo: z.enum(['abierta', 'cerrada', 'opcion_multiple']).describe('abierta: respuesta libre en texto. cerrada: Sí/No. opcion_multiple: el cliente puede marcar una o varias de "opciones" (checkboxes).'),
+          opciones: z.array(z.string()).optional().describe('Lista de opciones a mostrar — obligatoria y con al menos 2 valores si tipo es "opcion_multiple"; se ignora en los otros tipos.'),
+          requerida: z.boolean().optional().describe('Si es false, el cliente puede dejarla sin responder. Por defecto true.'),
+        })).optional().describe('Arma un formulario de PREGUNTAS LIBRES en vez de un módulo fijo (ver descripción). No se puede combinar con modulo.'),
         plazoHoras: z.number().int().optional().describe('Plazo sugerido en horas'),
         fase: z.number().int().optional().describe('Número de fase; si se omite, usa la fase actual del proyecto. Se ignora si se da antesDeTareaId/despuesDeTareaId, o si el proyecto es de tipo "continuo".'),
         antesDeTareaId: z.string().optional().describe('ID de otra tarea del proyecto antes de la cual debe quedar esta solicitud'),
@@ -983,7 +1103,7 @@ function buildServer(usuario) {
         pedirArchivos: z.boolean().optional().describe('True si se le va a pedir al cliente subir archivo(s) (fotos, logo, documentos, materiales). Crea o reutiliza la carpeta de Drive del proyecto y adjunta el link directo en la tarjeta de la solicitud.'),
       },
     },
-    async ({ slug, titulo, instrucciones, modulo, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds, pedirArchivos }) => {
+    async ({ slug, titulo, instrucciones, modulo, preguntas, plazoHoras, fase, antesDeTareaId, despuesDeTareaId, dependeDeTareaIds, pedirArchivos }) => {
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
 
@@ -992,9 +1112,24 @@ function buildServer(usuario) {
 
       const moduloValido = modulo && MODULOS_CLIENTE[modulo] ? modulo : null
       if (modulo && !moduloValido) return fail(`Módulo inválido: "${modulo}". Valores: dominio, recursos, vobo, registrante_dominio.`)
+      if (moduloValido && preguntas) return fail('No puedes combinar "modulo" con "preguntas" — son dos formas distintas de estructurar la solicitud; usa una u otra.')
+
+      let preguntasFinal = null
+      if (preguntas) {
+        const errorForma = validarFormaPreguntas(preguntas)
+        if (errorForma) return fail(errorForma)
+        preguntasFinal = preguntas.map((pr, i) => ({
+          id: `p${i + 1}`,
+          texto: pr.texto.trim(),
+          tipo: pr.tipo,
+          ...(pr.tipo === 'opcion_multiple' ? { opciones: pr.opciones } : {}),
+          requerida: pr.requerida !== false,
+        }))
+      }
+
       let instruccionesFinal = instrucciones?.trim() || null
-      if (!instruccionesFinal && !moduloValido) {
-        return fail('Falta "instrucciones": describe qué necesita el cliente, o pasa un modulo (dominio, recursos, vobo, registrante_dominio) para usar su plantilla.')
+      if (!instruccionesFinal && !moduloValido && !preguntasFinal) {
+        return fail('Falta "instrucciones": describe qué necesita el cliente, o pasa un modulo (dominio, recursos, vobo, registrante_dominio) o preguntas para usar una plantilla.')
       }
 
       const esContinuo = p.tipo === 'continuo'
@@ -1007,9 +1142,18 @@ function buildServer(usuario) {
       let avisoDrive = ''
       if (moduloValido === 'recursos') {
         // Subcarpeta "Recursos" — el portal muestra el botón de subida cuando
-        // la tarea tiene driveFolderUrl.
-        driveFolderUrl = await obtenerOCrearCarpetaRecursos(p)
-        if (!driveFolderUrl) avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
+        // la tarea tiene driveFolderUrl. obtenerOCrearCarpetaRecursos ya hace
+        // su propio try/catch interno y devuelve null en caso de fallo, pero
+        // el try/catch también aquí mantiene el mismo patrón defensivo que
+        // la rama "pedirArchivos" de abajo, por si alguna vez cambia esa
+        // garantía interna.
+        try {
+          driveFolderUrl = await obtenerOCrearCarpetaRecursos(p)
+          if (!driveFolderUrl) avisoDrive = ' (Drive no está configurado en el servidor — la solicitud se creó sin el link de la carpeta.)'
+        } catch (err) {
+          console.error('Error creando carpeta de Recursos para la solicitud:', err)
+          avisoDrive = ' (No se pudo crear la carpeta de Drive — revisa los logs del servidor; la solicitud se creó sin el link.)'
+        }
       } else if (pedirArchivos) {
         if (driveConfigurado()) {
           try {
@@ -1025,8 +1169,10 @@ function buildServer(usuario) {
         }
       }
 
-      if (!instruccionesFinal) {
+      if (!instruccionesFinal && moduloValido) {
         instruccionesFinal = MODULOS_CLIENTE[moduloValido].plantilla({ conDrive: !!driveFolderUrl, urlDrive: driveFolderUrl })
+      } else if (!instruccionesFinal && preguntasFinal) {
+        instruccionesFinal = '<p>Por favor responde las siguientes preguntas.</p>'
       }
 
       const completadasIds = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
@@ -1044,6 +1190,7 @@ function buildServer(usuario) {
           esCliente: true,
           instruccionesCliente: instruccionesFinal,
           modulo: moduloValido,
+          preguntas: preguntasFinal,
           plazoHoras: plazoHoras ?? null,
           dependencias: dependeDeTareaIds || [],
           custom: true,
@@ -1056,7 +1203,8 @@ function buildServer(usuario) {
       emitirCambio(p.id)
 
       const nota = dependeDeTareaIds?.length ? ' (queda oculta para el cliente hasta completar sus dependencias)' : ''
-      return ok(`Se creó la solicitud "${titulo}" para el cliente${moduloValido ? ` con el módulo ${moduloValido}` : ''}${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive} id: "${id}"`)
+      const notaPreguntas = preguntasFinal ? ` ids de preguntas: ${preguntasFinal.map((pr) => `${pr.id}="${pr.texto}"`).join(', ')}.` : ''
+      return ok(`Se creó la solicitud "${titulo}" para el cliente${moduloValido ? ` con el módulo ${moduloValido}` : ''}${preguntasFinal ? ` con ${preguntasFinal.length} pregunta(s) libre(s)` : ''}${esContinuo ? '' : ` en fase ${posicion.faseFinal}`}${nota}.${avisoDrive} id: "${id}".${notaPreguntas}`)
     },
   )
 

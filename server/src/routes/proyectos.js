@@ -60,6 +60,20 @@ router.get('/:slug', requireAuth, async (req, res) => {
   try {
     const p = await getProyecto(req.params.slug)
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+
+    // Backfill perezoso: proyectos creados antes de clienteAccessToken no lo
+    // tienen todavía — se genera y guarda la primera vez que se consulta.
+    // Si la escritura falla, no tumba la lectura: se reintenta en la próxima consulta.
+    if (!p.clienteAccessToken) {
+      const nuevoToken = generarAccessToken()
+      try {
+        await prisma.proyecto.update({ where: { id: p.id }, data: { clienteAccessToken: nuevoToken } })
+        p.clienteAccessToken = nuevoToken
+      } catch (err) {
+        console.error('No se pudo guardar clienteAccessToken en backfill:', err)
+      }
+    }
+
     res.json({ ...p, salud: calcularSalud(p) })
   } catch (err) {
     console.error(err)

@@ -44,8 +44,11 @@ function inicioDelDia(ts) {
 }
 
 // Última señal de vida del proyecto: la entrada de log más reciente (el log
-// llega ordenado desc, basta ver la primera), la última tarea completada y
-// el último comentario de tarea. Si nunca hubo nada, se cae a creadoEn.
+// llega ordenado desc, basta ver la primera), la última tarea completada, el
+// último comentario de tarea y el último mensaje de WhatsApp (si la query lo
+// incluyó — antes la actividad en los grupos de WhatsApp del proyecto era
+// invisible para esta clasificación, aunque el equipo sí estuviera moviendo
+// el proyecto ahí). Si nunca hubo nada, se cae a creadoEn.
 function ultimaActividad(proyecto) {
   let ultima = null
   const considerar = (fecha) => {
@@ -58,6 +61,7 @@ function ultimaActividad(proyecto) {
     considerar(t.completadaEn)
     for (const c of t.comentarios || []) considerar(c.creadoEn)
   }
+  for (const m of proyecto.mensajesWhatsapp || []) considerar(m.fechaMensaje)
   return ultima ?? (proyecto.creadoEn ? new Date(proyecto.creadoEn).getTime() : null)
 }
 

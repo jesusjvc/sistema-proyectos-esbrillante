@@ -351,9 +351,13 @@ model Tarea {
   respuestaTexto       String?
   respuestaArchivoUrl  String?
   respuestaArchivoNombre String?
-  // Respuesta estructurada de un módulo con formulario (hoy solo
-  // registrante_dominio) — genérico para reusar en futuros módulos.
+  // Respuesta estructurada de un módulo con formulario (registrante_dominio)
+  // o de "preguntas" libres (ver abajo) — genérico para ambos casos.
   respuestaDatos       Json?
+  // Definición de preguntas libres (solicitar_al_cliente con el parámetro
+  // preguntas): array de { id, texto, tipo, opciones?, requerida }. Las
+  // respuestas del cliente quedan en respuestaDatos, keyed por id.
+  preguntas            Json?
   driveFolderUrl       String?
 
   comentarios Comentario[]
