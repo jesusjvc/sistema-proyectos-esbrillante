@@ -82,6 +82,18 @@ que el volumen de anotaciones de la sesión anterior.
       contra `foco_dev` (18 casos, incluida concurrencia). Commits `f1c132c`
       y `aa5b184` (este último arregla la misma condición de carrera en
       `nueva_version`, señalada por el hook de pre-commit).
+
+      Review de Gentle AI sobre la tarea completa encontró 7 hallazgos no
+      bloqueantes (3 WARNING, 4 SUGGESTION); se cerraron todos: validación
+      explícita de `accion`/`estado` contra sus enums documentados,
+      `finalizarRevisionCliente` ya no confunde cualquier error con "no
+      existe" (solo P2025), merge atómico de `contenido` vía `jsonb ||` en
+      vez de read-modify-write (mismo riesgo de lost-update que `numero`,
+      ahora en otro campo), `tipo` se corrige al reemplazar una página antes
+      externa, y los choques de unicidad en el primer publish/registro
+      externo dan un mensaje claro en vez de un error crudo de Prisma.
+      Commits `613924d` y `131a31b` (este último cierra un hueco adicional
+      que el propio hook señaló: `estado: ''` se colaba por el `COALESCE`).
 - [ ] 3. Resolución de identidad: helper que, dado un request, devuelve
       `{ nombre, rol }` — si hay cookie `token` de Foco válida usa esa sesión
       real; si no, null (el widget cae al flujo de pedir nombre, como hoy).
