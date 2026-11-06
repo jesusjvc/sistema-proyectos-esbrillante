@@ -52,6 +52,12 @@ export async function actualizarAnotacion(prototipoId, id, patch) {
   if (patch.estado !== undefined && !ESTADOS_ANOTACION.has(patch.estado)) {
     throw new Error(`Estado inválido: "${patch.estado}". Usa uno de: ${[...ESTADOS_ANOTACION].join(', ')}.`)
   }
+  // Debe ser un objeto plano: el operador jsonb || de Postgres concatena en
+  // vez de mezclar si el valor es un array, y guardaría basura silenciosa
+  // si fuera un string/número.
+  if (patch.contenido !== undefined && (typeof patch.contenido !== 'object' || patch.contenido === null || Array.isArray(patch.contenido))) {
+    throw new Error('contenido debe ser un objeto plano (ej. { texto: "..." }).')
+  }
   const contenidoPatch = patch.contenido ? JSON.stringify(patch.contenido) : null
   const filas = await prisma.$queryRaw`
     UPDATE anotaciones

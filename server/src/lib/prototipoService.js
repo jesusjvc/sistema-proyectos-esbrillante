@@ -73,6 +73,9 @@ export async function obtenerPrototipoPorSlug(slug) {
 // confirmación; con accion='reemplazar' sobreescribe el mismo slug;
 // con accion='nueva_version' crea "<slug>-v2", "-v3", etc.
 export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototipo', proyectoId }) {
+  if (!nombre || typeof nombre !== 'string') {
+    throw new Error('El nombre es obligatorio.')
+  }
   if (!html) {
     throw new Error('El contenido HTML es obligatorio.')
   }
@@ -113,8 +116,14 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
     // Si el existente era una página externa, ya no lo es — ahora tiene HTML
     // propio. Sin esto, tipo quedaría desincronizado con el contenido real.
     if (existente.urlExterna) data.tipo = tipo
-    const actualizado = await prisma.prototipo.update({ where: { slug: baseSlug }, data })
-    return { slug: actualizado.slug, accionRealizada: 'reemplazada', mensaje: `Página reemplazada correctamente. El link sigue siendo: /p/${actualizado.slug}` }
+    try {
+      const actualizado = await prisma.prototipo.update({ where: { slug: baseSlug }, data })
+      return { slug: actualizado.slug, accionRealizada: 'reemplazada', mensaje: `Página reemplazada correctamente. El link sigue siendo: /p/${actualizado.slug}` }
+    } catch (err) {
+      // TOCTOU: alguien borró la página entre el findUnique de arriba y este update.
+      if (err.code === 'P2025') throw new Error(`No existe la página con slug "${baseSlug}" — se borró al mismo tiempo desde otro lado.`)
+      throw err
+    }
   }
 
   if (accion !== 'nueva_version') {
@@ -142,6 +151,9 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
 // Página que vive fuera de Foco (Elementor, Vercel, etc.) — /p/:slug le hace
 // proxy con el widget de revisión inyectado en vez de servir `html` directo.
 export async function registrarPaginaExterna({ nombre, urlExterna, proyectoId }) {
+  if (!nombre || typeof nombre !== 'string') {
+    throw new Error('El nombre es obligatorio.')
+  }
   if (!urlExterna) {
     throw new Error('urlExterna es obligatoria.')
   }
@@ -190,9 +202,17 @@ export async function finalizarRevisionCliente(slug) {
 }
 
 export async function eliminarPrototipo(slug) {
-  validarSlug(slug)
+  // Sin validarSlug a propósito: a diferencia de publicar/registrar (que
+  // derivan el slug de un nombre nuevo), acá el slug ya es el de una fila
+  // existente — igual que asignarProyecto/cambiarEstado, que tampoco la usan.
   const existe = await prisma.prototipo.findUnique({ where: { slug } })
   if (!existe) throw new Error(`No existe la página con slug "${slug}".`)
-  await prisma.prototipo.delete({ where: { slug } }) // cascada: borra sus anotaciones
-  return `Página "${slug}" eliminada correctamente.`
+  try {
+    await prisma.prototipo.delete({ where: { slug } }) // cascada: borra sus anotaciones
+    return `Página "${slug}" eliminada correctamente.`
+  } catch (err) {
+    // TOCTOU: alguien más la borró entre el findUnique de arriba y este delete.
+    if (err.code === 'P2025') throw new Error(`No existe la página con slug "${slug}" — se borró al mismo tiempo desde otro lado.`)
+    throw err
+  }
 }
