@@ -13,26 +13,26 @@ enum Rol {
 }
 
 model User {
-  id        String  @id @default(cuid())
-  email     String  @unique
-  password  String
-  nombre    String
-  rol       Rol     @default(EQUIPO)
-  esKarla   Boolean @default(false)
-  activo    Boolean @default(true)
-  avatarUrl String?
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  nombre         String
+  rol            Rol      @default(EQUIPO)
+  esKarla        Boolean  @default(false)
+  activo         Boolean  @default(true)
+  avatarUrl      String?
   // Área a la que pertenece (web | diseno_grafico | redes_sociales) — determina
   // qué proyectos ve por defecto en el dashboard. null = ve todos (sin filtrar).
-  area      String?
+  area           String?
   // Lista plana de etiquetas libres (ej. "copy", "wordpress", "elementor") —
   // transparencia de quién puede hacer qué, sin niveles ni jerarquía.
-  habilidades String[] @default([])
+  habilidades    String[] @default([])
   // Correos distintos al principal con los que también se puede entrar por
   // Google (ej. webmaster@ para el usuario jesus@). Solo login con Google:
   // la contraseña y todos los correos del sistema siguen ligados al principal.
   emailsAlternos String[] @default([])
 
-  apiKeys ApiKey[]
+  apiKeys        ApiKey[]
   notificaciones Notificacion[]
 
   creadoEn DateTime @default(now())
@@ -50,7 +50,7 @@ model ApiKey {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Etiqueta libre para reconocerla en la lista (ej. "laptop trabajo"). Opcional.
-  nombre String @default("")
+  nombre  String @default("")
   // Primeros caracteres del token, visibles en la UI para identificarla sin
   // volver a mostrarla completa.
   prefijo String
@@ -80,13 +80,13 @@ model Proyecto {
   proyecto            Json
   condicionesTecnicas Json
   equipo              Json
-  linksCliente        Json     @default("{}")
+  linksCliente        Json      @default("{}")
   driveRespuestasId   String?
   // Subcarpeta "Recursos" dentro de la carpeta del proyecto — la crean las
   // solicitudes del módulo "recursos" (fotos, logo, textos del cliente).
   driveRecursosId     String?
   vistoAdminEn        DateTime?
-  tiempos             Json     @default("{}")
+  tiempos             Json      @default("{}")
   passwordCliente     String
   // Token largo para el enlace de acceso directo (sin contraseña) — opcional,
   // nulo en proyectos creados antes de este campo. Texto plano como
@@ -95,16 +95,17 @@ model Proyecto {
   clienteAccessToken  String?   @unique
   // Una o varias áreas (web | diseno_grafico | redes_sociales) — un proyecto
   // integral tiene varias. Vacío = visible en cualquier filtro de área.
-  areas               String[] @default([])
+  areas               String[]  @default([])
   // Etiquetas libres de tipo de servicio (Tienda online, Landing page, SEO,
   // Google Ads...) — pueden ser varias y las define el admin en el detalle.
-  etiquetas           String[] @default([])
+  etiquetas           String[]  @default([])
 
-  tareas      Tarea[]
-  log         LogEntry[]
-  solicitudes Solicitud[]
-  notas       NotaProyecto[]
+  tareas           Tarea[]
+  log              LogEntry[]
+  solicitudes      Solicitud[]
+  notas            NotaProyecto[]
   mensajesWhatsapp MensajeWhatsApp[]
+  prototipos       Prototipo[]
 
   creadoEn DateTime @default(now())
 
@@ -115,12 +116,12 @@ model Proyecto {
 // nunca visible al cliente). A diferencia de Comentario, no está atado a una
 // tarea: es la bitácora general de "qué ha pasado y por qué sigue atorado".
 model NotaProyecto {
-  id        String @id @default(cuid())
-  proyectoId String
-  proyecto  Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  autor     String
-  autorId   String?
-  texto     String
+  id          String   @id @default(cuid())
+  proyectoId  String
+  proyecto    Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  autor       String
+  autorId     String?
+  texto       String
   mencionados String[] @default([])
 
   creadoEn DateTime @default(now())
@@ -134,12 +135,12 @@ model NotaProyecto {
 // de 7 días — el ingest purga lo viejo; lo permanente es el resumen diario
 // que la automatización deja como NotaProyecto.
 model MensajeWhatsApp {
-  id         String @id @default(cuid())
-  proyectoId String
-  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  grupo      String
-  autor      String
-  texto      String
+  id           String   @id @default(cuid())
+  proyectoId   String
+  proyecto     Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  grupo        String
+  autor        String
+  texto        String
   fechaMensaje DateTime
 
   creadoEn DateTime @default(now())
@@ -222,36 +223,36 @@ model Sitio {
 // sitio afectados, no a un Proyecto: así una sola bandeja reúne todos los
 // reportes sin crear un proyecto artificial por cliente.
 model Incidencia {
-  id       String @id @default(cuid())
-  folio    Int    @unique @default(autoincrement())
+  id    String @id @default(cuid())
+  folio Int    @unique @default(autoincrement())
 
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
   sitioId   String
   sitio     Sitio   @relation(fields: [sitioId], references: [id], onDelete: Restrict)
 
-  titulo         String
-  descripcion    String @default("")
-  estado         String @default("todo") // todo | doing | revision | done
-  prioridad      String @default("normal") // urgente | normal | cuando_se_pueda
-  cobertura      String @default("por_valorar") // incluido | cortesia | adicional | por_valorar
-  infraestructura String @default("sin_localizar") // esbrillante | externa | sin_localizar
-  origen         String @default("interno") // whatsapp | telefono | interno | monitoreo | correo
-  tipo           String @default("falla") // falla | actualizacion | preventivo | consulta
-  responsableId  String?
-  reportadoPor   String?
-  telefonoOrigen String?
-  fechaLimite    DateTime?
+  titulo          String
+  descripcion     String    @default("")
+  estado          String    @default("todo") // todo | doing | revision | done
+  prioridad       String    @default("normal") // urgente | normal | cuando_se_pueda
+  cobertura       String    @default("por_valorar") // incluido | cortesia | adicional | por_valorar
+  infraestructura String    @default("sin_localizar") // esbrillante | externa | sin_localizar
+  origen          String    @default("interno") // whatsapp | telefono | interno | monitoreo | correo
+  tipo            String    @default("falla") // falla | actualizacion | preventivo | consulta
+  responsableId   String?
+  reportadoPor    String?
+  telefonoOrigen  String?
+  fechaLimite     DateTime?
 
-  diagnostico String @default("")
-  resolucion  String @default("")
-  causaRaiz   String @default("")
+  diagnostico String  @default("")
+  resolucion  String  @default("")
+  causaRaiz   String  @default("")
   archivada   Boolean @default(false)
 
-  iniciadoEn  DateTime?
-  resueltoEn  DateTime?
-  creadoEn    DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  iniciadoEn    DateTime?
+  resueltoEn    DateTime?
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
 
   correosEntrantes CorreoEntrante[]
 
@@ -268,14 +269,14 @@ model Incidencia {
 // "pendiente" esperando que alguien del equipo los asigne (o los descarte)
 // desde la mesa de mantenimiento.
 model CorreoEntrante {
-  id          String @id @default(cuid())
+  id          String    @id @default(cuid())
   // Message-ID del correo (o hash de de+asunto+fecha si no trae) — un
   // reenvío del mismo correo no debe crear dos tickets.
-  messageId   String @unique
+  messageId   String    @unique
   de          String
   nombreDe    String?
   asunto      String
-  texto       String @default("")
+  texto       String    @default("")
   fechaCorreo DateTime?
 
   // pendiente: no se pudo cruzar con un cliente/sitio — espera asignación.
@@ -330,7 +331,7 @@ model Tarea {
   modulo               String?
   // Archivos que el equipo adjunta a la tarea (van a Drive; aquí quedan
   // nombre + enlace + quién subió). [{nombre, url, subidoPor, fecha}]
-  adjuntos             Json @default("[]")
+  adjuntos             Json    @default("[]")
   plazoHoras           Int?
   esRutaCritica        Boolean @default(false)
   soloAdmin            Boolean @default(false)
@@ -348,17 +349,17 @@ model Tarea {
   avisosDesactivados   Boolean   @default(false)
   ultimoRecordatorioEn DateTime?
 
-  respuestaTexto       String?
-  respuestaArchivoUrl  String?
+  respuestaTexto         String?
+  respuestaArchivoUrl    String?
   respuestaArchivoNombre String?
   // Respuesta estructurada de un módulo con formulario (registrante_dominio)
   // o de "preguntas" libres (ver abajo) — genérico para ambos casos.
-  respuestaDatos       Json?
+  respuestaDatos         Json?
   // Definición de preguntas libres (solicitar_al_cliente con el parámetro
   // preguntas): array de { id, texto, tipo, opciones?, requerida }. Las
   // respuestas del cliente quedan en respuestaDatos, keyed por id.
-  preguntas            Json?
-  driveFolderUrl       String?
+  preguntas              Json?
+  driveFolderUrl         String?
 
   comentarios Comentario[]
 
@@ -381,11 +382,11 @@ model Comentario {
 }
 
 model Plantilla {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   nombre      String
-  area        String   @default("General")
-  descripcion String   @default("")
-  fases       Json     @default("[]")
+  area        String @default("General")
+  descripcion String @default("")
+  fases       Json   @default("[]")
 
   tareas TareaPlantilla[]
 
@@ -412,13 +413,13 @@ model TareaPlantilla {
   queEntregas      String   @default("")
   linkTipo         String?
 
-  esCliente             Boolean @default(false)
-  instruccionesCliente  String  @default("")
-  plazoHoras            Int?
-  esRutaCritica         Boolean @default(false)
-  soloAdmin             Boolean @default(false)
-  soloKarlaOAdmin       Boolean @default(false)
-  opcional              Boolean @default(false)
+  esCliente            Boolean @default(false)
+  instruccionesCliente String  @default("")
+  plazoHoras           Int?
+  esRutaCritica        Boolean @default(false)
+  soloAdmin            Boolean @default(false)
+  soloKarlaOAdmin      Boolean @default(false)
+  opcional             Boolean @default(false)
 
   @@map("tareas_plantilla")
 }
@@ -463,8 +464,8 @@ model Solicitud {
 // claude.ai u otro cliente OAuth. Se persiste para que el client_id
 // siga siendo válido entre reinicios/deploys del servidor.
 model OAuthClient {
-  id           String   @id @default(cuid())
-  clientId     String   @unique
+  id           String  @id @default(cuid())
+  clientId     String  @unique
   clientName   String?
   redirectUris Json
 
@@ -478,10 +479,10 @@ model LogEntry {
   proyectoId String
   proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 
-  fecha    DateTime @default(now())
-  usuario  String
-  accion   String
-  detalle  String   @default("")
+  fecha   DateTime @default(now())
+  usuario String
+  accion  String
+  detalle String   @default("")
 
   @@map("log_entries")
 }
@@ -521,4 +522,62 @@ model Notificacion {
   @@index([destinatarioId, leida])
   @@index([creadaEn])
   @@map("notificaciones")
+}
+
+// Páginas/prototipos publicados para revisión del cliente o del equipo —
+// hasta esta migración vivían en un servicio aparte (esbrillante-pages-mcp,
+// prototipos.esbrillante.mx) con persistencia en archivos JSON. Se migran acá
+// para que la identidad de quien comenta use la sesión real de Foco en vez de
+// un nombre plano por query param, que quedaba "congelado" en links copiados.
+model Prototipo {
+  id             String @id @default(cuid())
+  slug           String @unique
+  nombreOriginal String
+  tipo           String @default("prototipo") // prototipo | pagina_web
+  estado         String @default("en_revision") // en_revision | pendiente_equipo | aprobado
+
+  // Contenido HTML publicado. Ausente si es una página externa (urlExterna) —
+  // /p/:slug hace proxy en vez de servir este campo.
+  html       String?
+  urlExterna String?
+
+  version Int @default(1)
+
+  proyectoId String?
+  proyecto   Proyecto? @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+
+  anotaciones Anotacion[]
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@map("prototipos")
+}
+
+// Comentario/anotación que el cliente o el equipo deja en el widget de
+// revisión de un prototipo. `contenido` guarda texto/texto_original/
+// texto_sugerido/texto_citado/audio_url/accion según `tipo` — mismo contrato
+// que el servicio viejo (ver Annotation en su types.ts) para no romper el
+// widget más de lo necesario al migrarlo.
+model Anotacion {
+  id          String    @id @default(cuid())
+  prototipoId String
+  prototipo   Prototipo @relation(fields: [prototipoId], references: [id], onDelete: Cascade)
+
+  numero    Int
+  tipo      String // comentario | sugerencia_texto | audio
+  rol       String // cliente | equipo
+  autor     String
+  estado    String @default("pendiente") // pendiente | resuelto
+  selector  String
+  // Subruta del sitio donde se dejó — solo relevante en sitios multipágina
+  // externos; "/" en un prototipo de un solo archivo.
+  pagina    String @default("/")
+  posicion  Json
+  contenido Json
+
+  creadaEn DateTime @default(now())
+
+  @@index([prototipoId, estado])
+  @@map("anotaciones")
 }
