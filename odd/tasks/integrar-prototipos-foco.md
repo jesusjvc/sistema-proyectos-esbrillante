@@ -94,9 +94,12 @@ que el volumen de anotaciones de la sesión anterior.
       externo dan un mensaje claro en vez de un error crudo de Prisma.
       Commits `613924d` y `131a31b` (este último cierra un hueco adicional
       que el propio hook señaló: `estado: ''` se colaba por el `COALESCE`).
-- [ ] 3. Resolución de identidad: helper que, dado un request, devuelve
-      `{ nombre, rol }` — si hay cookie `token` de Foco válida usa esa sesión
-      real; si no, null (el widget cae al flujo de pedir nombre, como hoy).
+- [x] 3. Resolución de identidad: `server/src/lib/identidadRevisor.js`,
+      `resolverIdentidadRevisor(req)` — lee la cookie `token` de `requireAuth`;
+      devuelve `{userId, nombre, rol:'equipo'}` si hay sesión de staff activa,
+      `null` en cualquier otro caso (sin cookie, inválida, expirada, o de un
+      cliente). Probado sin DB: 5 casos (sin cookie, admin, equipo, token de
+      cliente, token inválido/expirado). Commit `02de73a`.
 - [ ] 4. Router público nuevo (`/p/:slug`, `/p/:slug/download`,
       `/p/:slug/finalizar-revision`, `/api/anotaciones/:slug` +
       `/eventos` SSE, POST/PATCH/DELETE de anotaciones) — sirve el HTML e
