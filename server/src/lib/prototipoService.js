@@ -1,6 +1,7 @@
 import prisma from './prisma.js'
 
 const MAX_HTML_SIZE_BYTES = 5 * 1024 * 1024
+const MAX_INTENTOS_VERSION = 5
 
 // Determinístico a propósito (a diferencia de generarSlug, que agrega un sufijo
 // aleatorio) — publicar/reemplazar/nueva_version depende de que el mismo nombre
@@ -106,12 +107,22 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
     return { slug: actualizado.slug, accionRealizada: 'reemplazada', mensaje: `Página reemplazada correctamente. El link sigue siendo: /p/${actualizado.slug}` }
   }
 
-  const { slug: nuevoSlug, version } = await siguienteVersion(baseSlug)
-  validarSlug(nuevoSlug)
-  const creado = await prisma.prototipo.create({
-    data: { slug: nuevoSlug, nombreOriginal: nombre, html, tipo, version, proyectoId: proyectoId || null },
-  })
-  return { slug: creado.slug, accionRealizada: 'nueva_version', version, mensaje: `Versión ${version} publicada en /p/${creado.slug}. El link anterior sigue activo.` }
+  // Mismo riesgo que crearAnotacion: dos publicaciones concurrentes con el
+  // mismo nombre pueden calcular la misma siguiente versión — se reintenta
+  // recalculándola si el slug ya fue tomado entre el cálculo y el create.
+  for (let intento = 0; intento < MAX_INTENTOS_VERSION; intento++) {
+    const { slug: nuevoSlug, version } = await siguienteVersion(baseSlug)
+    validarSlug(nuevoSlug)
+    try {
+      const creado = await prisma.prototipo.create({
+        data: { slug: nuevoSlug, nombreOriginal: nombre, html, tipo, version, proyectoId: proyectoId || null },
+      })
+      return { slug: creado.slug, accionRealizada: 'nueva_version', version, mensaje: `Versión ${version} publicada en /p/${creado.slug}. El link anterior sigue activo.` }
+    } catch (err) {
+      if (err.code === 'P2002' && intento < MAX_INTENTOS_VERSION - 1) continue
+      throw err
+    }
+  }
 }
 
 // Página que vive fuera de Foco (Elementor, Vercel, etc.) — /p/:slug le hace
