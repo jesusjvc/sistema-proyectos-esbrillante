@@ -74,9 +74,14 @@ que el volumen de anotaciones de la sesión anterior.
       Docker `foco-dev-db`, puerto 5433 — no toca la base real). `npx prisma
       validate` y `migrate deploy` limpios, cliente regenerado. Commit
       `901ecd3`.
-- [ ] 2. Servicios backend `server/src/lib/prototipoService.js` y
+- [x] 2. Servicios backend `server/src/lib/prototipoService.js` y
       `anotacionService.js` — CRUD sobre Prisma, mismo contrato de datos que
-      el servicio viejo (para no romper el widget más de lo necesario).
+      el servicio viejo. Cierra los dos hallazgos de la review de la tarea 1:
+      `@@unique([prototipoId, numero])` + retry en `crearAnotacion`, y CHECK
+      constraint en la migración para html/urlExterna. Probado manualmente
+      contra `foco_dev` (18 casos, incluida concurrencia). Commits `f1c132c`
+      y `aa5b184` (este último arregla la misma condición de carrera en
+      `nueva_version`, señalada por el hook de pre-commit).
 - [ ] 3. Resolución de identidad: helper que, dado un request, devuelve
       `{ nombre, rol }` — si hay cookie `token` de Foco válida usa esa sesión
       real; si no, null (el widget cae al flujo de pedir nombre, como hoy).
