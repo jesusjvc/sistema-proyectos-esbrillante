@@ -47,7 +47,9 @@ export async function crearAnotacion(prototipoId, data) {
 // la misma anotación casi al mismo tiempo, igual que el riesgo que ya se
 // resolvió para `numero` en crearAnotacion.
 export async function actualizarAnotacion(prototipoId, id, patch) {
-  if (patch.estado && !ESTADOS_ANOTACION.has(patch.estado)) {
+  // !== undefined (no truthy): un '' no debe colarse silenciosamente y
+  // terminar sobreescribiendo el estado real vía el COALESCE del UPDATE.
+  if (patch.estado !== undefined && !ESTADOS_ANOTACION.has(patch.estado)) {
     throw new Error(`Estado inválido: "${patch.estado}". Usa uno de: ${[...ESTADOS_ANOTACION].join(', ')}.`)
   }
   const contenidoPatch = patch.contenido ? JSON.stringify(patch.contenido) : null
