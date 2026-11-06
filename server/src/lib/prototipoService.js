@@ -73,6 +73,9 @@ export async function obtenerPrototipoPorSlug(slug) {
 // confirmación; con accion='reemplazar' sobreescribe el mismo slug;
 // con accion='nueva_version' crea "<slug>-v2", "-v3", etc.
 export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototipo', proyectoId }) {
+  if (!html) {
+    throw new Error('El contenido HTML es obligatorio.')
+  }
   if (Buffer.byteLength(html, 'utf-8') > MAX_HTML_SIZE_BYTES) {
     throw new Error('El HTML supera el límite máximo de 5 MB.')
   }
@@ -82,10 +85,15 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
   const existente = await prisma.prototipo.findUnique({ where: { slug: baseSlug } })
 
   if (!existente) {
-    const creado = await prisma.prototipo.create({
-      data: { slug: baseSlug, nombreOriginal: nombre, html, tipo, proyectoId: proyectoId || null },
-    })
-    return { slug: creado.slug, accionRealizada: 'publicada', mensaje: `Página publicada correctamente en /p/${creado.slug}` }
+    try {
+      const creado = await prisma.prototipo.create({
+        data: { slug: baseSlug, nombreOriginal: nombre, html, tipo, proyectoId: proyectoId || null },
+      })
+      return { slug: creado.slug, accionRealizada: 'publicada', mensaje: `Página publicada correctamente en /p/${creado.slug}` }
+    } catch (err) {
+      if (err.code === 'P2002') throw new Error(`Ya existe una página con el slug "${baseSlug}" — se publicó al mismo tiempo desde otro lado. Intenta de nuevo.`)
+      throw err
+    }
   }
 
   if (!accion || accion === 'publicar') {
@@ -101,10 +109,16 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
   }
 
   if (accion === 'reemplazar') {
-    // urlExterna:null por si el existente era una página externa — mantiene la
-    // invariante de "exactamente uno de html/urlExterna" que exige el CHECK de la DB.
-    const actualizado = await prisma.prototipo.update({ where: { slug: baseSlug }, data: { html, urlExterna: null } })
+    const data = { html, urlExterna: null }
+    // Si el existente era una página externa, ya no lo es — ahora tiene HTML
+    // propio. Sin esto, tipo quedaría desincronizado con el contenido real.
+    if (existente.urlExterna) data.tipo = tipo
+    const actualizado = await prisma.prototipo.update({ where: { slug: baseSlug }, data })
     return { slug: actualizado.slug, accionRealizada: 'reemplazada', mensaje: `Página reemplazada correctamente. El link sigue siendo: /p/${actualizado.slug}` }
+  }
+
+  if (accion !== 'nueva_version') {
+    throw new Error(`accion inválida: "${accion}". Usa 'reemplazar' o 'nueva_version'.`)
   }
 
   // Mismo riesgo que crearAnotacion: dos publicaciones concurrentes con el
@@ -128,14 +142,22 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
 // Página que vive fuera de Foco (Elementor, Vercel, etc.) — /p/:slug le hace
 // proxy con el widget de revisión inyectado en vez de servir `html` directo.
 export async function registrarPaginaExterna({ nombre, urlExterna, proyectoId }) {
+  if (!urlExterna) {
+    throw new Error('urlExterna es obligatoria.')
+  }
   const baseSlug = slugificarNombre(nombre)
   validarSlug(baseSlug)
   const existe = await prisma.prototipo.findUnique({ where: { slug: baseSlug } })
   if (existe) throw new Error(`Ya existe una página con el slug "${baseSlug}". Usa un nombre distinto.`)
-  const creado = await prisma.prototipo.create({
-    data: { slug: baseSlug, nombreOriginal: nombre, urlExterna, tipo: 'pagina_web', proyectoId: proyectoId || null },
-  })
-  return mapPrototipo(creado)
+  try {
+    const creado = await prisma.prototipo.create({
+      data: { slug: baseSlug, nombreOriginal: nombre, urlExterna, tipo: 'pagina_web', proyectoId: proyectoId || null },
+    })
+    return mapPrototipo(creado)
+  } catch (err) {
+    if (err.code === 'P2002') throw new Error(`Ya existe una página con el slug "${baseSlug}" — se registró al mismo tiempo desde otro lado. Intenta de nuevo.`)
+    throw err
+  }
 }
 
 export async function asignarProyecto(slug, proyectoId) {
@@ -144,18 +166,26 @@ export async function asignarProyecto(slug, proyectoId) {
   return prisma.prototipo.update({ where: { slug }, data: { proyectoId: proyectoId || null } })
 }
 
+const ESTADOS_PROTOTIPO = new Set(['en_revision', 'pendiente_equipo', 'aprobado'])
+
 export async function cambiarEstado(slug, estado) {
+  if (!ESTADOS_PROTOTIPO.has(estado)) {
+    throw new Error(`Estado inválido: "${estado}". Usa uno de: ${[...ESTADOS_PROTOTIPO].join(', ')}.`)
+  }
   const existe = await prisma.prototipo.findUnique({ where: { slug } })
   if (!existe) throw new Error(`No existe la página con slug "${slug}".`)
   return prisma.prototipo.update({ where: { slug }, data: { estado } })
 }
 
-// El cliente dio clic en "Terminar revisión" en el widget — null si el slug no existe.
+// El cliente dio clic en "Terminar revisión" en el widget — null si el slug no
+// existe (P2025); cualquier otro error (DB caída, timeout) se relanza en vez
+// de confundirse con "no existe" y aparentar que la página desapareció.
 export async function finalizarRevisionCliente(slug) {
   try {
     return await prisma.prototipo.update({ where: { slug }, data: { estado: 'pendiente_equipo' } })
-  } catch {
-    return null
+  } catch (err) {
+    if (err.code === 'P2025') return null
+    throw err
   }
 }
 

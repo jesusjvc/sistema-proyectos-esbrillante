@@ -1,6 +1,7 @@
 import prisma from './prisma.js'
 
 const MAX_INTENTOS_NUMERO = 5
+const ESTADOS_ANOTACION = new Set(['pendiente', 'resuelto'])
 
 export async function listarAnotaciones(prototipoId, estado) {
   return prisma.anotacion.findMany({
@@ -40,13 +41,24 @@ export async function crearAnotacion(prototipoId, data) {
   }
 }
 
+// El merge de `contenido` se hace dentro del propio UPDATE (operador jsonb ||
+// de Postgres) en vez de leer-mezclar-escribir en JS — un read-then-write
+// normal pierde cambios si dos escritores (widget, SSE, tool MCP) actualizan
+// la misma anotación casi al mismo tiempo, igual que el riesgo que ya se
+// resolvió para `numero` en crearAnotacion.
 export async function actualizarAnotacion(prototipoId, id, patch) {
-  const anotacion = await prisma.anotacion.findFirst({ where: { id, prototipoId } })
-  if (!anotacion) return null
-  const data = {}
-  if (patch.estado) data.estado = patch.estado
-  if (patch.contenido) data.contenido = { ...anotacion.contenido, ...patch.contenido }
-  return prisma.anotacion.update({ where: { id }, data })
+  if (patch.estado && !ESTADOS_ANOTACION.has(patch.estado)) {
+    throw new Error(`Estado inválido: "${patch.estado}". Usa uno de: ${[...ESTADOS_ANOTACION].join(', ')}.`)
+  }
+  const contenidoPatch = patch.contenido ? JSON.stringify(patch.contenido) : null
+  const filas = await prisma.$queryRaw`
+    UPDATE anotaciones
+    SET contenido = CASE WHEN ${contenidoPatch}::jsonb IS NOT NULL THEN contenido || ${contenidoPatch}::jsonb ELSE contenido END,
+        estado = COALESCE(${patch.estado ?? null}, estado)
+    WHERE id = ${id} AND "prototipoId" = ${prototipoId}
+    RETURNING *
+  `
+  return filas[0] ?? null
 }
 
 export async function eliminarAnotacion(prototipoId, id) {
