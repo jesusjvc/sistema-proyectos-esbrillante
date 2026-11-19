@@ -116,10 +116,26 @@ que el volumen de anotaciones de la sesión anterior.
         coherente con `requireAuth`, que tampoco lo hace en ningún otro lado
         del sistema — cambiarlo acá rompería esa consistencia y agregaría una
         dependencia de DB a una función hoy pura.
-- [ ] 4. Router público nuevo (`/p/:slug`, `/p/:slug/download`,
+- [x] 4. Router público nuevo (`/p/:slug`, `/p/:slug/download`,
       `/p/:slug/finalizar-revision`, `/api/anotaciones/:slug` +
       `/eventos` SSE, POST/PATCH/DELETE de anotaciones) — sirve el HTML e
       inyecta el widget, igual que `httpServer.ts` del servicio viejo.
+      Nuevo `server/src/routes/prototiposPublico.js`, montado sin prefijo en
+      `app.js` junto con `/resources` estático. Porta también
+      `externalProxy.js` (con el fix de cookie jar ya confirmado en
+      producción), `assetVersion.js`, y agrega el canal
+      `cambio-anotaciones`/`suscribirseAnotaciones` en `eventos.js` para el
+      SSE. La identidad de quien escribe (`identidadDe`) se resuelve de la
+      sesión real vía `resolverIdentidadRevisor`; sin sesión, cae al body
+      (flujo de cliente externo sin cambios). `auditar()` recibe el `autor`
+      ya resuelto como parámetro — se evitó un lookup innecesario a
+      `prisma.user` porque el JWT ya trae el nombre. `logEntry` se movió de
+      `mcp.js` a `lib/logEntry.js` para reutilizarlo acá. Probado end-to-end
+      con un script en el scratchpad de la sesión (14 aserciones: servir
+      HTML local, descarga, anotación de cliente vs. staff con identidad
+      real ignorando el body, listar/editar/borrar, auditoría con y sin
+      proyecto asignado, finalizar-revisión, SSE) — manual, por convención
+      del proyecto (sin test runner). Commit `edad951`.
 - [ ] 5. `server/src/routes/prototipos.js` (admin: listar/publicar/reasignar/
       eliminar) apuntando a los servicios locales en vez de `pagesMcpClient`.
 - [ ] 6. Widget: adaptar `resources/revision.js` para preguntar primero
