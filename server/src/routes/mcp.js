@@ -12,6 +12,7 @@ import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaN
 import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
+import { logEntry } from '../lib/logEntry.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, listarArchivosCarpeta, driveConfigurado } from '../lib/drive.js'
@@ -97,10 +98,6 @@ async function getProyecto(slug) {
       notas: { orderBy: { creadoEn: 'desc' }, take: 10 },
     },
   })
-}
-
-async function logEntry(proyectoId, usuario, accion, detalle = '') {
-  return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
 // Indicador de sincronización por grupo de WhatsApp, calculado on-demand

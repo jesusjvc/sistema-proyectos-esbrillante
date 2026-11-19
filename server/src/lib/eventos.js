@@ -26,3 +26,18 @@ export function suscribirseNotificaciones(listener) {
   bus.on('notificacion', listener)
   return () => bus.off('notificacion', listener)
 }
+
+// Avisa a los widgets de revisión de prototipos abiertos en ese slug que hay
+// anotaciones nuevas/cambiadas — para que varias personas revisando el mismo
+// prototipo a la vez se vean entre sí sin recargar. Mismo motivo de canal
+// aparte que 'notificacion': el filtro por slug pasa en el servidor (ver
+// routes/prototiposPublico.js), no se manda el contenido completo, solo el
+// aviso de que algo cambió.
+export function emitirCambioAnotaciones(slug) {
+  bus.emit('cambio-anotaciones', { slug, fecha: new Date().toISOString() })
+}
+
+export function suscribirseAnotaciones(listener) {
+  bus.on('cambio-anotaciones', listener)
+  return () => bus.off('cambio-anotaciones', listener)
+}
