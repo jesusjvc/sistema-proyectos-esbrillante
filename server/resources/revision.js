@@ -6,9 +6,10 @@
   /* document.currentScript solo es válido de forma síncrona al arrancar el script — capturarlo ya */
   const SCRIPT_TAG = document.currentScript;
   const TIPO = SCRIPT_TAG && SCRIPT_TAG.dataset.tipo === 'pagina_web' ? 'pagina_web' : 'prototipo';
-  /* Origen real del servidor de EsBrillante Pages, tomado de dónde se cargó este script (`.src`
-     siempre resuelve a absoluto). No usar rutas raíz-relativas sueltas para nuestras propias
-     llamadas: cuando esta página es un proxy de una URL externa (ver httpServer.ts), el <base>
+  /* Origen del API de Foco, tomado de dónde se cargó este script (`.src` siempre resuelve a
+     absoluto); el servidor lo inyecta desde el host del API para que las llamadas lleven la cookie
+     de sesión (ver urlPublicaApi). No usar rutas raíz-relativas sueltas para nuestras propias
+     llamadas: cuando esta página es un proxy de una URL externa (ver prototiposPublico.js), el <base>
      que apunta al dominio externo haría que esas rutas resolvieran contra el dominio equivocado. */
   const API_BASE = SCRIPT_TAG ? new URL(SCRIPT_TAG.src, location.href).origin : location.origin;
 
@@ -22,7 +23,7 @@
   const SLUG = (location.pathname.match(/\/p\/([^/?#]+)/) || [])[1]
              || location.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '-')
              || 'demo';
-  /* Sub-ruta dentro del sitio (solo aplica a páginas externas multipágina — ver httpServer.ts
+  /* Sub-ruta dentro del sitio (solo aplica a páginas externas multipágina — ver prototiposPublico.js
      /p/:slug/*): "/p/armado-web/nosotros.html" -> "/nosotros.html". "/index.html" (y variantes
      sin sufijo) se normalizan a "/" porque son la misma página de inicio vista de dos formas. Un
      prototipo de un solo archivo siempre da "/". Todas las anotaciones se guardan juntas por slug
