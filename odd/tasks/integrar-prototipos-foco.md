@@ -265,6 +265,15 @@ que el volumen de anotaciones de la sesión anterior.
       Verificación con sesión, hecha por el usuario: "Todo ok".
       `esbrillante-pages-mcp` se detiene (no se borra), y su volumen queda
       como respaldo de los datos originales.
+      Conectores MCP: el conector viejo `Esbrillante Prototipos`
+      (prototipos.esbrillante.mx/mcp, que ahora contesta Foco y pide
+      reautenticar) se desactiva y no se vuelve a autenticar, porque duplicaría
+      las tools de Foco. Sus 6 capacidades viven en `esbrillante-seguimiento`
+      (`publicar_prototipo`, `listar_prototipos`, `eliminar_prototipo`,
+      `comentar_prototipo`, `ver_comentarios_prototipo`,
+      `resolver_comentario_prototipo`). Los clientes ya conectados deben
+      reconectar `esbrillante-seguimiento` para ver la lista de tools nueva,
+      porque guardan la que recibieron al conectarse.
 
 ## Entrega
 
