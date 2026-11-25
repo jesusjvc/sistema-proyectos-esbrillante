@@ -18,7 +18,12 @@ import notificacionesRouter from './routes/notificaciones.js'
 import oauthRouter from './routes/oauth.js'
 import wellKnownRouter from './routes/wellKnown.js'
 import prototiposRouter from './routes/prototipos.js'
+import prototiposPublicoRouter from './routes/prototiposPublico.js'
 import plantillasRouter from './routes/plantillas.js'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import { revisarRecordatoriosVencidos } from './lib/recordatorios.js'
 import { sincronizarGoogleChat } from './lib/chatSync.js'
 
@@ -36,6 +41,18 @@ const origenesPermitidos = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
 
+// El widget de revisión corre en el dominio de prototipos y llama al host del
+// API con la cookie de sesión. Ese origen se admite SOLO en las rutas del
+// widget, nunca en el resto del API: el HTML de un prototipo es arbitrario y,
+// con CORS abierto, podría leer proyectos/clientes como el staff con sesión.
+// Va antes del cors global porque ese responde el preflight y corta la cadena.
+const origenesRevision = [...origenesPermitidos]
+if (process.env.PROTOTIPOS_PUBLIC_URL) origenesRevision.push(new URL(process.env.PROTOTIPOS_PUBLIC_URL).origin)
+app.use(
+  ['/api/anotaciones', '/api/prototipos/yo', '/p/:slug/finalizar-revision'],
+  cors({ origin: origenesRevision, credentials: true }),
+)
+
 app.use(cors({
   origin: origenesPermitidos,
   credentials: true,
@@ -49,6 +66,12 @@ app.use('/api/proyectos', proyectosRouter)
 app.use('/api/plantillas', plantillasRouter)
 app.use('/api/miembros', miembrosRouter)
 app.use('/api/prototipos', prototiposRouter)
+// Sin prefijo a propósito: replica /p/:slug y /api/anotaciones/* del servicio
+// viejo (esbrillante-pages-mcp) tal cual — públicas, el cliente externo sin
+// cuenta las sigue usando igual, y el equipo con sesión de Foco activa queda
+// identificado solo (ver resolverIdentidadRevisor).
+app.use(prototiposPublicoRouter)
+app.use('/resources', express.static(path.join(__dirname, '../resources')))
 app.use('/api/cliente', clienteRouter)
 app.use('/api/clientes', clientesRouter)
 app.use('/api/incidencias', incidenciasRouter)

@@ -1,15 +1,19 @@
 import { Router } from 'express'
 import { timingSafeEqual } from 'crypto'
 import { requireAuth } from '../middleware/auth.js'
+import prisma from '../lib/prisma.js'
+import { urlPublicaPrototipos } from '../lib/baseUrl.js'
+import { logEntry } from '../lib/logEntry.js'
+import { notificarRevisionTerminada } from '../lib/notificarRevision.js'
 import {
   listarPrototipos,
-  crearPrototipo,
-  actualizarPrototipo,
+  obtenerPrototipoPorSlug,
+  publicarPrototipo,
+  registrarPaginaExterna,
+  asignarProyecto,
+  cambiarEstado,
   eliminarPrototipo,
-} from '../lib/pagesMcpClient.js'
-import prisma from '../lib/prisma.js'
-import { enviarEmail } from '../lib/email.js'
-import { enviarGoogleChat } from '../lib/googleChat.js'
+} from '../lib/prototipoService.js'
 
 const router = Router()
 
@@ -25,63 +29,132 @@ function requireNotifyKey(req, res, next) {
   res.status(401).json({ error: 'No autorizado' })
 }
 
-// GET /api/prototipos — lista todos los prototipos (esbrillante-pages-mcp es la fuente de verdad)
+// Mismo formato que devolvía el servicio viejo (PageMeta de esbrillante-pages-mcp),
+// porque el frontend lee esos campos tal cual.
+function aPageMeta(p, base) {
+  return {
+    slug: p.slug,
+    nombre_original: p.nombreOriginal,
+    url: `${base}/p/${p.slug}`,
+    archivo: p.urlExterna ? undefined : `${p.slug}.html`,
+    urlExterna: p.urlExterna ?? undefined,
+    fecha_creacion: p.creadoEn,
+    fecha_actualizacion: p.actualizadoEn,
+    version: p.version,
+    proyectoSlug: p.proyectoSlug ?? p.proyecto?.slug ?? undefined,
+    proyectoNombre: p.proyectoNombre ?? p.proyecto?.cliente?.nombreComercial ?? undefined,
+    tipo: p.tipo,
+    estado: p.estado,
+    comentariosPendientes: p.comentariosPendientes,
+  }
+}
+
+// Los servicios lanzan Error plano para validaciones ("No existe...", "Slug
+// inválido...") y dejan pasar los errores de Prisma/DB tal cual — esos sí son 500.
+function responderError(res, err) {
+  if (err?.code || err?.name?.startsWith('Prisma')) {
+    console.error(err)
+    return res.status(500).json({ error: 'Error interno' })
+  }
+  const mensaje = err instanceof Error ? err.message : String(err)
+  res.status(mensaje.startsWith('No existe') ? 404 : 400).json({ error: mensaje })
+}
+
+async function proyectoIdDeSlug(proyectoSlug) {
+  if (!proyectoSlug) return null
+  const proyecto = await prisma.proyecto.findUnique({ where: { slug: proyectoSlug }, select: { id: true } })
+  if (!proyecto) throw new Error(`No existe el proyecto "${proyectoSlug}".`)
+  return proyecto.id
+}
+
+async function auditar(proyectoId, usuario, accion, detalle) {
+  if (!proyectoId) return
+  try {
+    await logEntry(proyectoId, usuario.nombre, accion, detalle)
+  } catch (err) {
+    console.error('No se pudo registrar en el historial una acción sobre un prototipo:', err)
+  }
+}
+
+// GET /api/prototipos — lista todos los prototipos
 router.get('/', requireAuth, async (req, res) => {
   try {
-    res.json(await listarPrototipos())
+    const base = urlPublicaPrototipos(req)
+    res.json((await listarPrototipos()).map((p) => aPageMeta(p, base)))
   } catch (err) {
-    console.error(err)
-    res.status(502).json({ error: err.message })
+    responderError(res, err)
   }
 })
 
 // POST /api/prototipos — publica un nuevo prototipo/página web, opcionalmente ligado a un proyecto
 router.post('/', requireAuth, async (req, res) => {
-  const { nombre, tipo, modo, html, url, proyectoSlug, proyectoNombre } = req.body
-  if (!nombre) return res.status(400).json({ error: 'nombre es requerido' })
-  if (modo === 'url' ? !url : !html) {
+  const { nombre, tipo, modo, html, url, accion, proyectoSlug } = req.body
+  if (!nombre?.trim()) return res.status(400).json({ error: 'nombre es requerido' })
+  if (modo === 'url' ? !url?.trim() : !html) {
     return res.status(400).json({ error: modo === 'url' ? 'url es requerida' : 'html es requerido' })
   }
 
   try {
-    res.json(await crearPrototipo({ nombre, tipo, modo, html, url, proyectoSlug, proyectoNombre }))
+    const proyectoId = await proyectoIdDeSlug(proyectoSlug)
+    const base = urlPublicaPrototipos(req)
+
+    if (modo === 'url') {
+      const creado = await registrarPaginaExterna({ nombre: nombre.trim(), urlExterna: url.trim(), proyectoId })
+      await auditar(proyectoId, req.user, 'Página web registrada', `${creado.nombreOriginal} — ${base}/p/${creado.slug}`)
+      return res.json(aPageMeta(creado, base))
+    }
+
+    const tipoValido = tipo === 'pagina_web' ? 'pagina_web' : 'prototipo'
+    const resultado = await publicarPrototipo({ nombre: nombre.trim(), html, accion, tipo: tipoValido, proyectoId })
+    if (resultado.slug) {
+      await auditar(proyectoId, req.user, 'Prototipo publicado', `${nombre.trim()} — ${base}/p/${resultado.slug}`)
+    }
+    res.json(resultado)
   } catch (err) {
-    console.error(err)
-    res.status(502).json({ error: err.message })
+    responderError(res, err)
   }
 })
 
 // PATCH /api/prototipos/:slug — reasignar proyecto y/o cambiar estado
 router.patch('/:slug', requireAuth, async (req, res) => {
-  const { proyectoSlug, proyectoNombre, estado } = req.body
+  const { slug } = req.params
+  const { proyectoSlug, estado } = req.body
   try {
-    res.json(await actualizarPrototipo(req.params.slug, { proyectoSlug, proyectoNombre, estado }))
+    // Orden a propósito: primero lo que puede fallar por validación (proyecto
+    // inexistente, estado inválido) y al final la reasignación, para no dejar
+    // un cambio a medias si la otra mitad del PATCH es inválida.
+    const proyectoId = proyectoSlug !== undefined ? await proyectoIdDeSlug(proyectoSlug) : undefined
+    if (estado !== undefined) await cambiarEstado(slug, estado)
+    if (proyectoSlug !== undefined) await asignarProyecto(slug, proyectoId)
+
+    const actualizado = await obtenerPrototipoPorSlug(slug)
+    if (!actualizado) return res.status(404).json({ error: `No existe la página con slug "${slug}".` })
+    if (proyectoSlug !== undefined) await auditar(actualizado.proyectoId, req.user, 'Prototipo asignado al proyecto', actualizado.nombreOriginal)
+    if (estado !== undefined) await auditar(actualizado.proyectoId, req.user, 'Estado de prototipo cambiado', `${actualizado.nombreOriginal} → ${estado}`)
+    res.json(aPageMeta(actualizado, urlPublicaPrototipos(req)))
   } catch (err) {
-    console.error(err)
-    res.status(502).json({ error: err.message })
+    responderError(res, err)
   }
 })
 
 // DELETE /api/prototipos/:slug — es irreversible, pero admin y equipo comparten la gestión de prototipos
 router.delete('/:slug', requireAuth, async (req, res) => {
+  const { slug } = req.params
   try {
-    res.json(await eliminarPrototipo(req.params.slug))
+    const existente = await obtenerPrototipoPorSlug(slug)
+    const mensaje = await eliminarPrototipo(slug)
+    await auditar(existente?.proyectoId, req.user, 'Prototipo eliminado', existente?.nombreOriginal || slug)
+    res.json({ ok: true, mensaje })
   } catch (err) {
-    console.error(err)
-    res.status(502).json({ error: err.message })
+    responderError(res, err)
   }
 })
 
-// Prototipos (bocetos/copy) quedan a cargo de Minuette; páginas web (diseño) a cargo de Mario.
-// Sin campo de "asignado" por prototipo — se resuelve por tipo, como acordamos.
-const RESPONSABLE_POR_TIPO = {
-  prototipo: 'minuette.ruiz@gmail.com',
-  pagina_web: 'mruiz.graphics@gmail.com',
-}
-
 // POST /api/prototipos/:slug/notificar-revision — llamado por esbrillante-pages-mcp
 // (server-to-server, con PROTOTIPOS_NOTIFY_KEY) cuando el cliente da clic en "Terminar
-// revisión" en el widget. Avisa por correo a quien tenga a cargo ese tipo de trabajo.
+// revisión" en el widget. Se mantiene mientras el servicio viejo siga sirviendo
+// tráfico (hasta el corte); las páginas ya servidas por Foco avisan directo desde
+// prototiposPublico.js.
 router.post('/:slug/notificar-revision', requireNotifyKey, async (req, res) => {
   const { nombrePrototipo, urlPrototipo, proyectoSlug, tipo } = req.body
   try {
@@ -92,49 +165,5 @@ router.post('/:slug/notificar-revision', requireNotifyKey, async (req, res) => {
     res.status(500).json({ error: 'Error interno' })
   }
 })
-
-async function notificarRevisionTerminada(slug, { nombrePrototipo, urlPrototipo, proyectoSlug, tipo }) {
-  const emailResponsable = RESPONSABLE_POR_TIPO[tipo]
-  let destinatarios = emailResponsable
-    ? await prisma.user.findMany({ where: { email: emailResponsable, activo: true }, select: { email: true, nombre: true } })
-    : []
-
-  // Si no se resolvió a nadie (tipo desconocido, o esa cuenta ya no existe/está inactiva), caemos a Admin.
-  if (!destinatarios.length) {
-    destinatarios = await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { email: true, nombre: true } })
-  }
-  if (!destinatarios.length) return
-
-  let proyecto = null
-  if (proyectoSlug) {
-    proyecto = await prisma.proyecto.findFirst({ where: { slug: proyectoSlug } })
-  }
-
-  const nombreProyecto = proyecto?.cliente?.nombreComercial
-  const linkGestion = proyecto
-    ? `${process.env.CLIENT_URL || ''}/admin/proyecto/${proyecto.slug}`
-    : `${process.env.CLIENT_URL || ''}/admin/prototipos`
-
-  const contexto = nombreProyecto ? ` (proyecto: ${nombreProyecto})` : ''
-  const texto =
-    `El cliente terminó de revisar "${nombrePrototipo}"${contexto} y dejó sus comentarios.\n\n` +
-    `Ver prototipo: ${urlPrototipo}\n` +
-    `Gestionar: ${linkGestion}`
-
-  const html = `
-    <p>El cliente terminó de revisar <strong>${nombrePrototipo}</strong>${contexto ? ` <span style="color:#64748b">${contexto}</span>` : ''} y dejó sus comentarios.</p>
-    <p><a href="${urlPrototipo}">Ver prototipo →</a></p>
-    <p><a href="${linkGestion}">Gestionar en el sistema →</a></p>
-  `
-
-  await Promise.all(destinatarios.map((a) => enviarEmail({
-    to: a.email,
-    nombreDestino: a.nombre,
-    asunto: `📝 Revisión terminada — ${nombrePrototipo}`,
-    texto,
-    html,
-  })))
-  enviarGoogleChat(`📝 Revisión terminada — ${nombrePrototipo}\n${texto}`)
-}
 
 export default router

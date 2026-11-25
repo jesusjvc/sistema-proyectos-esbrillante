@@ -12,12 +12,22 @@ import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaN
 import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
 import { generarSlug } from '../lib/slug.js'
+import { logEntry } from '../lib/logEntry.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { obtenerOCrearCarpetaProyecto, obtenerOCrearCarpetaRecursos, listarArchivosCarpeta, driveConfigurado } from '../lib/drive.js'
 import { MODULOS_CLIENTE, validarFormaPreguntas } from '../lib/modulosCliente.js'
 import { chatEspacios, chatEnviar } from '../lib/googleChat.js'
-import { listarPrototipos as listarPrototiposPages, listarAnotacionesPrototipo, resolverAnotacionPrototipo } from '../lib/pagesMcpClient.js'
+import {
+  listarPrototipos,
+  obtenerPrototipoPorSlug,
+  publicarPrototipo,
+  registrarPaginaExterna,
+  eliminarPrototipo,
+} from '../lib/prototipoService.js'
+import { listarAnotaciones, crearAnotacion, resolverMultiplesAnotaciones } from '../lib/anotacionService.js'
+import { emitirCambioAnotaciones } from '../lib/eventos.js'
+import { urlPublicaPrototipos } from '../lib/baseUrl.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea, asegurarResponsableValido } from '../lib/tareaHelpers.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
@@ -97,10 +107,6 @@ async function getProyecto(slug) {
       notas: { orderBy: { creadoEn: 'desc' }, take: 10 },
     },
   })
-}
-
-async function logEntry(proyectoId, usuario, accion, detalle = '') {
-  return prisma.logEntry.create({ data: { proyectoId, usuario, accion, detalle } })
 }
 
 // Indicador de sincronización por grupo de WhatsApp, calculado on-demand
@@ -230,7 +236,9 @@ async function resolverColumnaYOrden(p, { columna, antesDeTareaId, despuesDeTare
   return { estadoFinal, orden: ordenAlFinal(tareasColumna) }
 }
 
-function buildServer(usuario) {
+// baseProto: dominio público de prototipos, para armar los links que se le
+// devuelven a la IA (y que esta suele compartir con el cliente).
+function buildServer(usuario, baseProto) {
   const server = new McpServer({ name: 'esbrillante-seguimiento', version: '1.0.0' })
 
   server.registerTool(
@@ -1505,23 +1513,86 @@ function buildServer(usuario) {
       },
     },
     async ({ proyectoSlug }) => {
-      let paginas;
-      try {
-        paginas = await listarPrototiposPages()
-      } catch (err) {
-        return fail(`No se pudo consultar prototipos.esbrillante.mx: ${err instanceof Error ? err.message : String(err)}`)
+      let proyectoId
+      if (proyectoSlug) {
+        const p = await getProyecto(proyectoSlug)
+        if (!p) return fail(`No existe el proyecto "${proyectoSlug}".`)
+        proyectoId = p.id
       }
-      const filtradas = proyectoSlug ? paginas.filter((p) => p.proyectoSlug === proyectoSlug) : paginas
-      const resumen = filtradas.map((p) => ({
+      const resumen = (await listarPrototipos({ proyectoId })).map((p) => ({
         slug: p.slug,
-        nombre: p.nombre_original,
+        nombre: p.nombreOriginal,
         tipo: p.tipo,
         estado: p.estado,
         comentariosPendientes: p.comentariosPendientes ?? 0,
-        url: p.url,
+        url: `${baseProto}/p/${p.slug}`,
+        urlExterna: p.urlExterna || null,
         proyectoSlug: p.proyectoSlug || null,
       }))
       return ok(JSON.stringify(resumen, null, 2))
+    },
+  )
+
+  server.registerTool(
+    'publicar_prototipo',
+    {
+      title: 'Publicar prototipo o página web',
+      description: "Publica un prototipo o página web en prototipos.esbrillante.mx y devuelve su URL pública (con el widget de revisión para que el cliente comente). tipo='prototipo' para bocetos/wireframes, tipo='pagina_web' para la propuesta/demo real del sitio. Si la página ya vive en otro lado (Vercel, Elementor, Shopify...), usa modo='url' para solo registrar el link — no se sube HTML. Si ya existe uno con ese nombre (modo='html'), NO se sobreescribe: la respuesta trae requiereConfirmacion y las opciones; pregúntale al usuario y vuelve a llamar con accion='reemplazar' (mismo link) o accion='nueva_version' (link nuevo -v2, -v3...). Pasa proyectoSlug para que quede ligado al proyecto desde que se publica.",
+      inputSchema: {
+        nombre: z.string().describe("Nombre del cliente o propuesta, de él sale el slug del link. Ej: 'Dr Garcia Propuesta'"),
+        proyectoSlug: z.string().optional().describe('Slug o ID del proyecto de este sistema al que pertenece. Muy recomendado: sin esto queda "Sin proyecto asignado".'),
+        tipo: z.enum(['prototipo', 'pagina_web']).optional().describe("'prototipo' (default) = boceto/wireframe. 'pagina_web' = propuesta/demo real del sitio. Con modo='url' siempre queda como pagina_web."),
+        modo: z.enum(['html', 'url']).optional().describe("'html' (default) = sube y aloja el HTML. 'url' = solo registra una página ya alojada externamente."),
+        html: z.string().optional().describe("HTML completo de la página (máx. 5 MB). Requerido con modo='html'."),
+        url: z.string().optional().describe("URL http(s) donde ya vive la página. Requerido con modo='url'."),
+        accion: z.enum(['publicar', 'reemplazar', 'nueva_version']).optional().describe("Solo con modo='html' y solo después de que la respuesta pidió confirmación: 'reemplazar' sobreescribe el mismo link, 'nueva_version' crea uno nuevo. Pregúntale al usuario cuál."),
+      },
+    },
+    async ({ nombre, proyectoSlug, tipo, modo, html, url, accion }) => {
+      let proyecto = null
+      if (proyectoSlug) {
+        proyecto = await getProyecto(proyectoSlug)
+        if (!proyecto) return fail(`No existe el proyecto "${proyectoSlug}".`)
+      }
+      try {
+        if (modo === 'url') {
+          if (!url) return fail("url es requerida cuando modo='url'.")
+          const creado = await registrarPaginaExterna({ nombre, urlExterna: url, proyectoId: proyecto?.id })
+          const link = `${baseProto}/p/${creado.slug}`
+          if (proyecto) await logEntry(proyecto.id, usuario.nombre, 'Página web registrada', `${nombre} — ${link}`)
+          return ok(`Página externa registrada. Link de revisión: ${link}`)
+        }
+        if (!html) return fail("html es requerido cuando modo='html'.")
+        const resultado = await publicarPrototipo({ nombre, html, accion, tipo: tipo || 'prototipo', proyectoId: proyecto?.id })
+        if (resultado.requiereConfirmacion) return ok(JSON.stringify(resultado, null, 2))
+        const link = `${baseProto}/p/${resultado.slug}`
+        if (proyecto) await logEntry(proyecto.id, usuario.nombre, 'Prototipo publicado', `${nombre} — ${link}`)
+        return ok(`${resultado.mensaje.replace(`/p/${resultado.slug}`, link)}`)
+      } catch (err) {
+        return fail(err instanceof Error ? err.message : String(err))
+      }
+    },
+  )
+
+  server.registerTool(
+    'eliminar_prototipo',
+    {
+      title: 'Eliminar prototipo o página web',
+      description: 'Elimina un prototipo/página web por su slug junto con todos sus comentarios. Es irreversible: el link deja de funcionar de inmediato. Confírmalo con el usuario antes de llamarla.',
+      inputSchema: {
+        prototipoSlug: z.string().describe("Slug del prototipo (no el del proyecto) — ver listar_prototipos. Ej: 'dr-garcia-propuesta-v2'"),
+      },
+    },
+    async ({ prototipoSlug }) => {
+      const prototipo = await obtenerPrototipoPorSlug(prototipoSlug)
+      if (!prototipo) return fail(`No existe el prototipo "${prototipoSlug}".`)
+      try {
+        await eliminarPrototipo(prototipoSlug)
+      } catch (err) {
+        return fail(err instanceof Error ? err.message : String(err))
+      }
+      if (prototipo.proyectoId) await logEntry(prototipo.proyectoId, usuario.nombre, 'Prototipo eliminado', prototipo.nombreOriginal)
+      return ok(`Prototipo "${prototipoSlug}" eliminado.`)
     },
   )
 
@@ -1536,20 +1607,17 @@ function buildServer(usuario) {
       },
     },
     async ({ prototipoSlug, estado }) => {
-      let anotaciones;
-      try {
-        anotaciones = await listarAnotacionesPrototipo(prototipoSlug, estado)
-      } catch (err) {
-        return fail(`No se pudo consultar los comentarios de "${prototipoSlug}": ${err instanceof Error ? err.message : String(err)}`)
-      }
-      const resumen = anotaciones.map((a) => ({
+      const prototipo = await obtenerPrototipoPorSlug(prototipoSlug)
+      if (!prototipo) return fail(`No existe el prototipo "${prototipoSlug}".`)
+      const resumen = (await listarAnotaciones(prototipo.id, estado)).map((a) => ({
         id: a.id,
         numero: a.numero,
         autor: a.autor,
         rol: a.rol,
         tipo: a.tipo,
         estado: a.estado,
-        fecha: a.fecha,
+        fecha: a.creadaEn,
+        pagina: a.pagina,
         texto: a.contenido?.texto || null,
         texto_original: a.contenido?.texto_original || null,
         texto_sugerido: a.contenido?.texto_sugerido || null,
@@ -1564,19 +1632,59 @@ function buildServer(usuario) {
     'resolver_comentario_prototipo',
     {
       title: 'Marcar comentario de prototipo como resuelto',
-      description: 'Marca como resuelto un comentario/anotación de un prototipo (ver_comentarios_prototipo) una vez que ya se implementó lo que pedía. Desaparece de la lista de pendientes en el widget de revisión.',
+      description: 'Marca como resueltos uno o varios comentarios/anotaciones de un prototipo (ver_comentarios_prototipo) una vez que ya se implementó lo que pedían. Desaparecen de la lista de pendientes en el widget de revisión (los que tienen el prototipo abierto lo ven al momento). Pasa anotacionId para uno, o anotacionIds para varios de una vez.',
       inputSchema: {
         prototipoSlug: z.string().describe('Slug del prototipo (no el del proyecto)'),
-        anotacionId: z.string().describe('ID del comentario a resolver (ver_comentarios_prototipo lista los IDs)'),
+        anotacionId: z.string().optional().describe('ID de un comentario a resolver (ver_comentarios_prototipo lista los IDs)'),
+        anotacionIds: z.array(z.string()).optional().describe('IDs de varios comentarios a resolver de una vez'),
       },
     },
-    async ({ prototipoSlug, anotacionId }) => {
-      try {
-        await resolverAnotacionPrototipo(prototipoSlug, anotacionId)
-      } catch (err) {
-        return fail(`No se pudo resolver el comentario "${anotacionId}" en "${prototipoSlug}": ${err instanceof Error ? err.message : String(err)}`)
+    async ({ prototipoSlug, anotacionId, anotacionIds }) => {
+      const ids = [...new Set([...(anotacionIds || []), ...(anotacionId ? [anotacionId] : [])])]
+      if (!ids.length) return fail('Pasa anotacionId o anotacionIds.')
+      const prototipo = await obtenerPrototipoPorSlug(prototipoSlug)
+      if (!prototipo) return fail(`No existe el prototipo "${prototipoSlug}".`)
+      const resueltos = await resolverMultiplesAnotaciones(prototipo.id, ids)
+      if (!resueltos) return fail(`Ninguno de esos comentarios estaba pendiente en "${prototipoSlug}" (no existen o ya estaban resueltos).`)
+      emitirCambioAnotaciones(prototipoSlug)
+      if (prototipo.proyectoId) await logEntry(prototipo.proyectoId, usuario.nombre, 'Comentario de prototipo resuelto', `${prototipo.nombreOriginal} — ${resueltos} comentario(s)`)
+      return ok(`${resueltos} de ${ids.length} comentario(s) marcado(s) como resuelto(s).`)
+    },
+  )
+
+  server.registerTool(
+    'comentar_prototipo',
+    {
+      title: 'Comentar un prototipo',
+      description: "Deja un comentario del equipo en el widget de revisión de un prototipo, firmado con tu identidad de este sistema (no se puede firmar a nombre de otro). Úsala para dejar notas de justificación de un cambio antes de mandárselo al cliente — el cliente sí las ve. tipo='sugerencia_texto' propone cambiar un texto concreto (pasa texto_original y texto_sugerido).",
+      inputSchema: {
+        prototipoSlug: z.string().describe('Slug del prototipo (no el del proyecto) — ver listar_prototipos'),
+        texto: z.string().describe('Texto del comentario o justificación'),
+        tipo: z.enum(['comentario', 'sugerencia_texto']).optional().describe("'comentario' (default) o 'sugerencia_texto'"),
+        selector: z.string().optional().describe("Selector CSS del elemento al que se ancla el comentario (default 'body', o sea la página en general)"),
+        texto_original: z.string().optional().describe("Texto actual en la página (solo con tipo='sugerencia_texto')"),
+        texto_sugerido: z.string().optional().describe("Texto propuesto (solo con tipo='sugerencia_texto')"),
+      },
+    },
+    async ({ prototipoSlug, texto, tipo, selector, texto_original, texto_sugerido }) => {
+      const prototipo = await obtenerPrototipoPorSlug(prototipoSlug)
+      if (!prototipo) return fail(`No existe el prototipo "${prototipoSlug}".`)
+      const tipoFinal = tipo || 'comentario'
+      if (tipoFinal === 'sugerencia_texto' && (!texto_original || !texto_sugerido)) {
+        return fail("tipo='sugerencia_texto' requiere texto_original y texto_sugerido.")
       }
-      return ok(`Comentario "${anotacionId}" marcado como resuelto.`)
+      const contenido = { texto }
+      if (tipoFinal === 'sugerencia_texto') Object.assign(contenido, { texto_original, texto_sugerido })
+      const ann = await crearAnotacion(prototipo.id, {
+        tipo: tipoFinal,
+        rol: 'equipo',
+        autor: usuario.nombre,
+        selector: selector || 'body',
+        contenido,
+      })
+      emitirCambioAnotaciones(prototipoSlug)
+      if (prototipo.proyectoId) await logEntry(prototipo.proyectoId, usuario.nombre, 'Comentario en prototipo', `${prototipo.nombreOriginal} — ${texto.slice(0, 80)}`)
+      return ok(`Comentario #${ann.numero} creado en "${prototipoSlug}" (id: ${ann.id}).`)
     },
   )
 
@@ -1887,7 +1995,7 @@ function buildServer(usuario) {
 // POST /mcp
 router.post('/', requireMcpAuth, async (req, res) => {
   try {
-    const server = buildServer(req.user)
+    const server = buildServer(req.user, urlPublicaPrototipos(req))
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
 
     res.on('close', () => {
