@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { baseUrl, urlPublicaPrototipos } from '../lib/baseUrl.js'
+import { baseUrl, urlPublicaPrototipos, urlPublicaApi } from '../lib/baseUrl.js'
 import { logEntry } from '../lib/logEntry.js'
 import { resolverIdentidadRevisor } from '../lib/identidadRevisor.js'
 import { fetchHtmlExterno, inyectarWidgetProxy, paginaErrorProxy } from '../lib/externalProxy.js'
@@ -53,6 +53,27 @@ async function auditar(prototipo, userId, autor, accion, detalle = '') {
   }
 }
 
+// Las páginas solo se sirven en el dominio público de prototipos: ahí no existe
+// la cookie de staff de Foco. Servidas desde el host del API, el HTML arbitrario
+// de un prototipo (o los scripts de un sitio proxeado) correría en el mismo
+// origen que todo el API con la sesión del staff disponible. Solo GET: el POST
+// de finalizar-revision lo manda el widget al host del API a propósito.
+router.use('/p', (req, res, next) => {
+  const publica = process.env.PROTOTIPOS_PUBLIC_URL
+  if (!publica || req.method !== 'GET') return next()
+  const destino = new URL(publica)
+  if (req.get('host') === destino.host) return next()
+  res.redirect(302, `${destino.origin}${req.originalUrl}`)
+})
+
+// "¿Quién soy?" del widget: lo llama con credentials:'include' contra el host
+// del API, que es donde el navegador manda la cookie de sesión de Foco.
+router.get('/api/prototipos/yo', (req, res) => {
+  const real = resolverIdentidadRevisor(req)
+  res.set('Cache-Control', 'no-store')
+  res.json({ sesion: real ? { nombre: real.nombre, rol: real.rol } : null })
+})
+
 router.get('/p/:slug', async (req, res) => {
   const { slug } = req.params
   const prototipo = await obtenerPrototipoPorSlug(slug)
@@ -60,6 +81,7 @@ router.get('/p/:slug', async (req, res) => {
 
   const tipo = prototipo.tipo === 'pagina_web' ? 'pagina_web' : 'prototipo'
   const base = baseUrl(req)
+  const widgetBase = urlPublicaApi(req)
 
   // Página externa (sin HTML local) — proxy de la URL real, inyectando el
   // mismo widget de revisión para que sus funciones que necesitan DOM directo
@@ -68,7 +90,7 @@ router.get('/p/:slug', async (req, res) => {
   if (!prototipo.html && prototipo.urlExterna) {
     try {
       const { html: htmlExterno, finalUrl } = await fetchHtmlExterno(prototipo.urlExterna)
-      res.type('html').send(inyectarWidgetProxy(htmlExterno, finalUrl, tipo, slug, base))
+      res.type('html').send(inyectarWidgetProxy(htmlExterno, finalUrl, tipo, slug, base, widgetBase))
     } catch (err) {
       console.error(`Error proxeando "${prototipo.urlExterna}":`, err)
       res.status(502).type('html').send(paginaErrorProxy(prototipo.urlExterna))
@@ -82,7 +104,7 @@ router.get('/p/:slug', async (req, res) => {
   // se inyecta con src absoluto (no ruta raíz-relativa) para que revision.js
   // siga hablando con este servidor incluso si la página trae su propio
   // <base> (caso proxy de arriba).
-  const tag = `<script src="${base}/resources/gsap.min.js?v=${ASSET_VERSION}"></script><script src="${base}/resources/revision.js?v=${ASSET_VERSION}" data-tipo="${tipo}"></script>`
+  const tag = `<script src="${widgetBase}/resources/gsap.min.js?v=${ASSET_VERSION}"></script><script src="${widgetBase}/resources/revision.js?v=${ASSET_VERSION}" data-tipo="${tipo}"></script>`
   const html = /<\/body>/i.test(prototipo.html)
     ? prototipo.html.replace(/<\/body>/i, `${tag}</body>`)
     : prototipo.html + tag
@@ -151,7 +173,7 @@ router.get('/p/:slug/*', async (req, res) => {
 
   try {
     const { html: htmlExterno, finalUrl } = await fetchHtmlExterno(targetUrl)
-    res.type('html').send(inyectarWidgetProxy(htmlExterno, finalUrl, tipo, slug, baseUrl(req)))
+    res.type('html').send(inyectarWidgetProxy(htmlExterno, finalUrl, tipo, slug, baseUrl(req), urlPublicaApi(req)))
   } catch (err) {
     console.error(`Error proxeando sub-página "${targetUrl}":`, err)
     res.status(502).type('html').send(paginaErrorProxy(targetUrl))

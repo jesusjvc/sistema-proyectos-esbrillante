@@ -161,9 +161,39 @@ que el volumen de anotaciones de la sesión anterior.
       **Orden de despliegue:** esta rama no se puede desplegar a medias — con
       la tarea 5 en producción y sin la 9 (migración de datos), el listado
       admin saldría vacío porque las 58 páginas siguen en el servicio viejo.
-- [ ] 6. Widget: adaptar `resources/revision.js` para preguntar primero
+- [x] 6. Widget: adaptar `resources/revision.js` para preguntar primero
       "¿quién soy?" al backend de Foco (nueva ruta que devuelve la sesión si
       existe) antes de caer al modal/localStorage actual.
+      **Premisa corregida:** la cookie `token` es host-only en
+      `api-proyectos.esbrillante.mx`, así que nunca llegaba a las páginas en
+      `prototipos.esbrillante.mx` — la identidad por sesión de las tareas 3-4
+      no habría funcionado en producción. Decisión del usuario (2026-11-24):
+      el widget habla con el host del API, no `Domain=.esbrillante.mx` (eso
+      habría dado al HTML arbitrario de los prototipos acceso a todo el API
+      con la sesión del staff).
+      Implementado: el `<script>` del widget se inyecta desde `API_PUBLIC_URL`
+      (el widget ya derivaba `API_BASE` de su `src`); nueva ruta
+      `GET /api/prototipos/yo`; escrituras con `credentials:'include'`; CORS
+      al dominio de prototipos solo en `/api/anotaciones`,
+      `/api/prototipos/yo` y `/p/:slug/finalizar-revision`, montado antes del
+      CORS global. **Hueco de seguridad cerrado:** `/p/*` (GET) solo se sirve
+      en `PROTOTIPOS_PUBLIC_URL`; desde el host del API redirige — si no, el
+      HTML de un prototipo corría en el mismo origen que todo el API con la
+      cookie de staff. Con sesión, el nombre no se guarda en localStorage.
+      Probado: regresión de tareas 4-5 (35 aserciones) con config por
+      defecto; 12 aserciones de dos dominios con curl (redirect, CORS
+      acotado — `/api/proyectos` NO se abre —, identidad real, SSE); y
+      navegador real: sin sesión aparece el modal; con sesión entra como
+      equipo sin modal, el comentario queda con el nombre real aunque el
+      body diga otro, `/api/proyectos` bloqueado por CORS desde la página, y
+      tras logout vuelve el modal. Nota de prueba: con `api.localhost` vs
+      `prototipos.localhost` la cookie NO viaja porque Chrome los trata como
+      sitios distintos; se validó con `localhost:3096`/`:3097` (mismo sitio,
+      distinto origen), equivalente a `*.esbrillante.mx` en producción.
+      Commits `23bde84`, `96b83c6` (comentarios que apuntaban a `httpServer.ts`,
+      sugerencia de la review). Review: PASSED.
+      **Para el corte (tarea 10):** definir en Coolify `PROTOTIPOS_PUBLIC_URL`
+      y `API_PUBLIC_URL` en el backend.
 - [ ] 7. `server/src/routes/mcp.js`: las 6 tools de prototipos
       (`pages_publicar_pagina`, `pages_listar_paginas`, `pages_eliminar_pagina`,
       `anotaciones_crear`, `anotaciones_listar`, `anotaciones_resolver`) usan
