@@ -35,8 +35,10 @@ async function pedir(ruta, { json = true, conKey = false } = {}) {
 // @@unique([prototipoId, numero]): el primero conserva su número y los demás
 // (o los que no traen) toman el siguiente libre. Sin id, se usa uno estable por
 // posición para que re-correr la migración no duplique.
-function normalizarAnotaciones(slug, crudas) {
-  const usados = new Set()
+// `numerosSoloEnFoco`: números de anotaciones creadas directo en Foco entre una
+// corrida y otra — también cuentan como ocupados.
+function normalizarAnotaciones(slug, crudas, numerosSoloEnFoco = []) {
+  const usados = new Set(numerosSoloEnFoco)
   let renumeradas = 0
   const resultado = crudas.map((a, i) => {
     const ann = aAnotacion(a)
@@ -78,7 +80,13 @@ function aAnotacion(a) {
 async function prepararPagina(meta, proyectoIdPorSlug) {
   const esExterna = !meta.archivo && !!meta.urlExterna
   const html = esExterna ? null : await pedir(`/p/${encodeURIComponent(meta.slug)}/download`, { json: false })
-  const { anotaciones, renumeradas } = normalizarAnotaciones(meta.slug, await pedir(`/api/anotaciones/${encodeURIComponent(meta.slug)}`))
+  const crudas = await pedir(`/api/anotaciones/${encodeURIComponent(meta.slug)}`)
+  const idsQueVienen = crudas.map((a, i) => a.id || `migrada-${meta.slug}-${i + 1}`)
+  const soloEnFoco = await prisma.anotacion.findMany({
+    where: { prototipo: { slug: meta.slug }, id: { notIn: idsQueVienen } },
+    select: { numero: true },
+  })
+  const { anotaciones, renumeradas } = normalizarAnotaciones(meta.slug, crudas, soloEnFoco.map((a) => a.numero))
 
   const proyectoId = meta.proyectoSlug ? proyectoIdPorSlug.get(meta.proyectoSlug) ?? null : null
   return {
@@ -143,7 +151,7 @@ async function main() {
       if (plan.audios) avisos.push(`${meta.slug}: ${plan.audios} anotación(es) con audio_url — se copia el link tal cual`)
     } catch (err) {
       totales.errores++
-      console.log(`ERROR      ${meta.slug.padEnd(40)} ${err instanceof Error ? err.message : String(err)}`)
+      console.log(`ERROR      ${String(meta.slug ?? '(sin slug)').padEnd(40)} ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
