@@ -228,12 +228,59 @@ que el volumen de anotaciones de la sesión anterior.
       widget entra como equipo sin pedir nombre. `vite build` OK. El panel
       dentro del detalle de proyecto tiene el mismo cambio, verificado solo
       por build (no se abrió en navegador). Commit `15ab705`. Review: PASSED.
-- [ ] 9. Script de migración de datos (58 páginas + anotaciones) desde el
+- [x] 9. Script de migración de datos (58 páginas + anotaciones) desde el
       servicio viejo hacia las tablas nuevas — dry-run primero, confirmación
       antes de escribir.
+      `server/src/scripts/migrarPrototipos.js` (`npm run db:migrar-prototipos`).
+      Lee por la API HTTP del servicio viejo (`/api/prototipos` con
+      `PAGES_MCP_API_KEY`, `/p/:slug/download`, `/api/anotaciones/:slug`) — no
+      necesita acceso al volumen. Sin `--aplicar` es dry-run. Re-ejecutable:
+      upsert por slug y por id, nunca borra lo que existe solo en Foco.
+      Hallazgo: el widget viejo calculaba `numero` en el navegador y el
+      servicio no validaba nada, así que puede haber números repetidos o
+      anotaciones sin id; se renumeran al siguiente libre (respetando también
+      los números de anotaciones creadas solo en Foco) y el reporte lo avisa.
+      Probado contra el servicio viejo levantado en local con datos en el
+      scratchpad: 23 aserciones (dry-run no escribe, HTML byte a byte, fechas
+      e ids conservados, externa sin HTML, proyecto faltante, renumeración,
+      convergencia en re-corridas, choque con números de Foco, sin API key).
+      Commits `f957b9e`, `ac440a5` (2 hallazgos de review cerrados, el
+      choque con RED/GREEN observado). **La corrida en producción es parte
+      del corte (tarea 10).**
 - [ ] 10. Corte: usuario agrega `prototipos.esbrillante.mx` como dominio
       adicional al servicio de Foco en Coolify; verificación en producción;
       solo después se pausa (no se borra todavía) `esbrillante-pages-mcp`.
+
+## Runbook del corte (tarea 10)
+
+Pasos manuales en Coolify, en este orden. Merge, deploy y cambios de dominio
+son decisiones del usuario.
+
+1. **Variables del backend de Foco** (antes del deploy):
+   `PROTOTIPOS_PUBLIC_URL=https://prototipos.esbrillante.mx`,
+   `API_PUBLIC_URL=https://api-proyectos.esbrillante.mx`,
+   `PAGES_MCP_API_KEY` = la `API_KEY` del servicio viejo, y
+   `PAGES_MCP_URL` = **una URL del servicio viejo que no sea
+   prototipos.esbrillante.mx** (la que genera Coolify, o un dominio temporal).
+   Si apunta a prototipos.esbrillante.mx, en cuanto se mueva el dominio el
+   script se estaría leyendo a sí mismo.
+2. **Merge de la rama y deploy** (backend corre la migración de Prisma al
+   arrancar). Desde aquí el listado de prototipos en Foco sale de Postgres:
+   vacío hasta el paso 4, así que hacer 3-4 de inmediato.
+3. **Dry-run** en la terminal del contenedor del backend:
+   `npm run db:migrar-prototipos`. Revisar errores y avisos.
+4. **Aplicar:** `npm run db:migrar-prototipos -- --aplicar`.
+5. **Mover el dominio** `prototipos.esbrillante.mx` del servicio viejo al
+   backend de Foco.
+6. **Re-correr** `npm run db:migrar-prototipos -- --aplicar` para traer
+   comentarios que hayan entrado al viejo entre el paso 4 y el 5.
+7. **Verificar en producción:** abrir 2-3 prototipos (uno HTML, uno externo
+   con sub-páginas); comentar en incógnito (pide nombre) y con sesión de Foco
+   (entra como equipo sin preguntar); "Terminar revisión" manda el correo;
+   la lista admin muestra las 58 páginas con sus comentarios.
+8. **Conectores MCP:** pasar los que usan el MCP viejo
+   (`pages_*`/`anotaciones_*`) al MCP de Foco.
+9. Solo después de verificar: **pausar** (no borrar) `esbrillante-pages-mcp`.
 
 ## Criterios de aceptación
 
