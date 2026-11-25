@@ -218,8 +218,16 @@ que el volumen de anotaciones de la sesión anterior.
       **Para el corte:** los conectores que hoy usan el MCP viejo
       (`pages_*`/`anotaciones_*` en prototipos.esbrillante.mx/mcp) deben
       pasarse al MCP de Foco; las skills que nombren esas tools, actualizarse.
-- [ ] 8. Frontend: `Prototipos.jsx`/`PrototiposPanel.jsx` — el botón "copiar"
+- [x] 8. Frontend: `Prototipos.jsx`/`PrototiposPanel.jsx` — el botón "copiar"
       ya no arma `?rol=&nombre=`, copia la URL limpia.
+      No había botón de copiar explícito: el link con `?rol=equipo&nombre=`
+      era el del botón "Ver" (`urlEquipo`), que es el que se abría o se
+      copiaba. Ahora es `p.url` tal cual; se quitó `useAuth` del panel (ya no
+      se usaba). Probado en navegador con backend + Vite locales: el link de
+      "Ver" sale limpio, la lista viene del backend local, y al abrirlo el
+      widget entra como equipo sin pedir nombre. `vite build` OK. El panel
+      dentro del detalle de proyecto tiene el mismo cambio, verificado solo
+      por build (no se abrió en navegador). Commit `15ab705`. Review: PASSED.
 - [ ] 9. Script de migración de datos (58 páginas + anotaciones) desde el
       servicio viejo hacia las tablas nuevas — dry-run primero, confirmación
       antes de escribir.
