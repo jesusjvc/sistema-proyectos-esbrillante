@@ -194,10 +194,30 @@ que el volumen de anotaciones de la sesión anterior.
       sugerencia de la review). Review: PASSED.
       **Para el corte (tarea 10):** definir en Coolify `PROTOTIPOS_PUBLIC_URL`
       y `API_PUBLIC_URL` en el backend.
-- [ ] 7. `server/src/routes/mcp.js`: las 6 tools de prototipos
+- [x] 7. `server/src/routes/mcp.js`: las 6 tools de prototipos
       (`pages_publicar_pagina`, `pages_listar_paginas`, `pages_eliminar_pagina`,
       `anotaciones_crear`, `anotaciones_listar`, `anotaciones_resolver`) usan
       los servicios locales + `logEntry` de auditoría en cada escritura.
+      Aclaración: Foco solo tenía 3 tools (los equivalentes de listar, ver
+      comentarios y resolver); las 6 nombradas arriba son las del MCP viejo.
+      Se migraron las 3 existentes a los servicios locales y se agregaron
+      `publicar_prototipo`, `eliminar_prototipo` y `comentar_prototipo` con el
+      estilo de nombres de Foco, para que las 6 capacidades sigan existiendo
+      tras el corte. `comentar_prototipo` firma con la identidad del MCP (sin
+      `autor` libre); `resolver_comentario_prototipo` acepta `anotacionIds`.
+      Toda escritura audita en `LogEntry` (el plan decía que `resolver` ya lo
+      hacía — no era así) y avisa por SSE a los widgets abiertos.
+      `reemplazar` ahora asigna el proyecto dentro del servicio. Eliminado
+      `pagesMcpClient.js` y `PAGES_MCP_*`. Probado vía JSON-RPC real contra
+      `/mcp`: 34 aserciones + regresión de tareas 4-6. Commit `2c8b205`.
+      Review PASSED con 2 notas: (1) `PATCH /api/prototipos/:slug` reasignaba
+      el proyecto aunque el estado fuera inválido — corregido con RED/GREEN
+      observado, commit `dcc61ed`; (2) "`crear_ticket` llama al CRM sin
+      try/catch" — falso positivo, ya está protegido en
+      `server/src/lib/resolverCliente.js:34`.
+      **Para el corte:** los conectores que hoy usan el MCP viejo
+      (`pages_*`/`anotaciones_*` en prototipos.esbrillante.mx/mcp) deben
+      pasarse al MCP de Foco; las skills que nombren esas tools, actualizarse.
 - [ ] 8. Frontend: `Prototipos.jsx`/`PrototiposPanel.jsx` — el botón "copiar"
       ya no arma `?rol=&nombre=`, copia la URL limpia.
 - [ ] 9. Script de migración de datos (58 páginas + anotaciones) desde el

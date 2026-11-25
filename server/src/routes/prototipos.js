@@ -107,8 +107,6 @@ router.post('/', requireAuth, async (req, res) => {
     const tipoValido = tipo === 'pagina_web' ? 'pagina_web' : 'prototipo'
     const resultado = await publicarPrototipo({ nombre: nombre.trim(), html, accion, tipo: tipoValido, proyectoId })
     if (resultado.slug) {
-      // reemplazar no toca proyectoId en el servicio — se asigna aparte, igual que hacía el servicio viejo.
-      if (proyectoId && resultado.accionRealizada === 'reemplazada') await asignarProyecto(resultado.slug, proyectoId)
       await auditar(proyectoId, req.user, 'Prototipo publicado', `${nombre.trim()} — ${base}/p/${resultado.slug}`)
     }
     res.json(resultado)
@@ -122,8 +120,12 @@ router.patch('/:slug', requireAuth, async (req, res) => {
   const { slug } = req.params
   const { proyectoSlug, estado } = req.body
   try {
-    if (proyectoSlug !== undefined) await asignarProyecto(slug, await proyectoIdDeSlug(proyectoSlug))
+    // Orden a propósito: primero lo que puede fallar por validación (proyecto
+    // inexistente, estado inválido) y al final la reasignación, para no dejar
+    // un cambio a medias si la otra mitad del PATCH es inválida.
+    const proyectoId = proyectoSlug !== undefined ? await proyectoIdDeSlug(proyectoSlug) : undefined
     if (estado !== undefined) await cambiarEstado(slug, estado)
+    if (proyectoSlug !== undefined) await asignarProyecto(slug, proyectoId)
 
     const actualizado = await obtenerPrototipoPorSlug(slug)
     if (!actualizado) return res.status(404).json({ error: `No existe la página con slug "${slug}".` })
