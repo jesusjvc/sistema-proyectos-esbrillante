@@ -9,6 +9,15 @@ const RESPONSABLE_POR_TIPO = {
   pagina_web: 'mruiz.graphics@gmail.com',
 }
 
+// Escapa también comillas porque se usa dentro de atributos href.
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 // Avisa por correo (y Google Chat) a quien tenga a cargo ese tipo de trabajo que
 // alguien dio clic en "Terminar revisión" en el widget.
 export async function notificarRevisionTerminada(slug, { nombrePrototipo, urlPrototipo, proyectoSlug, tipo }) {
@@ -40,9 +49,9 @@ export async function notificarRevisionTerminada(slug, { nombrePrototipo, urlPro
     `Gestionar: ${linkGestion}`
 
   const html = `
-    <p>El cliente terminó de revisar <strong>${nombrePrototipo}</strong>${contexto ? ` <span style="color:#64748b">${contexto}</span>` : ''} y dejó sus comentarios.</p>
-    <p><a href="${urlPrototipo}">Ver prototipo →</a></p>
-    <p><a href="${linkGestion}">Gestionar en el sistema →</a></p>
+    <p>El cliente terminó de revisar <strong>${escapeHtml(nombrePrototipo)}</strong>${contexto ? ` <span style="color:#64748b">${escapeHtml(contexto)}</span>` : ''} y dejó sus comentarios.</p>
+    <p><a href="${escapeHtml(urlPrototipo)}">Ver prototipo →</a></p>
+    <p><a href="${escapeHtml(linkGestion)}">Gestionar en el sistema →</a></p>
   `
 
   await Promise.all(destinatarios.map((a) => enviarEmail({
