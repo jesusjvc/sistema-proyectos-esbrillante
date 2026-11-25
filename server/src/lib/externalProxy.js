@@ -151,7 +151,9 @@ export function reescribirLinksProxy(html, slug, paginaUrl, baseUrl) {
 // que sigan hablando con este servidor sin importar el <base> recién insertado. También reescribe
 // los enlaces internos del sitio para que la navegación por su menú siga pasando por nuestro
 // proxy — así el widget no se pierde al entrar a otra página del mismo sitio.
-export function inyectarWidgetProxy(html, finalUrl, tipo, slug, baseUrl) {
+// `baseUrl` es el dominio donde se ve la página (los links reescritos se quedan
+// ahí); `widgetBase` es de dónde se carga el widget (ver urlPublicaApi).
+export function inyectarWidgetProxy(html, finalUrl, tipo, slug, baseUrl, widgetBase = baseUrl) {
   let out = html
 
   if (!/<base[\s>]/i.test(out)) {
@@ -164,8 +166,8 @@ export function inyectarWidgetProxy(html, finalUrl, tipo, slug, baseUrl) {
   out = reescribirLinksProxy(out, slug, finalUrl, baseUrl)
 
   const widgetTag =
-    `<script src="${baseUrl}/resources/gsap.min.js?v=${ASSET_VERSION}"></script>` +
-    `<script src="${baseUrl}/resources/revision.js?v=${ASSET_VERSION}" data-tipo="${tipo}"></script>`
+    `<script src="${widgetBase}/resources/gsap.min.js?v=${ASSET_VERSION}"></script>` +
+    `<script src="${widgetBase}/resources/revision.js?v=${ASSET_VERSION}" data-tipo="${tipo}"></script>`
   out = /<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${widgetTag}</body>`) : out + widgetTag
 
   return out

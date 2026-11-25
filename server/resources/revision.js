@@ -13,12 +13,11 @@
   const API_BASE = SCRIPT_TAG ? new URL(SCRIPT_TAG.src, location.href).origin : location.origin;
 
   const params = new URLSearchParams(location.search);
-  const ROL  = params.get('rol') === 'equipo' ? 'equipo' : 'cliente';
-  /* Cuando Foco abre el link para alguien del equipo, manda su nombre real de sesión en la URL
-     (junto con rol=equipo) — así no se le pregunta y sus comentarios no quedan etiquetados como
-     "Cliente". Mismo nivel de confianza que ya tenía `rol` (ninguno — es un query param abierto,
-     no un token firmado); no cambia el modelo de confianza existente, solo evita una pregunta
-     redundante cuando el link ya viene de una sesión autenticada de Foco. */
+  /* `let`: si hay sesión real de Foco (ver quienSoy), pasa a 'equipo' al arrancar. */
+  let ROL  = params.get('rol') === 'equipo' ? 'equipo' : 'cliente';
+  /* Links viejos generados antes de que el widget preguntara la sesión a Foco: traen el nombre
+     del staff en la URL. Se respeta solo como respaldo sin sesión — mismo nivel de confianza que
+     `rol` (ninguno); con sesión, el servidor ignora lo que diga el body. */
   const NOMBRE_URL = (params.get('nombre') || '').trim();
   const SLUG = (location.pathname.match(/\/p\/([^/?#]+)/) || [])[1]
              || location.pathname.replace(/^\/|\/$/g, '').replace(/\//g, '-')
@@ -119,22 +118,33 @@
     } catch { /* sin servidor — usar localStorage */ }
   }
 
+  /* Las escrituras van con credentials:'include': API_BASE es el host del API de Foco (otro
+     origen que la página), y sin esto el navegador no manda la cookie de sesión del staff. */
+  async function quienSoy() {
+    try {
+      const resp = await fetch(API_BASE + '/api/prototipos/yo', { credentials: 'include' });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return data && data.sesion ? data.sesion : null;
+    } catch { return null; }
+  }
+
   function apiCreate(ann) {
     fetch(API_BASE + '/api/anotaciones/' + SLUG, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify(ann),
     }).catch(() => {});
   }
 
   function apiPatch(id, patch) {
     fetch(API_BASE + '/api/anotaciones/' + SLUG + '/' + id, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify(patch),
     }).catch(() => {});
   }
 
   function apiDelete(id) {
-    fetch(API_BASE + '/api/anotaciones/' + SLUG + '/' + id, { method: 'DELETE' }).catch(() => {});
+    fetch(API_BASE + '/api/anotaciones/' + SLUG + '/' + id, { method: 'DELETE', credentials: 'include' }).catch(() => {});
   }
 
   function newAnnotation(x, y, selector, tipo, contenido) {
@@ -195,11 +205,16 @@
     limitarAnchoContenido();
     injectCSS();
     annotations = loadFromLocalStorage(); // render inmediato desde localStorage
-    if (ROL === 'equipo' && NOMBRE_URL) {
-      authorName = NOMBRE_URL;
-      localStorage.setItem(LS_NOMBRE, authorName);
-    }
-    syncAnnotationsFromApi().then(() => {  // luego sincroniza desde servidor
+    Promise.all([quienSoy(), syncAnnotationsFromApi()]).then(([sesion]) => {
+      if (sesion) {
+        /* Sin guardarlo en localStorage: si la sesión expira, a la siguiente se vuelve a preguntar
+           en vez de quedar firmando con el nombre del staff en ese navegador. */
+        ROL = 'equipo';
+        authorName = sesion.nombre;
+      } else if (ROL === 'equipo' && NOMBRE_URL) {
+        authorName = NOMBRE_URL;
+        localStorage.setItem(LS_NOMBRE, authorName);
+      }
       if (!authorName) showNameModal();
       else buildUI();
       resumirLocateEntrePaginas();
@@ -779,7 +794,7 @@ body.ebr-sugg-active{padding-top:48px!important;}
     document.getElementById('ebr-help-btn').addEventListener('click', startGuide);
     document.getElementById('ebr-btn-share').addEventListener('click', shareLink);
     const dlBtn = document.getElementById('ebr-btn-download');
-    if (dlBtn) dlBtn.addEventListener('click', () => { window.location.href = `${API_BASE}/p/${SLUG}/download`; });
+    if (dlBtn) dlBtn.addEventListener('click', () => { window.location.href = `${location.origin}/p/${SLUG}/download`; });
     refreshCount();
     setMode('com');
   }
@@ -840,7 +855,7 @@ body.ebr-sugg-active{padding-top:48px!important;}
       : `¡Revisión completada! ${total} comentario${total !== 1 ? 's' : ''}, ${pending} pendiente${pending !== 1 ? 's' : ''}.`;
     showToast(msg, 3500);
     fetch(API_BASE + '/p/' + SLUG + '/finalizar-revision', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({ rol: ROL, autor: authorName }),
     }).catch(() => {});
   }
@@ -1591,7 +1606,8 @@ body.ebr-sugg-active{padding-top:48px!important;}
           // Está en otra página del sitio — navegar ahí y retomar el locate al cargar
           // (resumirLocateEntrePaginas), en vez de hacer scroll a un pin que no existe aquí.
           sessionStorage.setItem(LS_LOCATE, id);
-          location.href = API_BASE + '/p/' + SLUG + (paginaDe(ann) === '/' ? '' : paginaDe(ann));
+          // location.origin, no API_BASE: la página se ve en el dominio de prototipos, no en el del API.
+          location.href = location.origin + '/p/' + SLUG + (paginaDe(ann) === '/' ? '' : paginaDe(ann));
         } else {
           locateAnn(ann);
         }

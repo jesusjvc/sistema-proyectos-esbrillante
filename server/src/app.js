@@ -41,6 +41,18 @@ const origenesPermitidos = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
 
+// El widget de revisión corre en el dominio de prototipos y llama al host del
+// API con la cookie de sesión. Ese origen se admite SOLO en las rutas del
+// widget, nunca en el resto del API: el HTML de un prototipo es arbitrario y,
+// con CORS abierto, podría leer proyectos/clientes como el staff con sesión.
+// Va antes del cors global porque ese responde el preflight y corta la cadena.
+const origenesRevision = [...origenesPermitidos]
+if (process.env.PROTOTIPOS_PUBLIC_URL) origenesRevision.push(new URL(process.env.PROTOTIPOS_PUBLIC_URL).origin)
+app.use(
+  ['/api/anotaciones', '/api/prototipos/yo', '/p/:slug/finalizar-revision'],
+  cors({ origin: origenesRevision, credentials: true }),
+)
+
 app.use(cors({
   origin: origenesPermitidos,
   credentials: true,
