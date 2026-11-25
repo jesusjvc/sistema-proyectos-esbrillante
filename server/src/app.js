@@ -18,7 +18,12 @@ import notificacionesRouter from './routes/notificaciones.js'
 import oauthRouter from './routes/oauth.js'
 import wellKnownRouter from './routes/wellKnown.js'
 import prototiposRouter from './routes/prototipos.js'
+import prototiposPublicoRouter from './routes/prototiposPublico.js'
 import plantillasRouter from './routes/plantillas.js'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import { revisarRecordatoriosVencidos } from './lib/recordatorios.js'
 import { sincronizarGoogleChat } from './lib/chatSync.js'
 
@@ -49,6 +54,12 @@ app.use('/api/proyectos', proyectosRouter)
 app.use('/api/plantillas', plantillasRouter)
 app.use('/api/miembros', miembrosRouter)
 app.use('/api/prototipos', prototiposRouter)
+// Sin prefijo a propósito: replica /p/:slug y /api/anotaciones/* del servicio
+// viejo (esbrillante-pages-mcp) tal cual — públicas, el cliente externo sin
+// cuenta las sigue usando igual, y el equipo con sesión de Foco activa queda
+// identificado solo (ver resolverIdentidadRevisor).
+app.use(prototiposPublicoRouter)
+app.use('/resources', express.static(path.join(__dirname, '../resources')))
 app.use('/api/cliente', clienteRouter)
 app.use('/api/clientes', clientesRouter)
 app.use('/api/incidencias', incidenciasRouter)
