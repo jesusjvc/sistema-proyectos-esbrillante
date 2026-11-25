@@ -275,31 +275,36 @@ solo al final, justo antes del corte.
 Pasos manuales en Coolify, en este orden. Merge, deploy y cambios de dominio
 son decisiones del usuario.
 
-1. **Variables del backend de Foco** (antes del deploy):
-   `PROTOTIPOS_PUBLIC_URL=https://prototipos.esbrillante.mx`,
-   `API_PUBLIC_URL=https://api-proyectos.esbrillante.mx`,
-   `PAGES_MCP_API_KEY` = la `API_KEY` del servicio viejo, y
-   `PAGES_MCP_URL` = **una URL del servicio viejo que no sea
-   prototipos.esbrillante.mx** (la que genera Coolify, o un dominio temporal).
-   Si apunta a prototipos.esbrillante.mx, en cuanto se mueva el dominio el
-   script se estaría leyendo a sí mismo.
-2. **Merge de la rama y deploy** (backend corre la migración de Prisma al
-   arrancar). Desde aquí el listado de prototipos en Foco sale de Postgres:
-   vacío hasta el paso 4, así que hacer 3-4 de inmediato.
+1. **Variables del backend de Foco** — ✅ hechas el 2026-11-24 (vía la
+   sesión `cuentas-esbrillante`, API de Coolify):
+   `PROTOTIPOS_PUBLIC_URL=https://prototipos.esbrillante.mx` y
+   `API_PUBLIC_URL=https://api-proyectos.esbrillante.mx` creadas;
+   `PAGES_MCP_API_KEY` ya existía y coincide con la `API_KEY` del viejo;
+   `PAGES_MCP_URL` se queda en `https://prototipos.esbrillante.mx`.
+   La app vieja no tiene otro dominio que responda (su único fqdn es
+   prototipos.esbrillante.mx; el sslip.io no está ruteado; sin puertos
+   expuestos). Decisión del usuario (2026-11-24): no exponerla, y migrar
+   **antes** de mover el dominio, sin re-corrida posterior.
+2. **Merge del rastreador #18 y deploy** (backend corre la migración de
+   Prisma al arrancar). Desde aquí el listado de prototipos en Foco sale de
+   Postgres: vacío hasta el paso 4, así que hacer 3-5 de inmediato y seguido.
 3. **Dry-run** en la terminal del contenedor del backend:
    `npm run db:migrar-prototipos`. Revisar errores y avisos.
 4. **Aplicar:** `npm run db:migrar-prototipos -- --aplicar`.
 5. **Mover el dominio** `prototipos.esbrillante.mx` del servicio viejo al
-   backend de Foco.
-6. **Re-correr** `npm run db:migrar-prototipos -- --aplicar` para traer
-   comentarios que hayan entrado al viejo entre el paso 4 y el 5.
-7. **Verificar en producción:** abrir 2-3 prototipos (uno HTML, uno externo
+   backend de Foco **justo después** del paso 4. Lo que se comente en el
+   viejo entre el 4 y el 5 no se migra (riesgo aceptado: minutos).
+   Después del paso 5 el script ya no sirve: `PAGES_MCP_URL` apunta a Foco,
+   cuyo `/api/prototipos` exige sesión, así que el script aborta con 401
+   sin escribir nada (falla ruidosa, no corrompe). Los datos del viejo
+   siguen en su volumen si hiciera falta recuperar algo.
+6. **Verificar en producción:** abrir 2-3 prototipos (uno HTML, uno externo
    con sub-páginas); comentar en incógnito (pide nombre) y con sesión de Foco
    (entra como equipo sin preguntar); "Terminar revisión" manda el correo;
    la lista admin muestra las 58 páginas con sus comentarios.
-8. **Conectores MCP:** pasar los que usan el MCP viejo
+7. **Conectores MCP:** pasar los que usan el MCP viejo
    (`pages_*`/`anotaciones_*`) al MCP de Foco.
-9. Solo después de verificar: **pausar** (no borrar) `esbrillante-pages-mcp`.
+8. Solo después de verificar: **pausar** (no borrar) `esbrillante-pages-mcp`.
 
 ## Criterios de aceptación
 
