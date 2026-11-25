@@ -578,6 +578,9 @@ model Anotacion {
 
   creadaEn DateTime @default(now())
 
+  // Evita que dos escritores concurrentes (widget, SSE, tool MCP) asignen el
+  // mismo número dentro de un prototipo — el servicio reintenta ante choque.
+  @@unique([prototipoId, numero])
   @@index([prototipoId, estado])
   @@map("anotaciones")
 }

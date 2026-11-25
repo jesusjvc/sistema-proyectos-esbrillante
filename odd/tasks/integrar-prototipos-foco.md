@@ -74,12 +74,48 @@ que el volumen de anotaciones de la sesión anterior.
       Docker `foco-dev-db`, puerto 5433 — no toca la base real). `npx prisma
       validate` y `migrate deploy` limpios, cliente regenerado. Commit
       `901ecd3`.
-- [ ] 2. Servicios backend `server/src/lib/prototipoService.js` y
+- [x] 2. Servicios backend `server/src/lib/prototipoService.js` y
       `anotacionService.js` — CRUD sobre Prisma, mismo contrato de datos que
-      el servicio viejo (para no romper el widget más de lo necesario).
-- [ ] 3. Resolución de identidad: helper que, dado un request, devuelve
-      `{ nombre, rol }` — si hay cookie `token` de Foco válida usa esa sesión
-      real; si no, null (el widget cae al flujo de pedir nombre, como hoy).
+      el servicio viejo. Cierra los dos hallazgos de la review de la tarea 1:
+      `@@unique([prototipoId, numero])` + retry en `crearAnotacion`, y CHECK
+      constraint en la migración para html/urlExterna. Probado manualmente
+      contra `foco_dev` (18 casos, incluida concurrencia). Commits `f1c132c`
+      y `aa5b184` (este último arregla la misma condición de carrera en
+      `nueva_version`, señalada por el hook de pre-commit).
+
+      Review de Gentle AI sobre la tarea completa encontró 7 hallazgos no
+      bloqueantes (3 WARNING, 4 SUGGESTION); se cerraron todos: validación
+      explícita de `accion`/`estado` contra sus enums documentados,
+      `finalizarRevisionCliente` ya no confunde cualquier error con "no
+      existe" (solo P2025), merge atómico de `contenido` vía `jsonb ||` en
+      vez de read-modify-write (mismo riesgo de lost-update que `numero`,
+      ahora en otro campo), `tipo` se corrige al reemplazar una página antes
+      externa, y los choques de unicidad en el primer publish/registro
+      externo dan un mensaje claro en vez de un error crudo de Prisma.
+      Commits `613924d` y `131a31b` (este último cierra un hueco adicional
+      que el propio hook señaló: `estado: ''` se colaba por el `COALESCE`).
+- [x] 3. Resolución de identidad: `server/src/lib/identidadRevisor.js`,
+      `resolverIdentidadRevisor(req)` — lee la cookie `token` de `requireAuth`;
+      devuelve `{userId, nombre, rol:'equipo'}` si hay sesión de staff activa,
+      `null` en cualquier otro caso (sin cookie, inválida, expirada, o de un
+      cliente). Probado sin DB: 5 casos (sin cookie, admin, equipo, token de
+      cliente, token inválido/expirado). Commit `02de73a`.
+
+      Review de Gentle AI sobre el acumulado encontró 6 hallazgos no
+      bloqueantes (2 WARNING, 4 SUGGESTION). Se cerraron 4: contenido no-objeto
+      rechazado en `actualizarAnotacion`, `nombre` validado antes de slugificar,
+      TOCTOU de borrado concurrente en `reemplazar`/`eliminarPrototipo` con
+      mensaje claro, y `validarSlug` quitado de `eliminarPrototipo` (operaba
+      sobre un slug ya existente, no uno derivado de un nombre). Commit
+      `1e8f071`. Dos quedan sin abordar a propósito:
+      - **Falta de test automatizado repetible**: este repo no tiene test
+        runner — la verificación es manual, por convención explícita del
+        proyecto (ver AGENTS.md). Los scripts de verificación quedan en el
+        scratchpad de la sesión, no en el repo.
+      - **`identidadRevisor` no revalida `User.activo` contra la DB**:
+        coherente con `requireAuth`, que tampoco lo hace en ningún otro lado
+        del sistema — cambiarlo acá rompería esa consistencia y agregaría una
+        dependencia de DB a una función hoy pura.
 - [ ] 4. Router público nuevo (`/p/:slug`, `/p/:slug/download`,
       `/p/:slug/finalizar-revision`, `/api/anotaciones/:slug` +
       `/eventos` SSE, POST/PATCH/DELETE de anotaciones) — sirve el HTML e
