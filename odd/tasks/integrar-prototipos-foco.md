@@ -66,11 +66,14 @@ que el volumen de anotaciones de la sesión anterior.
 
 ## Checklist
 
-- [x] 0. Documento de seguimiento creado (este archivo).
-- [ ] 1. Schema Prisma: modelos `Prototipo` (slug, tipo, estado, html/urlExterna,
+- [x] 0. Documento de seguimiento creado (este archivo). Commit `87c7695`.
+- [x] 1. Schema Prisma: modelos `Prototipo` (slug, tipo, estado, html/urlExterna,
       proyectoId opcional) y `Anotacion` (prototipoId, autor, rol, estado,
-      contenido) + migración. `npx prisma validate` y `npx prisma migrate dev`
-      limpios.
+      contenido) + migración `20261105184129_add_prototipos_anotaciones`.
+      Validada localmente contra un Postgres de desarrollo aparte (contenedor
+      Docker `foco-dev-db`, puerto 5433 — no toca la base real). `npx prisma
+      validate` y `migrate deploy` limpios, cliente regenerado. Commit
+      `901ecd3`.
 - [ ] 2. Servicios backend `server/src/lib/prototipoService.js` y
       `anotacionService.js` — CRUD sobre Prisma, mismo contrato de datos que
       el servicio viejo (para no romper el widget más de lo necesario).
