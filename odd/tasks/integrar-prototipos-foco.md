@@ -247,9 +247,33 @@ que el volumen de anotaciones de la sesión anterior.
       Commits `f957b9e`, `ac440a5` (2 hallazgos de review cerrados, el
       choque con RED/GREEN observado). **La corrida en producción es parte
       del corte (tarea 10).**
-- [ ] 10. Corte: usuario agrega `prototipos.esbrillante.mx` como dominio
+- [x] 10. Corte: usuario agrega `prototipos.esbrillante.mx` como dominio
       adicional al servicio de Foco en Coolify; verificación en producción;
       solo después se pausa (no se borra todavía) `esbrillante-pages-mcp`.
+      Hecho el 2026-11-24. Los pasos en Coolify los ejecutó la sesión
+      `cuentas-esbrillante` (tiene el token; esta sesión no), con la
+      autorización del usuario en cada uno:
+      variables de entorno; merge del #18 (`7815bba`, deploy ~90 s);
+      migración vía tareas programadas de Coolify (no hay endpoint de exec):
+      dry-run y luego `--aplicar` → 62 páginas, 2 anotaciones, 0 errores;
+      dominio quitado de la app vieja y agregado a `proyectos-backend`
+      (fqdn `https://api-proyectos.esbrillante.mx,https://prototipos.esbrillante.mx`).
+      Ambas apps están en el mismo servidor, así que no hubo cambio de DNS.
+      Verificación pública desde esta sesión: páginas HTML y externas, widget
+      desde api-proyectos, comentarios migrados, redirect de `/p` en el host
+      del API, CORS acotado (`/api/proyectos` cerrado), SSE y certificado.
+      Verificación con sesión, hecha por el usuario: "Todo ok".
+      `esbrillante-pages-mcp` se detiene (no se borra), y su volumen queda
+      como respaldo de los datos originales.
+      Conectores MCP: el conector viejo `Esbrillante Prototipos`
+      (prototipos.esbrillante.mx/mcp, que ahora contesta Foco y pide
+      reautenticar) se desactiva y no se vuelve a autenticar, porque duplicaría
+      las tools de Foco. Sus 6 capacidades viven en `esbrillante-seguimiento`
+      (`publicar_prototipo`, `listar_prototipos`, `eliminar_prototipo`,
+      `comentar_prototipo`, `ver_comentarios_prototipo`,
+      `resolver_comentario_prototipo`). Los clientes ya conectados deben
+      reconectar `esbrillante-seguimiento` para ver la lista de tools nueva,
+      porque guardan la que recibieron al conectarse.
 
 ## Entrega
 
