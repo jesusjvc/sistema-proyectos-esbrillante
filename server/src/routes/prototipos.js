@@ -120,8 +120,12 @@ router.patch('/:slug', requireAuth, async (req, res) => {
   const { slug } = req.params
   const { proyectoSlug, estado } = req.body
   try {
-    if (proyectoSlug !== undefined) await asignarProyecto(slug, await proyectoIdDeSlug(proyectoSlug))
+    // Orden a propósito: primero lo que puede fallar por validación (proyecto
+    // inexistente, estado inválido) y al final la reasignación, para no dejar
+    // un cambio a medias si la otra mitad del PATCH es inválida.
+    const proyectoId = proyectoSlug !== undefined ? await proyectoIdDeSlug(proyectoSlug) : undefined
     if (estado !== undefined) await cambiarEstado(slug, estado)
+    if (proyectoSlug !== undefined) await asignarProyecto(slug, proyectoId)
 
     const actualizado = await obtenerPrototipoPorSlug(slug)
     if (!actualizado) return res.status(404).json({ error: `No existe la página con slug "${slug}".` })
