@@ -120,6 +120,8 @@ export async function publicarPrototipo({ nombre, html, accion, tipo = 'prototip
     // Si el existente era una página externa, ya no lo es — ahora tiene HTML
     // propio. Sin esto, tipo quedaría desincronizado con el contenido real.
     if (existente.urlExterna) data.tipo = tipo
+    // Sin proyectoId se conserva el que ya tenía (no se desasigna al reemplazar).
+    if (proyectoId) data.proyectoId = proyectoId
     try {
       const actualizado = await prisma.prototipo.update({ where: { slug: baseSlug }, data })
       return { slug: actualizado.slug, accionRealizada: 'reemplazada', mensaje: `Página reemplazada correctamente. El link sigue siendo: /p/${actualizado.slug}` }

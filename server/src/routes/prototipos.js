@@ -107,8 +107,6 @@ router.post('/', requireAuth, async (req, res) => {
     const tipoValido = tipo === 'pagina_web' ? 'pagina_web' : 'prototipo'
     const resultado = await publicarPrototipo({ nombre: nombre.trim(), html, accion, tipo: tipoValido, proyectoId })
     if (resultado.slug) {
-      // reemplazar no toca proyectoId en el servicio — se asigna aparte, igual que hacía el servicio viejo.
-      if (proyectoId && resultado.accionRealizada === 'reemplazada') await asignarProyecto(resultado.slug, proyectoId)
       await auditar(proyectoId, req.user, 'Prototipo publicado', `${nombre.trim()} — ${base}/p/${resultado.slug}`)
     }
     res.json(resultado)
