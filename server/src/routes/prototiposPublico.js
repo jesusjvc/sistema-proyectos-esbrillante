@@ -1,9 +1,10 @@
 import { Router } from 'express'
-import { baseUrl } from '../lib/baseUrl.js'
+import { baseUrl, urlPublicaPrototipos } from '../lib/baseUrl.js'
 import { logEntry } from '../lib/logEntry.js'
 import { resolverIdentidadRevisor } from '../lib/identidadRevisor.js'
 import { fetchHtmlExterno, inyectarWidgetProxy, paginaErrorProxy } from '../lib/externalProxy.js'
 import { ASSET_VERSION } from '../lib/assetVersion.js'
+import { notificarRevisionTerminada } from '../lib/notificarRevision.js'
 import { emitirCambioAnotaciones, suscribirseAnotaciones } from '../lib/eventos.js'
 import {
   obtenerPrototipoPorSlug,
@@ -111,10 +112,9 @@ router.get('/p/:slug/download', async (req, res) => {
 
 // Disparado por el widget de revisión cuando alguien (cliente o equipo) da
 // clic en "Terminar revisión" — mismo nivel de acceso público que
-// /api/anotaciones (cualquiera con el link ya puede comentar). Si quien lo
-// dispara tiene sesión real de Foco, queda auditado en el historial del
-// proyecto — antes esto avisaba por HTTP a un sistema de seguimiento aparte;
-// ahora que vive dentro de Foco, el LogEntry directo ya es ese aviso.
+// /api/anotaciones (cualquiera con el link ya puede comentar). Avisa por correo
+// al responsable (antes lo hacía el servicio viejo vía HTTP a notificar-revision)
+// y, si quien lo dispara tiene sesión real de Foco, queda auditado en el historial.
 router.post('/p/:slug/finalizar-revision', async (req, res) => {
   const { slug } = req.params
   const entry = await finalizarRevisionCliente(slug)
@@ -122,6 +122,13 @@ router.post('/p/:slug/finalizar-revision', async (req, res) => {
 
   const { autor, userId } = identidadDe(req)
   await auditar(entry, userId, autor, 'Revisión de prototipo terminada')
+  // Sin await: el correo no debe hacer esperar ni tumbar la respuesta al widget.
+  notificarRevisionTerminada(slug, {
+    nombrePrototipo: entry.nombreOriginal,
+    urlPrototipo: `${urlPublicaPrototipos(req)}/p/${slug}`,
+    proyectoSlug: entry.proyecto?.slug ?? null,
+    tipo: entry.tipo,
+  }).catch((err) => console.error('No se pudo avisar la revisión terminada:', err))
   res.json({ ok: true, estado: entry.estado })
 })
 

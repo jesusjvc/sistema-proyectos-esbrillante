@@ -49,10 +49,14 @@ function mapPrototipo(p) {
   }
 }
 
+// Sin `html` a propósito: cada página puede pesar hasta 5 MB y el listado no
+// lo necesita. Una página tiene HTML propio si y solo si no es externa.
 export async function listarPrototipos({ proyectoId } = {}) {
   const prototipos = await prisma.prototipo.findMany({
     where: proyectoId ? { proyectoId } : undefined,
-    include: {
+    select: {
+      id: true, slug: true, nombreOriginal: true, tipo: true, estado: true,
+      urlExterna: true, version: true, proyectoId: true, creadoEn: true, actualizadoEn: true,
       proyecto: { select: { slug: true, cliente: true } },
       _count: { select: { anotaciones: { where: { estado: 'pendiente' } } } },
     },
@@ -157,6 +161,11 @@ export async function registrarPaginaExterna({ nombre, urlExterna, proyectoId })
   if (!urlExterna) {
     throw new Error('urlExterna es obligatoria.')
   }
+  let parsed
+  try { parsed = new URL(urlExterna) } catch { parsed = null }
+  if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
+    throw new Error(`URL inválida: "${urlExterna}". Debe empezar con http:// o https://.`)
+  }
   const baseSlug = slugificarNombre(nombre)
   validarSlug(baseSlug)
   const existe = await prisma.prototipo.findUnique({ where: { slug: baseSlug } })
@@ -194,7 +203,11 @@ export async function cambiarEstado(slug, estado) {
 // de confundirse con "no existe" y aparentar que la página desapareció.
 export async function finalizarRevisionCliente(slug) {
   try {
-    return await prisma.prototipo.update({ where: { slug }, data: { estado: 'pendiente_equipo' } })
+    return await prisma.prototipo.update({
+      where: { slug },
+      data: { estado: 'pendiente_equipo' },
+      include: { proyecto: { select: { slug: true } } },
+    })
   } catch (err) {
     if (err.code === 'P2025') return null
     throw err

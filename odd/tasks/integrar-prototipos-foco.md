@@ -136,8 +136,31 @@ que el volumen de anotaciones de la sesión anterior.
       real ignorando el body, listar/editar/borrar, auditoría con y sin
       proyecto asignado, finalizar-revisión, SSE) — manual, por convención
       del proyecto (sin test runner). Commit `edad951`.
-- [ ] 5. `server/src/routes/prototipos.js` (admin: listar/publicar/reasignar/
+- [x] 5. `server/src/routes/prototipos.js` (admin: listar/publicar/reasignar/
       eliminar) apuntando a los servicios locales en vez de `pagesMcpClient`.
+      Responde el mismo formato `PageMeta` del servicio viejo (`nombre_original`,
+      `url`, `archivo`, `fecha_actualizacion`, `proyectoSlug`...) para no tocar
+      el frontend todavía. `proyectoSlug` se traduce a `proyectoId` (404 si no
+      existe). Escrituras de staff con proyecto asignado quedan en `LogEntry`.
+      Se mantiene `notificar-revision` (server-to-server) mientras el servicio
+      viejo siga vivo. Extras dentro del alcance: el listado ya no carga el
+      `html` de cada página; `registrarPaginaExterna` valida http(s) (una URL
+      inválida hacía reventar el proxy de sub-páginas); links compartibles con
+      `PROTOTIPOS_PUBLIC_URL` (nueva en `.env.example`).
+      **Regresión de la tarea 4 corregida:** "Terminar revisión" ya no avisaba
+      por correo/Chat al responsable — `notificarRevisionTerminada` se movió a
+      `lib/notificarRevision.js` y se llama sin `await` desde el router público.
+      Probado: 21 aserciones del router admin + las 14 de la tarea 4 como
+      regresión (SSE endurecido: ahora exige el evento con el slug) + dominio
+      público con la variable definida. Commit `eebb8f1`.
+      Review de Gentle Guardian Angel: PASSED con 2 hallazgos. Cerrado el
+      escape HTML del correo (commit `0f19607`). Descartado con evidencia:
+      "falta `include: { cliente: true }`" — `Proyecto.cliente` es columna
+      `Json`, Prisma la devuelve sin include, y con include lanza "include
+      statements only accept relation fields".
+      **Orden de despliegue:** esta rama no se puede desplegar a medias — con
+      la tarea 5 en producción y sin la 9 (migración de datos), el listado
+      admin saldría vacío porque las 58 páginas siguen en el servicio viejo.
 - [ ] 6. Widget: adaptar `resources/revision.js` para preguntar primero
       "¿quién soy?" al backend de Foco (nueva ruta que devuelve la sesión si
       existe) antes de caer al modal/localStorage actual.
