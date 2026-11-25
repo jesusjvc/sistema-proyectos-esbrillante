@@ -251,6 +251,25 @@ que el volumen de anotaciones de la sesión anterior.
       adicional al servicio de Foco en Coolify; verificación en producción;
       solo después se pausa (no se borra todavía) `esbrillante-pages-mcp`.
 
+## Entrega
+
+Estrategia (decisión del usuario, 2026-11-24): cadena con PR rastreador. La
+rama no puede llegar a `main` por partes porque Coolify despliega desde ahí.
+
+| PR | Rama | Commits (hasta) | Tareas |
+|----|------|-----------------|--------|
+| #18 | `feature/integrar-prototipos-foco` (rastreador, borrador → `main`) | `87c7695` | 0 |
+| #19 | `…-01-schema` | `ce27dac` | 1 |
+| #20 | `…-02-servicios` | `756abea` | 2-3 |
+| #21 | `…-03-router-publico` | `e338762` | 4 (size:exception: assets copiados) |
+| #22 | `…-04-router-admin` | `8967438` | 5 |
+| #23 | `…-05-widget-sesion` | `643a1b0` | 6 |
+| #24 | `…-06-tools-mcp` | `4a2ecda` | 7 |
+| #25 | `…-07-migracion` | este documento | 8-9 |
+
+Fusionar los hijos en orden, sin squash; el rastreador se fusiona a `main`
+solo al final, justo antes del corte.
+
 ## Runbook del corte (tarea 10)
 
 Pasos manuales en Coolify, en este orden. Merge, deploy y cambios de dominio
