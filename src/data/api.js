@@ -118,7 +118,7 @@ export const aprobarSolicitud = (slug, id, data) => req('POST', `/api/proyectos/
 export const rechazarSolicitud = (slug, id, motivo) => req('POST', `/api/proyectos/${slug}/solicitudes/${id}/rechazar`, { motivo })
 export const crearSolicitudInterna = (slug, data) => req('POST', `/api/proyectos/${slug}/solicitudes`, data)
 
-// ─── Prototipos (esbrillante-pages-mcp) ──────────────────────────────────────
+// ─── Prototipos ───────────────────────────────────────────────────────────
 export const getPrototipos = () => req('GET', '/api/prototipos')
 export const crearPrototipo = (data) => req('POST', '/api/prototipos', data)
 export const actualizarPrototipo = (slug, data) => req('PATCH', `/api/prototipos/${slug}`, data)
