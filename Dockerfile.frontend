@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ARG VITE_API_URL=https://foco-api-lr.esbrillante.mx
+ARG VITE_API_URL=https://api-proyectos.esbrillante.mx
 ENV VITE_API_URL=$VITE_API_URL
 # client id publico por diseno (el frontend lo expone en su bundle)
 ARG VITE_GOOGLE_CLIENT_ID=82795136970-9f5abare0ig9fucbrdoo5ekrgsih88pb.apps.googleusercontent.com
