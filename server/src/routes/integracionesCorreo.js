@@ -16,6 +16,7 @@ import { dominioDesde } from '../lib/clientesCrm.js'
 import { enviarEmail } from '../lib/email.js'
 import { enviarGoogleChat } from '../lib/googleChat.js'
 import { emitirCambio } from '../lib/eventos.js'
+import { urlPanel } from '../lib/urlPanel.js'
 
 const router = Router()
 
@@ -104,7 +105,7 @@ async function notificarAdminsPendiente(correo, motivo) {
   const admins = await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { email: true, nombre: true } })
   if (!admins.length) return
 
-  const link = `${process.env.CLIENT_URL || ''}/admin/mantenimiento`
+  const link = `${urlPanel()}/admin/mantenimiento`
   const texto = [
     `Correo de ${correo.de} sin cliente identificado.`,
     `\nAsunto: ${correo.asunto}`,

@@ -11,6 +11,7 @@ import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import { extraerDominio, camposFaltantes, resumenRegistranteDominio, erroresRespuestasPreguntas, resumenPreguntas } from '../lib/modulosCliente.js'
 import { notificarInformacionLista } from '../lib/notificaciones.js'
 import { idsTareasClienteDisponibles } from '../lib/avance.js'
+import { urlPanel } from '../lib/urlPanel.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
@@ -257,12 +258,21 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true })
 })
 
+// Lo que escribe el cliente va dentro del HTML del correo a los admins.
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 async function notificarAdminsRespuestaCliente(proyecto, tarea, { respuestaTexto, archivoNombre, archivoUrl }) {
   const admins = await prisma.user.findMany({ where: { rol: 'ADMIN', activo: true }, select: { email: true, nombre: true } })
   if (!admins.length) return
 
   const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
-  const linkProyecto = `${process.env.CLIENT_URL || ''}/admin/proyecto/${proyecto.slug}`
+  const linkProyecto = `${urlPanel()}/admin/proyecto/${proyecto.slug}`
 
   const partes = [`${nombreCliente} respondió "${tarea.titulo}".`]
   if (respuestaTexto) partes.push(`\nRespuesta: ${respuestaTexto}`)
@@ -271,9 +281,9 @@ async function notificarAdminsRespuestaCliente(proyecto, tarea, { respuestaTexto
   const texto = partes.join('\n')
 
   const html = `
-    <p><strong>${nombreCliente}</strong> respondió "<strong>${tarea.titulo}</strong>".</p>
-    ${respuestaTexto ? `<p>${respuestaTexto}</p>` : ''}
-    ${archivoUrl ? `<p>📎 <a href="${archivoUrl}">${archivoNombre}</a></p>` : ''}
+    <p><strong>${escapeHtml(nombreCliente)}</strong> respondió "<strong>${escapeHtml(tarea.titulo)}</strong>".</p>
+    ${respuestaTexto ? `<p>${escapeHtml(respuestaTexto)}</p>` : ''}
+    ${archivoUrl ? `<p>📎 <a href="${escapeHtml(archivoUrl)}">${escapeHtml(archivoNombre)}</a></p>` : ''}
     <p><a href="${linkProyecto}">Ver proyecto en el sistema →</a></p>
   `
 
@@ -292,7 +302,7 @@ async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
   if (!admins.length) return
 
   const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
-  const linkProyecto = `${process.env.CLIENT_URL || ''}/admin/proyecto/${proyecto.slug}`
+  const linkProyecto = `${urlPanel()}/admin/proyecto/${proyecto.slug}`
 
   const texto = [
     `${nombreCliente} envió una nueva solicitud: "${solicitud.titulo}".`,
@@ -302,9 +312,9 @@ async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
   ].join('')
 
   const html = `
-    <p><strong>${nombreCliente}</strong> envió una nueva solicitud: "<strong>${solicitud.titulo}</strong>".</p>
-    ${solicitud.descripcion ? `<p>${solicitud.descripcion}</p>` : ''}
-    ${solicitud.archivoUrl ? `<p>📎 <a href="${solicitud.archivoUrl}">${solicitud.archivoNombre}</a></p>` : ''}
+    <p><strong>${escapeHtml(nombreCliente)}</strong> envió una nueva solicitud: "<strong>${escapeHtml(solicitud.titulo)}</strong>".</p>
+    ${solicitud.descripcion ? `<p>${escapeHtml(solicitud.descripcion)}</p>` : ''}
+    ${solicitud.archivoUrl ? `<p>📎 <a href="${escapeHtml(solicitud.archivoUrl)}">${escapeHtml(solicitud.archivoNombre)}</a></p>` : ''}
     <p><a href="${linkProyecto}">Ver proyecto en el sistema →</a></p>
   `
 

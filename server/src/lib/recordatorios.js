@@ -4,6 +4,7 @@ import { dispararWebhookRecordatorio } from './webhooks.js'
 import { tareaClienteVencida as tareaVencida } from './salud.js'
 import { idsTareasClienteDisponibles } from './avance.js'
 import { sincronizarDisponibilidadCliente } from './tareaHelpers.js'
+import { urlPanel } from './urlPanel.js'
 
 const HORA_MS = 3600_000
 const DIA_MS = 24 * HORA_MS
@@ -63,7 +64,7 @@ export async function revisarRecordatoriosVencidos() {
     if (!correo) continue
 
     const nombreCliente = p.cliente?.nombreComercial || p.slug
-    const linkProyecto = `${process.env.CLIENT_URL || ''}/cliente/${p.slug}`
+    const linkProyecto = `${urlPanel()}/cliente/${p.slug}`
 
     const items = vencidas.map((t) => ({ titulo: t.titulo, atraso: formatoAtraso(t.disponibleDesde, t.plazoHoras) }))
 

@@ -1,6 +1,7 @@
 import prisma from './prisma.js'
 import { enviarEmail } from './email.js'
 import { enviarGoogleChat } from './googleChat.js'
+import { urlPanel } from './urlPanel.js'
 
 // Prototipos (bocetos/copy) quedan a cargo de Minuette; páginas web (diseño) a cargo de Mario.
 // Sin campo de "asignado" por prototipo — se resuelve por tipo, como acordamos.
@@ -39,8 +40,8 @@ export async function notificarRevisionTerminada(slug, { nombrePrototipo, urlPro
 
   const nombreProyecto = proyecto?.cliente?.nombreComercial
   const linkGestion = proyecto
-    ? `${process.env.CLIENT_URL || ''}/admin/proyecto/${proyecto.slug}`
-    : `${process.env.CLIENT_URL || ''}/admin/prototipos`
+    ? `${urlPanel()}/admin/proyecto/${proyecto.slug}`
+    : `${urlPanel()}/admin/prototipos`
 
   const contexto = nombreProyecto ? ` (proyecto: ${nombreProyecto})` : ''
   const texto =
