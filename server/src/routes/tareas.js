@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/auth.js'
 import { ordenAlFinal, ordenAntesDe, ordenDespuesDe } from '../lib/orden.js'
 import { emitirCambio } from '../lib/eventos.js'
 import { tareaLeCorresponde } from '../lib/permisos.js'
-import { crearTareaCustom, activarTareasClienteDisponibles, asegurarResponsableValido, destinatariosDeTarea } from '../lib/tareaHelpers.js'
+import { crearTareaCustom, activarTareasClienteDisponibles, dependenciasResueltas, asegurarResponsableValido, destinatariosDeTarea } from '../lib/tareaHelpers.js'
 import { notificarAsignacion } from '../lib/notificaciones.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { MODULOS_CLIENTE } from '../lib/modulosCliente.js'
@@ -179,12 +179,6 @@ router.post('/masivo', requireAuth, async (req, res) => {
 // una tarea bloqueada, pero eso es solo convención de frontend — sin esto,
 // nada impide llamar estos endpoints directo sobre una tarea con dependencias
 // pendientes.
-function dependenciasResueltas(tarea, todasLasTareas) {
-  if (!tarea.dependencias.length) return true
-  const completadasIds = new Set(todasLasTareas.filter((t) => t.estado === 'completada').map((t) => t.id))
-  return tarea.dependencias.every((d) => completadasIds.has(d))
-}
-
 // POST /api/proyectos/:slug/tareas/:tareaId/iniciar
 router.post('/:tareaId/iniciar', requireAuth, async (req, res) => {
   const { slug, tareaId } = req.params

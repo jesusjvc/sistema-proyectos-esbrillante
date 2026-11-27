@@ -138,3 +138,9 @@ export async function activarTareasClienteDisponibles(proyectoId, db = prisma) {
   const proyecto = await db.proyecto.findUnique({ where: { id: proyectoId }, include: { tareas: true } })
   if (proyecto) await sincronizarDisponibilidadCliente(proyecto, db)
 }
+
+export function dependenciasResueltas(tarea, todasLasTareas) {
+  if (!tarea.dependencias.length) return true
+  const completadasIds = new Set(todasLasTareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+  return tarea.dependencias.every((d) => completadasIds.has(d))
+}
