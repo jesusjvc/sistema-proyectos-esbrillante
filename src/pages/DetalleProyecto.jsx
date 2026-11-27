@@ -31,6 +31,7 @@ import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import { esUrl } from '../lib/texto'
 import KanbanBoard from '../components/KanbanBoard'
 import TablaTareasContinuas from '../components/TablaTareasContinuas'
+import ListaProximasActividades from '../components/ListaProximasActividades'
 import Avatar from '../components/Avatar'
 import PrototiposPanel from '../components/PrototiposPanel'
 import PanelSolicitudes from '../components/PanelSolicitudes'
@@ -45,7 +46,7 @@ import {
   CheckCircle2, Circle, Lock, AlertCircle, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle, Globe, Paperclip,
-  AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3, Search,
+  AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3, Search, ListChecks, Layers,
 } from 'lucide-react'
 
 export default function DetalleProyecto() {
@@ -63,6 +64,9 @@ export default function DetalleProyecto() {
   const [agregandoFase, setAgregandoFase] = useState(false)
   const [faseEliminando, setFaseEliminando] = useState(null)
   const [vistaContinuo, setVistaContinuo] = useState('tabla')
+  const [vistaFinito, setVistaFinito] = useState(() => {
+    try { return localStorage.getItem('foco.vistaFinito') === 'etapas' ? 'etapas' : 'proximas' } catch { return 'proximas' }
+  })
   const [copiado, setCopiado] = useState(false)
   const [tarjetaAbierta, setTarjetaAbierta] = useState(null)
   const [modalNueva, setModalNueva] = useState(null)
@@ -344,6 +348,34 @@ export default function DetalleProyecto() {
     if (!deps) return 'bloqueada_dependencia'
     if (t.esCliente) return 'bloqueada_cliente'
     return 'disponible'
+  }
+
+  function cambiarVistaFinito(valor) {
+    setVistaFinito(valor)
+    try { localStorage.setItem('foco.vistaFinito', valor) } catch { /* sin almacenamiento: solo dura la sesión */ }
+  }
+
+  function renderTareaRow(t, resaltada = false) {
+    return (
+      <TareaRow
+        tarea={t}
+        estado={estadoCalculado(t)}
+        avatares={avatares}
+        equipo={proyecto.equipo}
+        slug={proyecto.slug}
+        miembrosPorId={miembrosPorId}
+        miembros={miembros}
+        todasLasTareas={proyecto.tareas}
+        onCompletar={() => marcarCompleta(t.id)}
+        onReabrir={() => reabrir(t.id)}
+        onOmitir={() => omitir(t.id)}
+        onAbrir={() => setTarjetaAbierta(t.id)}
+        onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
+        onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
+        esAdmin={true}
+        resaltada={resaltada}
+      />
+    )
   }
 
   const esContinuo = proyecto.tipo === 'continuo'
@@ -784,8 +816,32 @@ export default function DetalleProyecto() {
 
       {tab === 'tareas' && !esContinuo && (
         <div className="space-y-3">
-          {buscadorTareas}
-          {tareasPorFaseOrdenado.map((fase, i) => {
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="inline-flex h-[52px] md:h-10 p-1 bg-slate-100 dark:bg-ink-900 rounded-lg" aria-label="Vista de tareas">
+              {[['proximas', 'Próximas', ListChecks], ['etapas', 'Por etapas', Layers]].map(([valor, label, Icono]) => (
+                <button
+                  key={valor}
+                  onClick={() => cambiarVistaFinito(valor)}
+                  className={`inline-flex h-11 md:h-8 items-center gap-1.5 px-3 rounded-md text-sm transition-colors ${vistaFinito === valor ? 'bg-white dark:bg-ink-700 text-slate-800 dark:text-ink-100 shadow-sm' : 'text-slate-500 dark:text-ink-400'}`}
+                  aria-pressed={vistaFinito === valor}
+                >
+                  <Icono size={15} /> {label}
+                </button>
+              ))}
+            </div>
+            {buscadorTareas}
+          </div>
+          {vistaFinito === 'proximas' && (
+            <ListaProximasActividades
+              tareas={proyecto.tareas}
+              estadoDe={estadoCalculado}
+              renderTarea={renderTareaRow}
+              equipo={proyecto.equipo}
+              miembrosPorId={miembrosPorId}
+              busqueda={qBuscarTarea}
+            />
+          )}
+          {vistaFinito === 'etapas' && tareasPorFaseOrdenado.map((fase, i) => {
             const completadas = fase.tareas.filter((t) => t.estado === 'completada' || t.estado === 'omitida').length
             const total = fase.tareas.length
             const faseCompleta = total > 0 && completadas === total
@@ -874,27 +930,7 @@ export default function DetalleProyecto() {
                         )}
                         <FaseTareasArrastrables tareas={grupo.tareas} onReordenar={handleReordenarTarea}>
                           {(t) => {
-                            const est = estadoCalculado(t)
-                            return (
-                              <TareaRow
-                                tarea={t}
-                                estado={est}
-                                avatares={avatares}
-                                equipo={proyecto.equipo}
-                                slug={proyecto.slug}
-                                miembrosPorId={miembrosPorId}
-                                miembros={miembros}
-                                todasLasTareas={proyecto.tareas}
-                                onCompletar={() => marcarCompleta(t.id)}
-                                onReabrir={() => reabrir(t.id)}
-                                onOmitir={() => omitir(t.id)}
-                                onAbrir={() => setTarjetaAbierta(t.id)}
-                                onEliminar={t.custom ? () => handleEliminarTarea(t.id) : null}
-                                onAsignarResponsable={(personaId) => asignarResponsable(t.id, personaId)}
-                                esAdmin={true}
-                                resaltada={tieneMatch && normalizarTexto(t.titulo).includes(qBuscarTarea)}
-                              />
-                            )
+                            return renderTareaRow(t, tieneMatch && normalizarTexto(t.titulo).includes(qBuscarTarea))
                           }}
                         </FaseTareasArrastrables>
                       </div>
@@ -921,7 +957,7 @@ export default function DetalleProyecto() {
               </div>
             )
           })}
-          {esAdminRol && (
+          {vistaFinito === 'etapas' && esAdminRol && (
             faseNuevaVisible ? (
               <div className="bg-white dark:bg-ink-800 rounded-xl border border-dashed border-brand-300 dark:border-brand-600 p-4 flex items-center gap-2">
                 <input
