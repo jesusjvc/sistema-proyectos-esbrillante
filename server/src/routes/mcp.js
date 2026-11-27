@@ -382,6 +382,7 @@ function buildServer(usuario, baseProto) {
         return proyecto
       })
       await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}${plantillaId ? ` — desde plantilla (${tareasFinal.length} tareas)` : ''}`)
+      await activarTareasClienteDisponibles(p.id)
 
       let avisoDrive = ''
       if (!driveFolderId && driveConfigurado()) {
@@ -507,6 +508,7 @@ function buildServer(usuario, baseProto) {
         data: { proyecto: { ...p.proyecto, fases: fasesFinal } },
       })
       await logEntry(p.id, usuario.nombre, 'Fase actualizada', `Fase ${numero} — ${faseActualizada.nombre}`)
+      await activarTareasClienteDisponibles(p.id)
       emitirCambio(p.id)
 
       return ok(`Fase ${numero} ("${faseActualizada.nombre}") actualizada.`)

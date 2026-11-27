@@ -10,6 +10,7 @@ import { enviarGoogleChat } from '../lib/googleChat.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import { extraerDominio, camposFaltantes, resumenRegistranteDominio, erroresRespuestasPreguntas, resumenPreguntas } from '../lib/modulosCliente.js'
 import { notificarInformacionLista } from '../lib/notificaciones.js'
+import { idsTareasClienteDisponibles } from '../lib/avance.js'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } })
 
@@ -102,6 +103,9 @@ router.post('/:slug/tareas/:tareaId/completar', requireClienteToken, upload.sing
 
     const tareaActual = p.tareas.find((t) => t.id === tareaId)
     if (!tareaActual) return res.status(404).json({ error: 'Tarea no encontrada' })
+    if (!idsTareasClienteDisponibles(p).has(tareaId)) {
+      return res.status(400).json({ error: 'Esta actividad todavía no está disponible' })
+    }
 
     // Módulos con formulario (hoy solo registrante_dominio): el cliente manda
     // los campos como JSON en el campo de texto respuestaDatos, no un párrafo.
@@ -314,8 +318,17 @@ async function notificarAdminsNuevaSolicitud(proyecto, solicitud) {
   enviarGoogleChat(`📝 Nueva solicitud de ${nombreCliente} — ${solicitud.titulo}\n${texto}`)
 }
 
+// Lo que el panel necesita de una tarea del equipo para el avance y "qué
+// está haciendo el equipo" — sin instrucciones internas, responsables ni
+// adjuntos.
+const CAMPOS_PUBLICOS_TAREA_EQUIPO = ['id', 'fase', 'frente', 'orden', 'titulo', 'estado', 'esCliente', 'opcional', 'dependencias', 'completadaEn']
+
 function proyectoPublico(p) {
   const { passwordCliente, clienteAccessToken, ...rest } = p
+  const disponibles = idsTareasClienteDisponibles(p)
+  rest.tareas = (p.tareas || []).map((t) => t.esCliente
+    ? { ...t, disponible: disponibles.has(t.id) }
+    : Object.fromEntries(CAMPOS_PUBLICOS_TAREA_EQUIPO.map((k) => [k, t[k]])))
   return rest
 }
 

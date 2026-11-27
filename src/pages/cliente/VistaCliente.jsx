@@ -120,13 +120,12 @@ export default function VistaCliente() {
   const fases = esContinuo ? [] : (proyecto.proyecto.fases || FASES_WEB)
   const faseActualNombre = fases.find((f) => f.numero === faseActual)?.nombre || ''
   const tieneFechasPorFase = fases.some((f) => f.fechaEstimada)
-  const completadasIds = new Set(proyecto.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
 
-  const tareasPendientesCliente = proyecto.tareas.filter((t) => {
-    if (t.estado === 'completada' || t.estado === 'omitida') return false
-    if (!t.esCliente) return false
-    return t.dependencias.every((d) => completadasIds.has(d))
-  }).sort((a, b) => a.orden - b.orden)
+  // `disponible` lo calcula el servidor: además de dependencias considera la
+  // etapa actual, el anticipo y los pagos de fase.
+  const tareasPendientesCliente = proyecto.tareas
+    .filter((t) => t.esCliente && t.disponible)
+    .sort((a, b) => a.orden - b.orden)
 
   const tareasEquipoVisibles = proyecto.tareas.filter((t) => {
     if (t.esCliente || t.estado === 'omitida') return false
@@ -345,8 +344,7 @@ export default function VistaCliente() {
                       <div className="px-5 py-2.5 bg-slate-50 dark:bg-ink-900/60"><span className="text-sm font-semibold text-slate-600 dark:text-ink-300">{fase.nombre}</span></div>
                     )}
                     {fase.tareasCliente.map((t) => {
-                      const desbloqueada = t.dependencias.every((d) => completadasIds.has(d))
-                      const est = t.estado === 'completada' ? 'completada' : desbloqueada ? 'pendiente_tuya' : 'por_venir'
+                      const est = t.estado === 'completada' ? 'completada' : t.disponible ? 'pendiente_tuya' : 'por_venir'
                       return (
                         <div key={t.id} className="px-5 py-3 flex items-center gap-3">
                           {est === 'completada' && <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />}
@@ -355,6 +353,7 @@ export default function VistaCliente() {
                           <span className={`text-base ${est === 'completada' ? 'line-through text-slate-500 dark:text-ink-400' : est === 'pendiente_tuya' ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-500 dark:text-ink-400'}`}>{t.titulo}</span>
                           {est === 'completada' && <span className="ml-auto text-sm text-emerald-500">Listo ✓</span>}
                           {est === 'pendiente_tuya' && <span className="ml-auto text-sm text-amber-500">Te toca</span>}
+                          {est === 'por_venir' && <span className="ml-auto text-sm text-slate-400 dark:text-ink-400">Más adelante</span>}
                         </div>
                       )
                     })}
