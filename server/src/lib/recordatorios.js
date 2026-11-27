@@ -49,7 +49,11 @@ export async function revisarRecordatoriosVencidos() {
   for (const p of proyectos) {
     // Corre cada hora: además de avisar, corrige relojes que quedaron viejos
     // (ej. tareas que nacieron "disponibles" en una fase futura).
-    await sincronizarDisponibilidadCliente(p)
+    try {
+      await sincronizarDisponibilidadCliente(p)
+    } catch (err) {
+      console.error(`Error sincronizando disponibilidad del cliente en ${p.slug}:`, err)
+    }
     const disponibles = idsTareasClienteDisponibles(p)
     const vencidas = p.tareas.filter((t) => disponibles.has(t.id) && tareaVencida(t) && !t.avisosDesactivados)
     if (!vencidas.length) continue

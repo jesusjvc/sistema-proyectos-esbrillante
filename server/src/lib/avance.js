@@ -23,6 +23,7 @@ function primeraFaseSinPago(proyecto) {
 // toca mientras el proyecto no llegue a esa fase, siga sin anticipo o tenga
 // un pago de fase pendiente. En pausa SÍ se muestran: la pausa se usa
 // justamente cuando el proyecto espera algo del cliente.
+// Duplicada en src/data/storage.js — si cambia aquí, cambiarla allá igual.
 export function idsTareasClienteDisponibles(proyecto) {
   const disponibles = new Set()
   if (proyecto.status !== 'activo' && proyecto.status !== 'en_pausa') return disponibles
