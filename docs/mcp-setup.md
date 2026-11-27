@@ -4,15 +4,15 @@ El backend de este sistema expone un endpoint MCP en `POST /mcp` (montado en `se
 
 ## 1. Variables de entorno del backend
 
-En el `.env` del servidor (local y en Coolify) agrega:
+En el `.env` del servidor (local y en LevelRail, con `levelrail-cli env set`) agrega:
 
 ```
 MCP_API_KEY="<genera una con: openssl rand -hex 32>"
 ```
 
-Esta es la key compartida (global, una sola para todos los proyectos) que usará el MCP para autenticarse. Nunca la subas al repo — vive solo en `.env` / variables de entorno de Coolify.
+Esta es la key compartida (global, una sola para todos los proyectos) que usará el MCP para autenticarse. Nunca la subas al repo — vive solo en `.env` / variables de entorno de la app en LevelRail.
 
-Ya está configurada en producción (app `proyectos-backend` en Coolify, `https://api-proyectos.esbrillante.mx`).
+Ya está configurada en producción (backend en LevelRail, `https://api-proyectos.esbrillante.mx`).
 
 ## 2. Agregar el MCP
 

@@ -7,7 +7,7 @@ Reglas de revisión de código para este repo. Úsalas al revisar un diff antes 
 Sistema interno de seguimiento de proyectos web para EsBrillante. Monorepo:
 - `src/` — frontend: React + Vite + Tailwind CSS v4 (paleta `brand`/`ink` en `src/index.css`, no colores de Tailwind por defecto para acentos).
 - `server/` — backend: Node/Express + Prisma + Postgres, incluye un servidor MCP (`server/src/routes/mcp.js`) para controlar el sistema desde agentes de IA.
-- Deploy: Coolify (apps separadas `proyectos-backend` y `proyectos-frontend`), cada una se construye y despliega de forma independiente.
+- Deploy: LevelRail (apps separadas para backend y frontend, cada una se construye y despliega de forma independiente). Ver `DEPLOY.md`. Las migraciones de Prisma se aplican solas al arrancar el backend.
 
 ## Convenciones del código (no son errores, son intencionales)
 
