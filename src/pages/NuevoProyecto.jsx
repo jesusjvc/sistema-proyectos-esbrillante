@@ -733,7 +733,7 @@ export default function NuevoProyecto() {
               </p>
               {!proyectoCreado.proyecto.anticipoConfirmado && (
                 <p className="text-amber-700 text-sm mt-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                  ⚠️ El proyecto está pendiente de anticipo. No se activará hasta confirmarlo.
+                  ⚠️ Pendiente de anticipo. Se activa solo cuando la factura ligada registre un pago: si ya existe, lígala en Info → Pagos → "Buscar facturas del cliente".
                 </p>
               )}
             </div>
