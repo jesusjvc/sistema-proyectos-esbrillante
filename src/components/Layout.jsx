@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, ChevronRight, Users, Package, Sun, Moon, LayoutTemplate, Terminal, Wrench, Menu, X } from 'lucide-react'
+import { LayoutDashboard, ListChecks, PlusCircle, LogOut, ChevronLeft, ChevronRight, Users, Package, Sun, Moon, LayoutTemplate, Terminal, Wrench, Menu, X, Activity } from 'lucide-react'
 import logo from '../assets/logo-foco-dark.svg'
 import icono from '../assets/icon-foco.svg'
 import AvatarUploader from './AvatarUploader'
@@ -57,6 +57,7 @@ export default function Layout({ children, titulo, volver, badge, acciones }) {
           {esAdmin && (
             <>
               <NavLink to="/admin/tareas" icon={<ListChecks size={16} />} label="Mis tareas" active={location.pathname === '/admin/tareas'} colapsado={colapsado} />
+              <NavLink to="/admin/equipo-ahora" icon={<Activity size={16} />} label="Equipo ahora" active={location.pathname === '/admin/equipo-ahora'} colapsado={colapsado} />
               <NavLink to="/admin" icon={<LayoutDashboard size={16} />} label="Proyectos" active={location.pathname === '/admin'} colapsado={colapsado} />
               <NavLink to="/admin/mantenimiento" icon={<Wrench size={16} />} label="Mantenimiento" active={location.pathname.startsWith('/admin/mantenimiento')} colapsado={colapsado} />
               <NavLink to="/admin/proyecto/nuevo" icon={<PlusCircle size={16} />} label="Nuevo proyecto" active={location.pathname === '/admin/proyecto/nuevo'} colapsado={colapsado} />

@@ -3,6 +3,7 @@ import prisma from './prisma.js'
 import { idsDeRol } from './permisos.js'
 import { destinatariosDeTarea } from './tareaHelpers.js'
 import { crearNotificacion } from './notificacionesHelper.js'
+import { urlPanel } from './urlPanel.js'
 
 const ROLES_EQUIPO_TAREA = ['copy', 'disenador', 'programador', 'redes']
 
@@ -22,7 +23,7 @@ export async function notificarMencion(proyecto, tarea, autor, texto, usuarios) 
   if (!usuarios.length) return
 
   const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
-  const clientUrl = process.env.CLIENT_URL || ''
+  const clientUrl = urlPanel()
 
   await Promise.all(usuarios.map((u) => {
     const base = u.rol === 'ADMIN' ? '/admin' : '/equipo'
@@ -83,7 +84,7 @@ export async function notificarAsignacion(proyecto, tareas, actor) {
     if (!porUsuario.size) return
 
     const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
-    const clientUrl = process.env.CLIENT_URL || ''
+    const clientUrl = urlPanel()
 
     await Promise.all([...porUsuario.values()].map(({ usuario, tareas }) => {
       const base = usuario.rol === 'ADMIN' ? '/admin' : '/equipo'
@@ -133,7 +134,7 @@ export async function notificarInformacionLista(proyecto, tareaDesbloqueada, tar
     if (!usuarios.length) return
 
     const nombreCliente = proyecto.cliente?.nombreComercial || proyecto.slug
-    const clientUrl = process.env.CLIENT_URL || ''
+    const clientUrl = urlPanel()
 
     await crearNotificacion({
       destinatarioIds: usuarios.map((u) => u.id),

@@ -2,6 +2,9 @@ import prisma from './prisma.js'
 import { enviarEmail } from './email.js'
 import { dispararWebhookRecordatorio } from './webhooks.js'
 import { tareaClienteVencida as tareaVencida } from './salud.js'
+import { idsTareasClienteDisponibles } from './avance.js'
+import { sincronizarDisponibilidadCliente } from './tareaHelpers.js'
+import { urlPanel } from './urlPanel.js'
 
 const HORA_MS = 3600_000
 const DIA_MS = 24 * HORA_MS
@@ -45,7 +48,15 @@ export async function revisarRecordatoriosVencidos() {
   })
 
   for (const p of proyectos) {
-    const vencidas = p.tareas.filter((t) => tareaVencida(t) && !t.avisosDesactivados)
+    // Corre cada hora: además de avisar, corrige relojes que quedaron viejos
+    // (ej. tareas que nacieron "disponibles" en una fase futura).
+    try {
+      await sincronizarDisponibilidadCliente(p)
+    } catch (err) {
+      console.error(`Error sincronizando disponibilidad del cliente en ${p.slug}:`, err)
+    }
+    const disponibles = idsTareasClienteDisponibles(p)
+    const vencidas = p.tareas.filter((t) => disponibles.has(t.id) && tareaVencida(t) && !t.avisosDesactivados)
     if (!vencidas.length) continue
     if (!vencidas.some(pasoElIntervalo)) continue
 
@@ -53,7 +64,7 @@ export async function revisarRecordatoriosVencidos() {
     if (!correo) continue
 
     const nombreCliente = p.cliente?.nombreComercial || p.slug
-    const linkProyecto = `${process.env.CLIENT_URL || ''}/cliente/${p.slug}`
+    const linkProyecto = `${urlPanel()}/cliente/${p.slug}`
 
     const items = vencidas.map((t) => ({ titulo: t.titulo, atraso: formatoAtraso(t.disponibleDesde, t.plazoHoras) }))
 

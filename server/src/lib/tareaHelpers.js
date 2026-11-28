@@ -3,6 +3,7 @@ import prisma from './prisma.js'
 import { ordenAlFinal } from './orden.js'
 import { estadoDeColumna } from './kanban.js'
 import { RESPONSABLES_ESPECIALES, ROLES_RESPONSABLE, ROLES_EQUIPO, conMiembroAgregado, idsDeRol } from './permisos.js'
+import { idsTareasClienteDisponibles } from './avance.js'
 
 // Valida `responsable` cuando es una persona específica (no uno de los valores especiales de
 // RESPONSABLES_ESPECIALES) y, si aún no participa del proyecto, la agrega al bucket genérico
@@ -117,20 +118,29 @@ export async function aprobarSolicitud(p, solicitud, { fase, columna, responsabl
   return { tarea: nueva, solicitud: actualizada }
 }
 
-// Marca `disponibleDesde` en las tareas de cliente que ya tienen todas sus
-// dependencias completadas pero aún no habían quedado activas — es el
-// momento en que empieza a correr `plazoHoras` para recordatorios y el
-// badge de "atrasada". Se llama después de cualquier cambio que pueda
-// completar una tarea (puede liberar la dependencia de otra tarea cliente).
-export async function activarTareasClienteDisponibles(proyectoId, db = prisma) {
-  const tareas = await db.tarea.findMany({ where: { proyectoId } })
-  const completadasIds = new Set(tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
-  const activables = tareas.filter((t) =>
-    t.esCliente && t.estado === 'pendiente' && !t.disponibleDesde &&
-    t.dependencias.every((d) => completadasIds.has(d))
-  )
-  if (!activables.length) return
-  await Promise.all(activables.map((t) =>
-    db.tarea.update({ where: { id: t.id }, data: { disponibleDesde: new Date() } })
+// Mantiene `disponibleDesde` alineado con lo que de verdad le toca al
+// cliente (idsTareasClienteDisponibles) — es el momento en que empieza a
+// correr `plazoHoras` para recordatorios y el badge de "atrasada". Si una
+// tarea deja de estar disponible (fase sin pagar, sin anticipo) su reloj se borra:
+// al volver a estar disponible arranca de cero en vez de nacer vencida. Se
+// llama después de cualquier cambio de tareas, status o pagos de fase.
+export async function sincronizarDisponibilidadCliente(proyecto, db = prisma) {
+  const disponibles = idsTareasClienteDisponibles(proyecto)
+  const cambios = proyecto.tareas.filter((t) =>
+    t.esCliente && t.estado === 'pendiente' && disponibles.has(t.id) !== !!t.disponibleDesde)
+  if (!cambios.length) return
+  await Promise.all(cambios.map((t) =>
+    db.tarea.update({ where: { id: t.id }, data: { disponibleDesde: disponibles.has(t.id) ? new Date() : null } })
   ))
+}
+
+export async function activarTareasClienteDisponibles(proyectoId, db = prisma) {
+  const proyecto = await db.proyecto.findUnique({ where: { id: proyectoId }, include: { tareas: true } })
+  if (proyecto) await sincronizarDisponibilidadCliente(proyecto, db)
+}
+
+export function dependenciasResueltas(tarea, todasLasTareas) {
+  if (!tarea.dependencias.length) return true
+  const completadasIds = new Set(todasLasTareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+  return tarea.dependencias.every((d) => completadasIds.has(d))
 }

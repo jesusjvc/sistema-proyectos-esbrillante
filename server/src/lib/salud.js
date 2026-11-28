@@ -5,7 +5,7 @@
 // frontend solo la muestra.
 
 import { idsDeRol } from './permisos.js'
-import { calcularAvance } from './avance.js'
+import { calcularAvance, idsTareasClienteDisponibles } from './avance.js'
 import { contarPorColumna } from './kanban.js'
 
 const HORA_MS = 3600_000
@@ -124,13 +124,16 @@ export function calcularSalud(proyecto, { ahora = Date.now() } = {}) {
     })
   }
 
-  const vencidasCliente = tareas.filter((t) => tareaClienteVencida(t, ahora))
+  // disponibleDesde puede quedar viejo hasta la siguiente sincronización —
+  // solo cuenta lo que hoy de verdad le toca al cliente.
+  const disponiblesCliente = idsTareasClienteDisponibles(proyecto)
+  const vencidasCliente = tareas.filter((t) => disponiblesCliente.has(t.id) && tareaClienteVencida(t, ahora))
   const idsVencidas = new Set(vencidasCliente.map((t) => t.id))
   // Esperando al cliente: la pelota está en la cancha del cliente (la tarea
   // ya quedó disponible, sin dependencias por completar) y todavía no
   // responde — cuenta aunque no tenga plazo o esté dentro de él.
   const esperandoCliente = tareas.filter((t) =>
-    t.esCliente && t.estado === 'pendiente' && t.disponibleDesde && !idsVencidas.has(t.id))
+    disponiblesCliente.has(t.id) && t.disponibleDesde && !idsVencidas.has(t.id))
   const vencidasEquipo = tareas.filter((t) =>
     !t.esCliente && ESTADOS_ACTIVOS_EQUIPO.includes(t.estado) && t.fechaLimite
     && new Date(t.fechaLimite).getTime() < inicioDelDia(ahora))

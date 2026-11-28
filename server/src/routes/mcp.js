@@ -29,7 +29,7 @@ import { listarAnotaciones, crearAnotacion, resolverMultiplesAnotaciones } from 
 import { emitirCambioAnotaciones } from '../lib/eventos.js'
 import { urlPublicaPrototipos } from '../lib/baseUrl.js'
 import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
-import { activarTareasClienteDisponibles, aprobarSolicitud, destinatariosDeTarea, asegurarResponsableValido } from '../lib/tareaHelpers.js'
+import { activarTareasClienteDisponibles, dependenciasResueltas, aprobarSolicitud, destinatariosDeTarea, asegurarResponsableValido } from '../lib/tareaHelpers.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { dominioDesde } from '../lib/clientesCrm.js'
 import { resolverClienteTicket } from '../lib/resolverCliente.js'
@@ -236,6 +236,56 @@ async function resolverColumnaYOrden(p, { columna, antesDeTareaId, despuesDeTare
   return { estadoFinal, orden: ordenAlFinal(tareasColumna) }
 }
 
+function resumenSiguiente(p, t) {
+  const detalle = detalleTarea(t)
+  return {
+    slug: p.slug,
+    proyecto: p.cliente?.nombreComercial || '(sin nombre)',
+    tareaId: t.id,
+    titulo: t.titulo,
+    ...(p.tipo === 'continuo' ? {} : { fase: t.fase }),
+    ...(t.frente ? { frente: t.frente } : {}),
+    responsable: t.responsable,
+    ...(t.prioridad && t.prioridad !== 'normal' ? { prioridad: t.prioridad } : {}),
+    ...(t.fechaLimite ? { fechaLimite: t.fechaLimite } : {}),
+    ...(detalle.queHacer ? { queHacer: detalle.queHacer.slice(0, 400) } : detalle.descripcion ? { descripcion: detalle.descripcion.slice(0, 400) } : {}),
+    ...(detalle.queEntregas ? { queEntregas: detalle.queEntregas.slice(0, 400) } : {}),
+  }
+}
+
+// Misma selección que la bandeja "Mis tareas" del frontend (src/lib/bandejaTareas.js):
+// un admin solo ve lo asignado a su persona — tareaLeCorresponde le da acceso total
+// porque sirve para autorizar, no para armar una bandeja. Las tareas con responsable
+// "equipo" quedan "al aire" y solo se listan aparte cuando se filtra por un proyecto.
+// identidadCompartida: con MCP_API_KEY no hay persona, así que se listan todas las
+// tareas del equipo del proyecto.
+export function siguienteActividadDe(proyectos, usuario, { identidadCompartida = false, conSinAsignar = false } = {}) {
+  const enCurso = []
+  const disponibles = []
+  const sinAsignar = []
+  const esAdmin = usuario.rol === 'ADMIN'
+  for (const p of proyectos) {
+    for (const t of [...p.tareas].sort((a, b) => a.orden - b.orden)) {
+      if (t.esCliente || t.estado === 'completada' || t.estado === 'omitida') continue
+      if (!identidadCompartida) {
+        if (t.soloKarlaOAdmin && !usuario.esKarla && !esAdmin) continue
+        if (esAdmin ? t.responsable !== usuario.id : !tareaLeCorresponde(t, p.equipo, usuario)) continue
+      }
+      if (t.estado === 'en_proceso') {
+        if (identidadCompartida || t.asignadoA === usuario.nombre) enCurso.push({ ...resumenSiguiente(p, t), asignadoA: t.asignadoA })
+        continue
+      }
+      if (t.estado !== 'pendiente' || !dependenciasResueltas(t, p.tareas)) continue
+      if (t.responsable === 'equipo' && !identidadCompartida) {
+        if (conSinAsignar) sinAsignar.push(resumenSiguiente(p, t))
+        continue
+      }
+      disponibles.push(resumenSiguiente(p, t))
+    }
+  }
+  return { enCurso, disponibles, ...(conSinAsignar ? { sinAsignar } : {}) }
+}
+
 // baseProto: dominio público de prototipos, para armar los links que se le
 // devuelven a la IA (y que esta suele compartir con el cliente).
 function buildServer(usuario, baseProto) {
@@ -382,6 +432,7 @@ function buildServer(usuario, baseProto) {
         return proyecto
       })
       await logEntry(p.id, usuario.nombre, 'Proyecto creado', `Paquete: ${paqueteFinal}${plantillaId ? ` — desde plantilla (${tareasFinal.length} tareas)` : ''}`)
+      await activarTareasClienteDisponibles(p.id)
 
       let avisoDrive = ''
       if (!driveFolderId && driveConfigurado()) {
@@ -507,6 +558,7 @@ function buildServer(usuario, baseProto) {
         data: { proyecto: { ...p.proyecto, fases: fasesFinal } },
       })
       await logEntry(p.id, usuario.nombre, 'Fase actualizada', `Fase ${numero} — ${faseActualizada.nombre}`)
+      await activarTareasClienteDisponibles(p.id)
       emitirCambio(p.id)
 
       return ok(`Fase ${numero} ("${faseActualizada.nombre}") actualizada.`)
@@ -1221,10 +1273,49 @@ function buildServer(usuario, baseProto) {
   )
 
   server.registerTool(
+    'mi_siguiente_actividad',
+    {
+      title: 'Mi siguiente actividad',
+      description: 'Devuelve las actividades de la persona autenticada (OAuth o API key personal): "enCurso" (tareas que ya marcó en proceso con iniciar_actividad) y "disponibles" (tareas del equipo pendientes, con dependencias resueltas, que le corresponden por rol o asignación directa), ordenadas como en el plan. Cada una trae slug, tareaId, titulo, fase (proyectos "finito"), responsable y, si existe, queHacer/queEntregas resumidos. Pensada para que un agente de IA la llame al empezar una sesión de trabajo y sepa qué reportar con iniciar_actividad / comentar_actividad / completar_actividad. Con "slug" se limita a ese proyecto y agrega "sinAsignar" (tareas disponibles con responsable "equipo", que nadie ha tomado). Con la API key compartida (sin persona) "slug" es obligatorio y se listan todas las tareas del equipo del proyecto.',
+      inputSchema: {
+        slug: z.string().optional().describe('Slug o ID del proyecto para filtrar (ej. el que indica el CLAUDE.md del repo del cliente). Si se omite, revisa todos los proyectos activos o en pausa.'),
+      },
+    },
+    async ({ slug }) => {
+      const identidadCompartida = usuario.id === 'mcp'
+      if (identidadCompartida && !slug) {
+        return fail('Estás conectado con la API key compartida, que no identifica a ninguna persona — no se puede saber qué actividades son "tuyas". Pasa "slug" para ver las tareas del equipo de ese proyecto, o conéctate con tu cuenta (OAuth) o tu API key personal.')
+      }
+
+      let proyectos
+      if (slug) {
+        const p = await getProyecto(slug)
+        if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+        proyectos = [p]
+      } else {
+        proyectos = await prisma.proyecto.findMany({
+          where: { status: { in: ['activo', 'en_pausa'] } },
+          include: { tareas: true },
+          orderBy: { creadoEn: 'desc' },
+        })
+      }
+
+      const resultado = siguienteActividadDe(proyectos, usuario, { identidadCompartida, conSinAsignar: !!slug })
+      const vacio = !resultado.enCurso.length && !resultado.disponibles.length && !(resultado.sinAsignar || []).length
+      if (vacio) {
+        return ok(slug
+          ? `No tienes actividades en curso ni disponibles en "${slug}". Si vas a trabajar en algo que no está en el plan, regístralo con registrar_actividad.`
+          : 'No tienes actividades en curso ni disponibles en los proyectos activos. Si vas a trabajar en algo que no está en el plan, regístralo con registrar_actividad.')
+      }
+      return ok(JSON.stringify(resultado, null, 2))
+    },
+  )
+
+  server.registerTool(
     'iniciar_actividad',
     {
       title: 'Marcar actividad en proceso',
-      description: 'Marca una tarea del checklist del equipo como "en proceso" — es decir, que alguien está trabajando en ella activamente ahora mismo, no solo que está disponible. Úsala cuando de verdad empieces a trabajar en algo, no para todo lo que esté disponible en paralelo: el objetivo es que el cliente y el equipo vean qué se está haciendo de verdad, no una lista de todo lo que técnicamente se podría hacer.',
+      description: 'Marca una tarea del checklist del equipo como "en proceso" — es decir, que alguien está trabajando en ella activamente ahora mismo, no solo que está disponible. Úsala cuando de verdad empieces a trabajar en algo, no para todo lo que esté disponible en paralelo: el objetivo es que el cliente y el equipo vean qué se está haciendo de verdad, no una lista de todo lo que técnicamente se podría hacer. Para saber qué te toca, usa mi_siguiente_actividad.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a marcar en proceso'),
@@ -1256,7 +1347,7 @@ function buildServer(usuario, baseProto) {
     'completar_actividad',
     {
       title: 'Completar actividad existente',
-      description: 'Marca como completada una tarea que ya existe — tanto del checklist del equipo como una solicitud al cliente (tareasPendientesEquipo o tareasPendientesCliente de ver_proyecto). Úsala también para cerrar una solicitud al cliente cuando responda por otro canal (WhatsApp, correo): pasa "respuesta" para dejar registrado qué contestó.',
+      description: 'Marca como completada una tarea que ya existe — tanto del checklist del equipo como una solicitud al cliente (tareasPendientesEquipo o tareasPendientesCliente de ver_proyecto). Úsala también para cerrar una solicitud al cliente cuando responda por otro canal (WhatsApp, correo): pasa "respuesta" para dejar registrado qué contestó. Márcala solo cuando el entregable esté hecho y verificado.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a completar (ver_proyecto lista los IDs pendientes)'),
@@ -1692,7 +1783,7 @@ function buildServer(usuario, baseProto) {
     'comentar_actividad',
     {
       title: 'Comentar una actividad',
-      description: 'Deja un comentario interno sobre una tarea de este proyecto (nunca visible para el cliente, ni siquiera en tareas que él sí ve en su portal) — para dar contexto de qué se está haciendo, dejar una nota para el equipo, o avisar de un problema. Úsala mientras trabajas una actividad para que quede transparencia de tu avance sin que dependa de que alguien te pregunte. Si el comentario es para alguien en particular, usa "mencionar" con su nombre — le llega un correo.',
+      description: 'Deja un comentario interno sobre una tarea de este proyecto (nunca visible para el cliente, ni siquiera en tareas que él sí ve en su portal) — para dar contexto de qué se está haciendo, dejar una nota para el equipo, o avisar de un problema. Úsala mientras trabajas una actividad para que quede transparencia de tu avance sin que dependa de que alguien te pregunte (un agente de IA debería dejar una nota breve en cada avance relevante y al cerrar su sesión: qué hizo, qué sigue y qué lo bloquea). Si el comentario es para alguien en particular, usa "mencionar" con su nombre — le llega un correo.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
         tareaId: z.string().describe('ID de la tarea a comentar'),

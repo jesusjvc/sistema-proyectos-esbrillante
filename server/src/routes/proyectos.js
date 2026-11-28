@@ -7,6 +7,7 @@ import { emitirCambio } from '../lib/eventos.js'
 import { validarYNormalizarEquipo } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
+import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 import notasRouter from './notas.js'
@@ -166,6 +167,7 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
       }
     }
 
+    await activarTareasClienteDisponibles(result.id)
     emitirCambio(result.id)
     res.status(201).json(result)
   } catch (err) {
@@ -517,6 +519,7 @@ router.post('/:slug/anticipo', requireAdmin, async (req, res) => {
     const tiempos = { ...(p.tiempos || {}), inicio: p.tiempos?.inicio || new Date().toISOString() }
     await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'activo', proyecto: { ...p.proyecto, anticipoConfirmado: true }, tiempos } })
     await logEntry(p.id, req.user.nombre, 'Anticipo confirmado')
+    await activarTareasClienteDisponibles(p.id)
 
     emitirCambio(p.id)
     res.json({ ok: true })

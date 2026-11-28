@@ -4,15 +4,15 @@ El backend de este sistema expone un endpoint MCP en `POST /mcp` (montado en `se
 
 ## 1. Variables de entorno del backend
 
-En el `.env` del servidor (local y en Coolify) agrega:
+En el `.env` del servidor (local y en LevelRail, con `levelrail-cli env set`) agrega:
 
 ```
 MCP_API_KEY="<genera una con: openssl rand -hex 32>"
 ```
 
-Esta es la key compartida (global, una sola para todos los proyectos) que usará el MCP para autenticarse. Nunca la subas al repo — vive solo en `.env` / variables de entorno de Coolify.
+Esta es la key compartida (global, una sola para todos los proyectos) que usará el MCP para autenticarse. Nunca la subas al repo — vive solo en `.env` / variables de entorno de la app en LevelRail.
 
-Ya está configurada en producción (app `proyectos-backend` en Coolify, `https://api-proyectos.esbrillante.mx`).
+Ya está configurada en producción (backend en LevelRail, `https://api-proyectos.esbrillante.mx`).
 
 ## 2. Agregar el MCP
 
@@ -109,6 +109,7 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `listar_proyectos` | Ver todos los proyectos (slug, cliente, paquete, etiquetas, status, tipo, avance o columnas Kanban, pendientes del cliente) con un `salud` compacto (`nivel`, `diasSinActividad`) por proyecto |
 | `ver_salud_proyectos(estado?)` | Clasifica los proyectos activos en `atrasado` (tareas de cliente vencidas o del equipo con fecha límite pasada), `estancado` (7+ días sin movimiento) o `avanza`, con los motivos concretos por proyecto (títulos, días, tareas sin fecha, tareas sin responsable). La tool para "¿qué está atrasado y por qué?" y para armar resúmenes de status |
 | `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
+| `mi_siguiente_actividad(slug?)` | Qué te toca a ti (identidad OAuth o API key personal): `enCurso` (lo que ya marcaste en proceso) y `disponibles` (pendientes, con dependencias resueltas, que te corresponden por rol o asignación), con `queHacer`/`queEntregas` resumidos. Con `slug` filtra a un proyecto y agrega `sinAsignar` (responsable "equipo"). Con la API key compartida `slug` es obligatorio. Es la primera llamada que hace un agente al empezar a trabajar (ver §5) |
 | `ver_proyecto(slug)` | Fase actual, % de avance, tareas pendientes propias y del cliente, respuestas recientes, solicitudes y el objeto `salud` completo |
 | `registrar_actividad(slug, titulo, descripcion?, fase?, completada?, antesDeTareaId?, despuesDeTareaId?)` | Reportar algo que se hizo (o se está haciendo, con `completada:false`) que no estaba en el checklist original. Visible al cliente si no es `esCliente`. |
 | `solicitar_al_cliente(slug, titulo, instrucciones?, modulo?, plazoHoras?, fase?, antesDeTareaId?, despuesDeTareaId?, dependeDeTareaIds?, pedirArchivos?)` | Pedirle algo al cliente — aparece de inmediato en su portal. Con `modulo` la solicitud se vuelve estructurada: `dominio` (al responder queda en la Info clave), `recursos` (subcarpeta de Drive lista para subir) o `vobo` (aceptación formal) |
@@ -144,18 +145,25 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 
 ## 5. Para que el reporte sea automático, no manual
 
-El MCP no reporta nada por sí solo — necesita que Claude Code lo invoque. Para que esto pase sin que tengas que pedirlo cada vez, agrega algo así al `CLAUDE.md` de cada repo cliente:
+El MCP no reporta nada por sí solo — necesita que el agente (Claude Code, OpenCode, etc.) lo invoque. Las reglas del juego viven en la skill `foco-reporte` (`skills/foco-reporte/SKILL.md` de este repo; instálala copiándola a `~/.claude/skills/foco-reporte/` o al directorio de skills de tu agente). Además, agrega algo así al `CLAUDE.md` (o `AGENTS.md`) de cada repo cliente:
 
 ```markdown
 # Reporte de avance
 
-Este proyecto se reporta al Sistema de Seguimiento de EsBrillante vía el MCP
-`esbrillante-seguimiento`. El slug de este proyecto es: `<slug-del-proyecto>`.
+Este proyecto se reporta en Foco (Sistema de Seguimiento de EsBrillante) vía el
+MCP `esbrillante-seguimiento`. El slug de este proyecto es: `<slug-del-proyecto>`.
+Sigue la skill `foco-reporte`:
 
-Después de completar una unidad de trabajo significativa (una funcionalidad,
-un fix importante, un hito del brief), usa `registrar_actividad` para dejarlo
-reportado. Si algo requiere una decisión, dato o recurso del cliente antes de
-poder seguir, usa `solicitar_al_cliente` en vez de solo preguntarme a mí.
+- Al empezar la sesión: `mi_siguiente_actividad(slug)` para ver qué está en curso
+  y qué sigue.
+- Antes de trabajar una tarea del plan: `iniciar_actividad`.
+- En cada avance relevante y al cerrar la sesión: `comentar_actividad` con 1-3
+  líneas (qué se hizo, qué sigue, bloqueos).
+- Al terminarla y verificarla: `completar_actividad` (en proyectos continuos,
+  `mover_a_revision` si alguien debe revisarla).
+- Trabajo que no estaba en el plan: `registrar_actividad`.
+- Si algo requiere una decisión, dato o recurso del cliente: `solicitar_al_cliente`
+  en vez de solo preguntarme a mí.
 ```
 
 Ajusta el criterio de "unidad de trabajo significativa" al ritmo real del proyecto — no cada commit, sino cada avance que le importaría ver al cliente.

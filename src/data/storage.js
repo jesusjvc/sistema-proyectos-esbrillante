@@ -340,8 +340,37 @@ export function calcularAvance(proyecto) {
 
 // ─── Seguimiento de respuestas del cliente ────────────────────────────────
 
+// Misma regla que idsTareasClienteDisponibles de server/src/lib/avance.js:
+// el frontend y el backend se despliegan por separado, mantener ambas iguales.
+function primeraFaseSinPago(proyecto) {
+  const bloqueadas = (proyecto.proyecto?.fases || [])
+    .filter((f) => f.requierePago && !f.pagoConfirmado)
+    .map((f) => f.numero)
+  return bloqueadas.length ? Math.min(...bloqueadas) : null
+}
+
+export function idsTareasClienteDisponibles(proyecto) {
+  const disponibles = new Set()
+  if (proyecto.status !== 'activo' && proyecto.status !== 'en_pausa') return disponibles
+  const tareas = proyecto.tareas || []
+  const completadas = new Set(tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
+  const esContinuo = proyecto.tipo === 'continuo'
+  const faseActual = esContinuo ? null : getFaseActual(proyecto)
+  const faseSinPago = esContinuo ? null : primeraFaseSinPago(proyecto)
+  for (const t of tareas) {
+    if (!t.esCliente || t.estado === 'completada' || t.estado === 'omitida') continue
+    if (!(t.dependencias || []).every((d) => completadas.has(d))) continue
+    if (!esContinuo) {
+      if (t.fase > faseActual) continue
+      if (faseSinPago !== null && t.fase >= faseSinPago) continue
+    }
+    disponibles.add(t.id)
+  }
+  return disponibles
+}
+
 export function contarPendientesCliente(proyecto) {
-  return proyecto.tareas.filter((t) => t.esCliente && t.estado === 'pendiente').length
+  return idsTareasClienteDisponibles(proyecto).size
 }
 
 // true si una tarea de cliente ya superó su plazoHoras desde que quedó
