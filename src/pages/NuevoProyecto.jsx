@@ -495,7 +495,7 @@ export default function NuevoProyecto() {
               <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={14} className="animate-spin" /> Buscando sus propuestas en el CRM…</p>
             )}
             {errorPropuestas && (
-              <p className="flex items-center gap-2 text-xs text-slate-500"><CircleAlert size={13} className="shrink-0" /> {errorPropuestas} — puedes capturarlo a mano.</p>
+              <p className="flex items-center gap-2 text-xs text-slate-500"><CircleAlert size={13} className="shrink-0" /> {errorPropuestas} — describe el proyecto aquí abajo para continuar sin propuesta.</p>
             )}
 
             {propuestas.length > 0 && (
