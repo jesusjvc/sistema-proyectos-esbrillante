@@ -54,11 +54,31 @@ bloquea (si algo). Ejemplo:
 
 ## Instalación
 
-- **Claude Code:** copia esta carpeta a `~/.claude/skills/foco-reporte/` (todas
-  las sesiones) o a `.claude/skills/foco-reporte/` dentro del repo del cliente.
-- **OpenCode:** copia la carpeta a `~/.config/opencode/skills/foco-reporte/`.
+Una sola vez por computadora; vuelve a correrlo para actualizar. OpenCode también
+lee `~/.claude/skills`, así que el mismo comando sirve para Claude Code y OpenCode.
+
+```bash
+# macOS / Linux
+mkdir -p ~/.claude/skills/foco-reporte && \
+  curl -fsSL https://raw.githubusercontent.com/jesusjvc/sistema-proyectos-esbrillante/main/skills/foco-reporte/SKILL.md \
+  -o ~/.claude/skills/foco-reporte/SKILL.md
+```
+
+```powershell
+# Windows (PowerShell)
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\foco-reporte" | Out-Null
+Invoke-WebRequest https://raw.githubusercontent.com/jesusjvc/sistema-proyectos-esbrillante/main/skills/foco-reporte/SKILL.md -OutFile "$HOME\.claude\skills\foco-reporte\SKILL.md"
+```
+
+- **Claude Cowork / claude.ai:** guarda este `SKILL.md` en una carpeta
+  `foco-reporte`, comprímela en .zip y súbela en Configuración → Capacidades → Skills.
 - **Otros agentes:** colócala en su directorio de skills, o pega la sección
   "Reglas" en su archivo de instrucciones (`AGENTS.md`).
+- Después, en el `CLAUDE.md`/`AGENTS.md` de cada repo de cliente, indica el slug del
+  proyecto en Foco (ver `docs/mcp-setup.md` §5). Para probar, pregúntale al agente
+  "¿qué me toca en Foco?".
+
+Las mismas instrucciones, con botón de copiar, están en Foco → MCP.
 
 Requisitos: el MCP `esbrillante-seguimiento` conectado con tu cuenta (OAuth) o
 tu API key personal, para que el avance quede a tu nombre. Con la API key

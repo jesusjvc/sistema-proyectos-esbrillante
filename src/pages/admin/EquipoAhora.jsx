@@ -77,28 +77,30 @@ export default function EquipoAhora() {
                   )}
                 </div>
 
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-brand-600 mb-1 flex items-center gap-1">
-                    <PlayCircle size={12} /> En curso
-                  </div>
-                  {enProceso.length ? (
+                {enProceso.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-brand-600 mb-1 flex items-center gap-1">
+                      <PlayCircle size={12} /> En curso
+                    </div>
                     <div className="space-y-2">{enProceso.map((t) => <LigaTarea key={`${t.proyectoSlug}-${t.id}`} tarea={t} />)}</div>
-                  ) : (
-                    <div className="text-sm text-slate-400 dark:text-ink-400 italic">Sin actividad en curso</div>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-ink-300 mb-1">Siguiente</div>
-                  {asignadas.length ? (
+                {asignadas.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-ink-300 mb-1">
+                      {enProceso.length ? 'Siguiente' : 'Puede empezar'}
+                    </div>
                     <div className="space-y-2">
                       {asignadas.slice(0, 2).map((t) => <LigaTarea key={`${t.proyectoSlug}-${t.id}`} tarea={t} />)}
                       {asignadas.length > 2 && <div className="text-xs text-slate-400 dark:text-ink-400">+{asignadas.length - 2} más disponibles</div>}
                     </div>
-                  ) : (
-                    <div className="text-sm text-slate-400 dark:text-ink-400 italic">Nada disponible por ahora</div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {!enProceso.length && !asignadas.length && (
+                  <div className="text-sm text-slate-400 dark:text-ink-400 italic">Sin tareas disponibles por ahora</div>
+                )}
               </section>
             ))}
           </div>
