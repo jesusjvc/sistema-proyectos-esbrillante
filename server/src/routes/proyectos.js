@@ -8,6 +8,8 @@ import { validarYNormalizarEquipo } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
+import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto } from '../lib/pagosPerfex.js'
+import { crmConfigurado } from '../lib/perfexClient.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 import notasRouter from './notas.js'
@@ -516,12 +518,65 @@ router.post('/:slug/anticipo', requireAdmin, async (req, res) => {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const tiempos = { ...(p.tiempos || {}), inicio: p.tiempos?.inicio || new Date().toISOString() }
-    await prisma.proyecto.update({ where: { id: p.id }, data: { status: 'activo', proyecto: { ...p.proyecto, anticipoConfirmado: true }, tiempos } })
-    await logEntry(p.id, req.user.nombre, 'Anticipo confirmado')
-    await activarTareasClienteDisponibles(p.id)
-
+    await confirmarAnticipo(p, req.user.nombre)
     emitirCambio(p.id)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/proyectos/:slug/pagos — liga una factura de Perfex (número
+// EB-000123 o id) al anticipo o a una fase: { numero, destino }.
+router.post('/:slug/pagos', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!crmConfigurado()) return res.status(503).json({ error: 'El CRM no está configurado en el servidor' })
+    const pago = await vincularFactura(p, req.body || {}, req.user.nombre)
+    res.json({ ok: true, pago, proyecto: p.proyecto, status: p.status })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error consultando la factura en el CRM' })
+  }
+})
+
+// DELETE /api/proyectos/:slug/pagos/:facturaId
+router.delete('/:slug/pagos/:facturaId', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const ok = await desvincularFactura(p, req.params.facturaId, req.user.nombre)
+    if (!ok) return res.status(404).json({ error: 'Esa factura no está vinculada al proyecto' })
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/proyectos/:slug/pagos/sincronizar — revisa ya en Perfex en vez
+// de esperar la revisión de cada hora.
+router.post('/:slug/pagos/sincronizar', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    await sincronizarPagosProyecto(p, req.user.nombre)
+    res.json({ ok: true, pagos: p.proyecto?.pagos || [] })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error consultando las facturas en el CRM' })
+  }
+})
+
+// POST /api/proyectos/:slug/pagado-desde-inicio
+router.post('/:slug/pagado-desde-inicio', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    await marcarPagadoDesdeInicio(p, req.user.nombre)
     res.json({ ok: true })
   } catch (err) {
     console.error(err)

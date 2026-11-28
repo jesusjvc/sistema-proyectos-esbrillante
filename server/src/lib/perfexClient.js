@@ -16,6 +16,10 @@
 // - GET  /contacts/{id}             → array con el contacto (para validar uno puntual)
 // - POST /contacts                  → { status, record_id } — campos: customer_id,
 //                                     firstname, lastname, email, phonenumber
+// - GET  /invoices/search/{key}     → array; acepta el número formateado (EB-002481)
+// - GET  /invoices/{id}             → factura con status (1 sin pagar, 2 pagada,
+//                                     3 parcial, 4 vencida, 5 cancelada, 6 borrador),
+//                                     total y total_left_to_pay (2026-11)
 // - Un WAF frontal devuelve 403 con caracteres como & % ? en el término de
 //   búsqueda — por eso terminoSeguro() los elimina antes de armar la URL.
 
@@ -54,6 +58,16 @@ export function terminoSeguro(q) {
     .replace(/[^\p{L}\p{N}\s@.-]/gu, '')
     .replace(/\s+/g, ' ')
     .slice(0, 64)
+}
+
+export async function obtenerFactura(facturaId) {
+  return req('GET', `/invoices/${encodeURIComponent(facturaId)}`)
+}
+
+export async function buscarFacturas(termino) {
+  const t = terminoSeguro(termino)
+  if (!t) return []
+  return (await req('GET', `/invoices/search/${encodeURIComponent(t)}`)) || []
 }
 
 export async function obtenerCustomer(crmId) {

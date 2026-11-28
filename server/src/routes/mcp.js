@@ -8,6 +8,7 @@ import prisma from '../lib/prisma.js'
 import { requireMcpAuth } from '../middleware/auth.js'
 import { tareaLeCorresponde, validarYNormalizarEquipo } from '../lib/permisos.js'
 import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
+import { vincularFactura, marcarPagadoDesdeInicio } from '../lib/pagosPerfex.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
@@ -32,6 +33,7 @@ import { notificarMencion, notificarAsignacion } from '../lib/notificaciones.js'
 import { activarTareasClienteDisponibles, dependenciasResueltas, aprobarSolicitud, destinatariosDeTarea, asegurarResponsableValido } from '../lib/tareaHelpers.js'
 import { crearNotificacion } from '../lib/notificacionesHelper.js'
 import { dominioDesde } from '../lib/clientesCrm.js'
+import { crmConfigurado } from '../lib/perfexClient.js'
 import { resolverClienteTicket } from '../lib/resolverCliente.js'
 import { gruposDe } from './integracionesWhatsApp.js'
 
@@ -562,6 +564,38 @@ function buildServer(usuario, baseProto) {
       emitirCambio(p.id)
 
       return ok(`Fase ${numero} ("${faseActualizada.nombre}") actualizada.`)
+    },
+  )
+
+  server.registerTool(
+    'vincular_factura',
+    {
+      title: 'Ligar una factura de Perfex al anticipo o a una fase',
+      description: 'Liga una factura del CRM (Perfex) a un proyecto para que Foco siga su pago solo: cuando el anticipo queda pagado, el proyecto se activa; cuando se paga la factura de una fase, esa fase se desbloquea. Foco guarda solo el número, el estado (pendiente, parcial, pagada, vencida, cancelada) y el porcentaje pagado — nunca montos. Revisa Perfex al ligarla y luego cada hora. Con pagadoDesdeInicio=true (sin numero) marca anticipo y todas las fases como pagadas, para clientes que liquidan todo de entrada. Solo admins.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        numero: z.string().optional().describe('Número de factura de Perfex tal como aparece en el CRM (ej. "EB-002481") o su id interno'),
+        destino: z.string().optional().describe('"anticipo" o "fase:<número>" (ej. "fase:3"). Requerido junto con numero'),
+        pagadoDesdeInicio: z.boolean().optional().describe('true para marcar el proyecto como pagado por completo desde el inicio, sin factura'),
+      },
+    },
+    async ({ slug, numero, destino, pagadoDesdeInicio }) => {
+      if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede ligar facturas o marcar pagos.')
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (pagadoDesdeInicio) {
+        await marcarPagadoDesdeInicio(p, usuario.nombre)
+        return ok(`Proyecto "${slug}" marcado como pagado desde el inicio: anticipo y fases con pago confirmados.`)
+      }
+      if (!numero || !destino) return fail('Manda numero y destino ("anticipo" o "fase:<número>"), o pagadoDesdeInicio=true.')
+      if (!crmConfigurado()) return fail('El CRM no está configurado en el servidor.')
+      try {
+        const pago = await vincularFactura(p, { numero, destino }, usuario.nombre)
+        return ok(`Factura ${pago.numero} ligada a ${destino} — estado: ${pago.estado}, ${pago.porcentaje}% pagado. Status del proyecto: ${p.status}.`)
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
     },
   )
 
