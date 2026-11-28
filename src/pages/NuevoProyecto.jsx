@@ -9,6 +9,7 @@ import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../da
 import { EQUIPO_NO_APLICA } from '../lib/permisos'
 import { AREAS } from '../lib/areas'
 import { etiquetasPersonas, miembroActivoPorNombre } from '../lib/nombresPersonas'
+import Avatar from '../components/Avatar'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import BuscadorCliente from '../components/BuscadorCliente'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch, CircleAlert, Sparkles } from 'lucide-react'
@@ -671,12 +672,13 @@ export default function NuevoProyecto() {
                           ...equipo,
                           [key]: equipo[key].includes(m.id) ? equipo[key].filter((id) => id !== m.id) : [...equipo[key], m.id],
                         })}
-                        className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                        className={`flex items-center gap-1.5 text-xs pl-1 pr-2.5 py-1 rounded-full border transition-colors ${
                           equipo[key].includes(m.id)
                             ? 'bg-brand-500 border-brand-500 text-slate-900 font-medium'
                             : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                         }`}
                       >
+                        <Avatar nombre={m.nombre} avatarUrl={m.avatarUrl} size={20} />
                         {etiquetaPersona[m.id]}
                       </button>
                     ))}

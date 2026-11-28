@@ -1760,12 +1760,13 @@ function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
                   key={m.id}
                   type="button"
                   onClick={() => toggle(key, m.id)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                  className={`flex items-center gap-1.5 text-xs pl-1 pr-2.5 py-1 rounded-full border transition-colors ${
                     form[key].includes(m.id)
                       ? 'bg-brand-500 border-brand-500 text-slate-900 font-medium'
                       : 'border-slate-200 dark:border-ink-500 text-slate-500 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-700'
                   }`}
                 >
+                  <Avatar nombre={m.nombre} avatarUrl={m.avatarUrl} size={20} />
                   {etiquetaPersona[m.id]}
                 </button>
               ))}
