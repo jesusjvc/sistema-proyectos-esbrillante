@@ -10,6 +10,8 @@ import { tareaLeCorresponde, validarYNormalizarEquipo } from '../lib/permisos.js
 import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
 import { vincularFactura, marcarPagadoDesdeInicio } from '../lib/pagosPerfex.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
+import { iaConfigurada } from '../lib/ia.js'
+import { generarBorradorPlan, aplicarBorradorPlan } from '../lib/planIA.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
@@ -86,6 +88,8 @@ function detalleTarea(t) {
     ...(t.queHacer ? { queHacer: htmlATexto(t.queHacer) } : {}),
     ...(t.necesitasAntes ? { necesitasAntes: htmlATexto(t.necesitasAntes) } : {}),
     ...(t.queEntregas ? { queEntregas: htmlATexto(t.queEntregas) } : {}),
+    ...(t.ejecutor === 'agente' ? { ejecutor: 'agente' } : {}),
+    ...(t.duracionDias ? { duracionDias: t.duracionDias } : {}),
   }
 }
 
@@ -619,6 +623,54 @@ function buildServer(usuario, baseProto) {
   )
 
   server.registerTool(
+    'generar_plan_ia',
+    {
+      title: 'Generar con IA el borrador del plan de trabajo',
+      description: 'La IA interna propone el plan de trabajo del proyecto a partir de su alcance contratado (importar_alcance primero): fases, tareas en orden con dependencias, quién las hace (equipo o cliente), si las ejecuta un agente de IA (Claude Code, OpenCode) una vez que una persona las inicia, duración en días, supuestos y preguntas por confirmar. Solo planea conceptos incluidos o confirmados. NO crea tareas: deja un borrador que se aplica con aplicar_plan_ia. Generarlo de nuevo reemplaza el borrador anterior. Puede tardar hasta un minuto. Solo admins.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+      },
+    },
+    async ({ slug }) => {
+      if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede generar el plan con IA.')
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (!iaConfigurada()) return fail('La IA no está configurada en el servidor.')
+      try {
+        const borrador = await generarBorradorPlan(p, usuario.nombre)
+        return ok(JSON.stringify(borrador, null, 2))
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
+    },
+  )
+
+  server.registerTool(
+    'aplicar_plan_ia',
+    {
+      title: 'Crear las tareas del borrador de plan IA',
+      description: 'Convierte el borrador de plan generado con generar_plan_ia en tareas reales del proyecto, con sus dependencias, ejecutor y duración. Se pueden dejar fuera tareas del borrador por su ref; las dependencias hacia ellas se quitan. Agrega al proyecto las fases del borrador que no existan. Al terminar, el borrador se borra. Solo admins.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        excluirRefs: z.array(z.string()).optional().describe('refs de las tareas del borrador que NO se deben crear (campo ref de cada tarea en generar_plan_ia o ver_proyecto)'),
+      },
+    },
+    async ({ slug, excluirRefs }) => {
+      if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede aplicar el plan.')
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      try {
+        const { creadas } = await aplicarBorradorPlan(p, { excluirRefs: excluirRefs || [] }, usuario.nombre)
+        return ok(`Plan aplicado: ${creadas} tarea${creadas === 1 ? '' : 's'} creada${creadas === 1 ? '' : 's'}.`)
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
+    },
+  )
+
+  server.registerTool(
     'vincular_factura',
     {
       title: 'Ligar una factura de Perfex al anticipo o a una fase',
@@ -768,6 +820,7 @@ function buildServer(usuario, baseProto) {
         // Lo contratado (de la propuesta de Perfex, sin precios) y el estado
         // de los pagos ligados — se omiten si el proyecto no los tiene.
         ...(p.proyecto?.alcance ? { alcance: { titulo: p.proyecto.alcance.titulo, conceptos: p.proyecto.alcance.conceptos.map(({ id, descripcion, detalle, estado }) => ({ id, descripcion, detalle, estado })) } } : {}),
+        ...(p.proyecto?.borradorPlan ? { borradorPlan: { tareas: p.proyecto.borradorPlan.tareas.length, refs: p.proyecto.borradorPlan.tareas.map(({ ref, titulo }) => `${ref}: ${titulo}`), supuestos: p.proyecto.borradorPlan.supuestos, preguntas: p.proyecto.borradorPlan.preguntas } } : {}),
         ...(p.proyecto?.pagos?.length ? { pagos: p.proyecto.pagos.map(({ numero, destino, estado, porcentaje }) => ({ numero, destino, estado, porcentaje })) } : {}),
       }
 

@@ -338,6 +338,11 @@ model Tarea {
   soloKarlaOAdmin      Boolean @default(false)
   opcional             Boolean @default(false)
   custom               Boolean @default(false)
+  // Quién ejecuta una tarea del equipo: 'humano' o 'agente' (Claude Code,
+  // OpenCode…; una persona solo inicia la solicitud). Lo propone el plan IA.
+  ejecutor             String?
+  // Duración estimada en días; base para encadenar fechas por dependencias.
+  duracionDias         Int?
 
   estado        String    @default("pendiente")
   completadaPor String?

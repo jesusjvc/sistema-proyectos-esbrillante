@@ -11,6 +11,8 @@ import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto } from '../lib/pagosPerfex.js'
 import { crmConfigurado } from '../lib/perfexClient.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
+import { iaConfigurada } from '../lib/ia.js'
+import { generarBorradorPlan, aplicarBorradorPlan, descartarBorradorPlan } from '../lib/planIA.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 import notasRouter from './notas.js'
@@ -596,6 +598,51 @@ router.put('/:slug/alcance/conceptos/:conceptoId', requireAdmin, async (req, res
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
     const concepto = await cambiarEstadoConcepto(p, req.params.conceptoId, req.body?.estado, req.user.nombre)
     res.json({ ok: true, concepto })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// POST /api/proyectos/:slug/plan/borrador — la IA propone el plan de trabajo
+// a partir del alcance contratado. Queda como borrador hasta aplicarlo.
+router.post('/:slug/plan/borrador', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!iaConfigurada()) return res.status(503).json({ error: 'La IA no está configurada en el servidor' })
+    const borradorPlan = await generarBorradorPlan(p, req.user.nombre)
+    res.json({ ok: true, borradorPlan })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error generando el borrador del plan' })
+  }
+})
+
+// POST /api/proyectos/:slug/plan/aplicar — crea las tareas del borrador:
+// { excluirRefs } con las refs de las tareas que no se quieren.
+router.post('/:slug/plan/aplicar', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const resultado = await aplicarBorradorPlan(p, { excluirRefs: req.body?.excluirRefs }, req.user.nombre)
+    res.json({ ok: true, ...resultado })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+// DELETE /api/proyectos/:slug/plan/borrador
+router.delete('/:slug/plan/borrador', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    await descartarBorradorPlan(p, req.user.nombre)
+    res.json({ ok: true })
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
