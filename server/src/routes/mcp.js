@@ -11,7 +11,7 @@ import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
 import { vincularFactura, marcarPagadoDesdeInicio } from '../lib/pagosPerfex.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
 import { iaConfigurada } from '../lib/ia.js'
-import { generarBorradorPlan, aplicarBorradorPlan } from '../lib/planIA.js'
+import { generarBorradorPlan, aplicarBorradorPlan, ajustarBorradorPlan } from '../lib/planIA.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
@@ -631,19 +631,46 @@ function buildServer(usuario, baseProto) {
     'generar_plan_ia',
     {
       title: 'Generar con IA el borrador del plan de trabajo',
-      description: 'La IA interna propone el plan de trabajo del proyecto a partir de su alcance contratado (importar_alcance primero): fases, tareas en orden con dependencias, quién las hace (equipo o cliente), si las ejecuta un agente de IA (Claude Code, OpenCode) una vez que una persona las inicia, duración en días, supuestos y preguntas por confirmar. Solo planea conceptos incluidos o confirmados. NO crea tareas: deja un borrador que se aplica con aplicar_plan_ia. Generarlo de nuevo reemplaza el borrador anterior. Puede tardar hasta un minuto. Solo admins.',
+      description: 'La IA interna propone el plan de trabajo del proyecto a partir de su alcance contratado (importar_alcance primero): fases, tareas en orden con dependencias, quién las hace (equipo o cliente), si las ejecuta un agente de IA (Claude Code, OpenCode) una vez que una persona las inicia, duración en días, supuestos y preguntas por confirmar. Solo planea conceptos incluidos o confirmados. NO crea tareas: deja un borrador que se aplica con aplicar_plan_ia. Si el proyecto tiene sitio actual (contexto técnico, dominio o un dominio en el alcance), antes lo revisa (páginas, sitemap, tecnología); si no puede entrar, agrega como primera tarea que un agente local lo revise. Generarlo de nuevo reemplaza el borrador anterior. Se afina después con afinar_plan_ia. Puede tardar un par de minutos. Solo admins.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
+        notas: z.string().max(2000).optional().describe('Contexto o indicaciones para la IA antes de armar el plan (ej. "el cliente ya tiene el contenido listo", "no incluyas redes sociales"). Tienen prioridad sobre las plantillas.'),
       },
     },
-    async ({ slug }) => {
+    async ({ slug, notas }) => {
       if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede generar el plan con IA.')
       const p = await getProyecto(slug)
       if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
       if (!iaConfigurada()) return fail('La IA no está configurada en el servidor.')
       try {
-        const borrador = await generarBorradorPlan(p, usuario.nombre)
+        const borrador = await generarBorradorPlan(p, usuario.nombre, { notas })
         return ok(JSON.stringify(borrador, null, 2))
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
+    },
+  )
+
+  server.registerTool(
+    'afinar_plan_ia',
+    {
+      title: 'Afinar con IA el borrador del plan de trabajo',
+      description: 'Pide a la IA un ajuste al borrador de plan existente (generar_plan_ia primero), como en un chat: "quita las tareas de redes", "agrega una ronda de revisión más", "junta las fases 2 y 3". La IA recibe el plan actual y la conversación previa y regresa el plan completo corregido más una respuesta corta de lo que cambió. NO crea tareas: el borrador se sigue aplicando con aplicar_plan_ia. Si la IA responde algo inválido, el borrador anterior se conserva. Puede tardar un par de minutos. Solo admins.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        instruccion: z.string().min(1).max(2000).describe('El ajuste que se quiere en el plan, en lenguaje natural'),
+      },
+    },
+    async ({ slug, instruccion }) => {
+      if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede afinar el plan con IA.')
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (!iaConfigurada()) return fail('La IA no está configurada en el servidor.')
+      try {
+        const borrador = await ajustarBorradorPlan(p, instruccion, usuario.nombre)
+        const respuesta = borrador.conversacion.at(-1)?.texto || ''
+        return ok(`${respuesta}\n\n${JSON.stringify(borrador, null, 2)}`)
       } catch (err) {
         if (err.status) return fail(err.message)
         throw err

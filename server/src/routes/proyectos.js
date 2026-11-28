@@ -12,7 +12,7 @@ import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDes
 import { crmConfigurado } from '../lib/perfexClient.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
 import { iaConfigurada } from '../lib/ia.js'
-import { generarBorradorPlan, aplicarBorradorPlan, descartarBorradorPlan } from '../lib/planIA.js'
+import { generarBorradorPlan, aplicarBorradorPlan, descartarBorradorPlan, ajustarBorradorPlan } from '../lib/planIA.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 import notasRouter from './notas.js'
@@ -88,6 +88,7 @@ router.get('/:slug', requireAuth, async (req, res) => {
 })
 
 const HOSTING_VALIDOS = ['nosotros', 'propio', 'migra']
+const CANALES_CLIENTE = ['whatsapp', 'correo']
 
 function contextoTecnicoValido(valor) {
   if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return null
@@ -124,6 +125,22 @@ router.post('/',requireAuthOrApiKey, async (req, res) => {
       if (!contexto) return res.status(400).json({ error: 'contextoTecnico inválido' })
       proyecto.contextoTecnico = contexto
     }
+    // canalCliente lo manda siempre el wizard; quien no lo mande (API/MCP)
+    // sigue creando proyectos sin grupo, como antes.
+    if (proyecto.canalCliente !== undefined) {
+      if (!CANALES_CLIENTE.includes(proyecto.canalCliente)) {
+        return res.status(400).json({ error: `canalCliente inválido — valores permitidos: ${CANALES_CLIENTE.join(', ')}` })
+      }
+      if (proyecto.canalCliente === 'whatsapp') {
+        const grupo = typeof proyecto.nombreGrupoWhatsapp === 'string' ? proyecto.nombreGrupoWhatsapp.trim().slice(0, 100) : ''
+        if (!grupo) return res.status(400).json({ error: 'Falta el nombre del grupo de WhatsApp' })
+        const infoClave = proyecto.infoClave && typeof proyecto.infoClave === 'object' && !Array.isArray(proyecto.infoClave) ? proyecto.infoClave : {}
+        const otros = (Array.isArray(infoClave.grupos) ? infoClave.grupos : [])
+          .filter((g) => g && typeof g.nombre === 'string' && g.nombre.trim().toLowerCase() !== grupo.toLowerCase())
+        proyecto.infoClave = { ...infoClave, grupos: [{ nombre: grupo, etiqueta: '', nota: '' }, ...otros] }
+      }
+    }
+    delete proyecto.nombreGrupoWhatsapp
     if (proyecto.propuestaId !== undefined && proyecto.propuestaId !== null && proyecto.propuestaId !== '') {
       if (typeof proyecto.propuestaId !== 'string' || !/^\d{1,12}$/.test(proyecto.propuestaId.trim())) {
         return res.status(400).json({ error: 'propuestaId inválido' })
@@ -715,12 +732,32 @@ router.post('/:slug/plan/borrador', requireAdmin, async (req, res) => {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
     if (!iaConfigurada()) return res.status(503).json({ error: 'La IA no está configurada en el servidor' })
-    const borradorPlan = await generarBorradorPlan(p, req.user.nombre)
+    const notas = typeof req.body?.notas === 'string' ? req.body.notas.slice(0, 4000) : ''
+    const borradorPlan = await generarBorradorPlan(p, req.user.nombre, { notas })
     res.json({ ok: true, borradorPlan })
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
     res.status(500).json({ error: 'Error generando el borrador del plan' })
+  }
+})
+
+// POST /api/proyectos/:slug/plan/ajustar — afina el borrador por chat:
+// { mensaje } con lo que el admin quiere cambiar.
+router.post('/:slug/plan/ajustar', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!iaConfigurada()) return res.status(503).json({ error: 'La IA no está configurada en el servidor' })
+    if (typeof req.body?.mensaje !== 'string' || !req.body.mensaje.trim()) {
+      return res.status(400).json({ error: 'Falta el mensaje con el ajuste' })
+    }
+    const borradorPlan = await ajustarBorradorPlan(p, req.body.mensaje.slice(0, 4000), req.user.nombre)
+    res.json({ ok: true, borradorPlan })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error ajustando el plan' })
   }
 })
 

@@ -7,6 +7,7 @@ import { ordenAlFinal } from './orden.js'
 import { activarTareasClienteDisponibles } from './tareaHelpers.js'
 import { logEntry } from './logEntry.js'
 import { emitirCambio } from './eventos.js'
+import { urlDelSitio, revisarSitioActual } from './sitioActual.js'
 
 // Borrador del plan de trabajo armado por la IA a partir del alcance
 // contratado. Siempre es borrador: vive en proyecto.proyecto.borradorPlan
@@ -15,6 +16,9 @@ import { emitirCambio } from './eventos.js'
 const RESPONSABLES_PLAN = [...ROLES_RESPONSABLE, 'admin']
 const MAX_TAREAS = 60
 const MAX_FASES = 12
+const MAX_TURNOS = 12
+const MAX_MENSAJE = 2000
+const AGENTE_LOCAL = 'agente local (Claude Code/OpenCode)'
 
 function errorConStatus(mensaje, status) {
   const error = new Error(mensaje)
@@ -39,6 +43,12 @@ Reglas:
 - No repitas tareas que ya existen en el proyecto.
 - Lista en "supuestos" lo que diste por hecho y en "preguntas" lo que hay que confirmar con el cliente o con el admin.
 - La agencia ya construye los sitios con Astro y stacks modernos, no con WordPress: no propongas tareas de WordPress (plugins, temas, instalación) salvo que el alcance lo pida.
+- El proyecto YA existe en Foco (el sistema de la agencia) con su cliente, equipo y canal de comunicación: nunca incluyas tareas de crear la ficha del cliente, dar de alta el proyecto o al cliente en el sistema, ni capturarlo en la plataforma.
+- "Confirmar equipo" no es asignarlo: el equipo ya se eligió al crear el proyecto ("equipoElegidoEnElAlta"). Si incluyes esa tarea, es una sola tarea corta (1 día) del admin para validar que se mantienen las mismas personas.
+- La comunicación con el cliente va por el canal del proyecto ("canalCliente"): con "whatsapp", el mensaje de bienvenida y las solicitudes se mandan en el grupo de WhatsApp del cliente; con "correo", por correo electrónico. Si "gruposWhatsapp" ya tiene un grupo, no incluyas abrir ni crear el grupo de WhatsApp.
+- Los títulos no llevan numeración al inicio ("1.", "2)"): el orden lo dan las fases y las dependencias.
+- "revisionSitioActual" es lo que se encontró al revisar el sitio actual del cliente (páginas, sitemap, tecnología): úsalo para planear la migración o el rediseño con las páginas reales. Si su estado es "bloqueado", la PRIMERA tarea debe ser "Revisar a fondo el sitio actual" con ejecutor "agente" y agenteSugerido "agente local (Claude Code/OpenCode)", porque el servidor no pudo entrar; las tareas que dependan de lo que tenga el sitio van después de ella, y anota en "preguntas" lo que queda incierto hasta revisarlo.
+- "notasDelAdmin" son indicaciones del admin para este plan: tienen prioridad sobre las plantillas.
 
 Contexto técnico ("contextoTecnico") en proyectos web:
 - Siempre incluye dar de alta Google Analytics (GA4) y Search Console, aunque el alcance no lo mencione.
@@ -59,11 +69,36 @@ async function resumenPlantillas() {
     nombre: pl.nombre,
     area: pl.area,
     fases: (Array.isArray(pl.fases) ? pl.fases : []).map((f) => f?.nombre).filter(Boolean),
-    tareas: pl.tareas.slice(0, 50).map((t) => `${t.fase}. ${t.titulo}${t.esCliente ? ' (cliente)' : ''}`),
+    // Sin "1. " delante: el modelo copiaba el número de fase como parte del título.
+    tareas: pl.tareas.slice(0, 50).map((t) => `${t.titulo} [fase ${t.fase}${t.esCliente ? ', cliente' : ''}]`),
   }))
 }
 
-function contextoDelProyecto(proyecto, tareasExistentes, plantillas) {
+function nombresDelEquipo(equipo) {
+  const nombres = {}
+  for (const [rol, valor] of Object.entries(equipo && typeof equipo === 'object' ? equipo : {})) {
+    const nombre = typeof valor === 'string' ? valor : valor?.nombre || valor?.name
+    if (nombre) nombres[rol] = String(nombre).slice(0, 80)
+  }
+  return nombres
+}
+
+function gruposDelProyecto(proyecto) {
+  const info = proyecto.proyecto?.infoClave || {}
+  const grupos = (Array.isArray(info.grupos) ? info.grupos : []).map((g) => g?.nombre).filter(Boolean)
+  if (!grupos.length && info.grupoWhatsapp) grupos.push(info.grupoWhatsapp)
+  return grupos
+}
+
+function revisionParaElModelo(revision) {
+  if (!revision || revision.estado === 'sin_sitio') return null
+  if (revision.estado === 'bloqueado') {
+    return { estado: 'bloqueado', url: revision.url, motivo: revision.motivo, nota: 'El servidor no pudo revisar el sitio: la primera tarea es que un agente local lo revise a fondo.' }
+  }
+  return { estado: 'revisado', url: revision.url, ...(revision.resumen ? { resumen: revision.resumen } : { resumenCorto: revision.resumenCorto }) }
+}
+
+function contextoDelProyecto(proyecto, tareasExistentes, plantillas, { revision, notas } = {}) {
   const conceptos = proyecto.proyecto.alcance.conceptos || []
   const texto = (c) => [c.descripcion, c.detalle].filter(Boolean).join(' — ')
   const esContinuo = proyecto.tipo === 'continuo'
@@ -77,6 +112,11 @@ function contextoDelProyecto(proyecto, tareasExistentes, plantillas) {
     fasesExistentes: esContinuo ? [] : (proyecto.proyecto?.fases || []).map(({ numero, nombre }) => ({ numero, nombre })),
     tareasQueYaExisten: tareasExistentes.slice(0, 80).map((t) => t.titulo),
     contextoTecnico: proyecto.proyecto?.contextoTecnico || null,
+    canalCliente: proyecto.proyecto?.canalCliente || 'whatsapp',
+    gruposWhatsapp: gruposDelProyecto(proyecto),
+    equipoElegidoEnElAlta: nombresDelEquipo(proyecto.equipo),
+    ...(revisionParaElModelo(revision) ? { revisionSitioActual: revisionParaElModelo(revision) } : {}),
+    ...(notas ? { notasDelAdmin: notas } : {}),
     plantillasDeLaAgencia: plantillas,
   }
 }
@@ -96,6 +136,16 @@ export function extraerJson(texto) {
 function textoLimpio(valor, max) {
   return quitarPrecios(typeof valor === 'string' ? valor : '').slice(0, max)
 }
+
+// "1. ", "2) ", "10.- " al inicio; "3 rondas" o "1.2 Algo" no se tocan.
+export function sinNumeracion(titulo) {
+  const limpio = titulo.replace(/^\s*\d{1,3}\s*(?:\.-|[.)]|-)\s+/, '').trim()
+  return limpio || titulo
+}
+
+// Red de seguridad por si el modelo ignora las reglas del prompt.
+const RE_ALTA_EN_SISTEMA = /ficha del cliente|\b(dar de alta|registrar|capturar|crear|abrir)\b.*\b(cliente|proyecto)\b.*\b(sistema|foco)\b/i
+const RE_ABRIR_GRUPO = /\b(abrir|crear)\b.*\bgrupo\b.*whats\s*app/i
 
 function enteroEntre(valor, min, max, porDefecto) {
   const n = Math.round(Number(valor))
@@ -118,7 +168,7 @@ function creaCiclo(aristas, desde, hacia) {
 }
 
 // Nunca se confía en la respuesta del modelo: todo se valida y se recorta.
-export function sanitizarPlan(crudo, { esContinuo = false, fasesExistentes = [] } = {}) {
+export function sanitizarPlan(crudo, { esContinuo = false, fasesExistentes = [], tieneGrupo = false } = {}) {
   const plan = crudo && typeof crudo === 'object' ? crudo : {}
 
   let fases = []
@@ -142,8 +192,8 @@ export function sanitizarPlan(crudo, { esContinuo = false, fasesExistentes = [] 
   const tareas = []
   const refs = new Set()
   for (const t of (Array.isArray(plan.tareas) ? plan.tareas : []).slice(0, MAX_TAREAS)) {
-    const titulo = textoLimpio(t?.titulo, 200)
-    if (!titulo) continue
+    const titulo = sinNumeracion(textoLimpio(t?.titulo, 200))
+    if (!titulo || RE_ALTA_EN_SISTEMA.test(titulo) || (tieneGrupo && RE_ABRIR_GRUPO.test(titulo))) continue
     let ref = typeof t.ref === 'string' || typeof t.ref === 'number' ? String(t.ref).trim().slice(0, 40) : ''
     if (!ref || refs.has(ref)) ref = `t${tareas.length + 1}-${refs.size}`
     refs.add(ref)
@@ -183,18 +233,61 @@ export function sanitizarPlan(crudo, { esContinuo = false, fasesExistentes = [] 
   return { fases, tareas, supuestos: lista(plan.supuestos), preguntas: lista(plan.preguntas) }
 }
 
-export async function generarBorradorPlan(proyecto, usuario) {
+function asegurarRevisionLocal(plan, revision) {
+  if (revision?.estado !== 'bloqueado') return plan
+  if (plan.tareas.some((t) => /revis\w*\b.*\bsitio/i.test(t.titulo))) return plan
+  const tarea = {
+    ref: 'revisar-sitio-actual',
+    titulo: 'Revisar a fondo el sitio actual',
+    fase: plan.fases[0]?.numero || 1,
+    responsable: 'programador',
+    esCliente: false,
+    descripcion: `El servidor no pudo revisar ${revision.url} (${revision.motivo}). Revisar páginas, contenido, sitemap y tecnología del sitio actual para completar el plan.`,
+    queEntregas: 'Inventario de páginas y contenido del sitio actual',
+    instruccionesCliente: '',
+    dependencias: [],
+    duracionDias: 1,
+    ejecutor: 'agente',
+    agenteSugerido: AGENTE_LOCAL,
+  }
+  return { ...plan, tareas: [tarea, ...plan.tareas] }
+}
+
+function opcionesDeSanitizado(proyecto, contexto) {
+  return { esContinuo: proyecto.tipo === 'continuo', fasesExistentes: contexto.fasesExistentes, tieneGrupo: contexto.gruposWhatsapp.length > 0 }
+}
+
+async function datosParaElModelo(proyecto) {
+  return Promise.all([
+    prisma.tarea.findMany({ where: { proyectoId: proyecto.id }, select: { titulo: true }, orderBy: [{ fase: 'asc' }, { orden: 'asc' }] }),
+    resumenPlantillas(),
+  ])
+}
+
+function revisionGuardada(revision) {
+  if (!revision || revision.estado === 'sin_sitio') return null
+  return {
+    estado: revision.estado,
+    url: revision.url,
+    ...(revision.motivo ? { motivo: revision.motivo } : {}),
+    resumenCorto: revision.resumenCorto || '',
+  }
+}
+
+export async function generarBorradorPlan(proyecto, usuario, { notas } = {}) {
   const alcance = proyecto.proyecto?.alcance
   if (!alcance) throw errorConStatus('Primero importa el alcance de la propuesta', 400)
   if (!(alcance.conceptos || []).some((c) => c.estado === 'incluido' || c.estado === 'confirmado')) {
     throw errorConStatus('El alcance no tiene conceptos incluidos o confirmados que planear', 400)
   }
+  const notasAdmin = typeof notas === 'string' ? notas.trim().slice(0, MAX_MENSAJE) : ''
 
-  const [tareasExistentes, plantillas] = await Promise.all([
-    prisma.tarea.findMany({ where: { proyectoId: proyecto.id }, select: { titulo: true }, orderBy: [{ fase: 'asc' }, { orden: 'asc' }] }),
-    resumenPlantillas(),
+  const url = urlDelSitio(proyecto)
+  const [[tareasExistentes, plantillas], revision] = await Promise.all([
+    datosParaElModelo(proyecto),
+    url ? revisarSitioActual(url) : null,
   ])
-  const contexto = contextoDelProyecto(proyecto, tareasExistentes, plantillas)
+  const contexto = contextoDelProyecto(proyecto, tareasExistentes, plantillas, { revision, notas: notasAdmin })
   const { texto, modelo } = await generarTexto({
     sistema: SISTEMA,
     mensajes: [{ role: 'user', content: `Arma el plan de trabajo de este proyecto:\n${JSON.stringify(contexto, null, 2)}` }],
@@ -203,16 +296,76 @@ export async function generarBorradorPlan(proyecto, usuario) {
 
   const crudo = extraerJson(texto)
   if (!crudo) throw errorConStatus('La IA respondió algo que no es un plan válido — intenta de nuevo', 502)
-  const plan = sanitizarPlan(crudo, { esContinuo: proyecto.tipo === 'continuo', fasesExistentes: contexto.fasesExistentes })
+  const plan = asegurarRevisionLocal(sanitizarPlan(crudo, opcionesDeSanitizado(proyecto, contexto)), revision)
   if (!plan.tareas.length) throw errorConStatus('La IA no propuso ninguna tarea — intenta de nuevo', 502)
 
-  const borradorPlan = { generadoEn: new Date().toISOString(), generadoPor: usuario, modelo, ...plan }
+  const revisionSitio = revisionGuardada(revision)
+  const borradorPlan = {
+    generadoEn: new Date().toISOString(),
+    generadoPor: usuario,
+    modelo,
+    ...plan,
+    ...(revisionSitio ? { revisionSitio } : {}),
+    conversacion: notasAdmin ? [{ rol: 'usuario', texto: notasAdmin, fecha: new Date().toISOString() }] : [],
+  }
   // La IA puede tardar minutos: se relee el proyecto para no pisar lo que
   // cambió mientras tanto (pagos, alcance, info clave).
   const vigente = await prisma.proyecto.findUnique({ where: { id: proyecto.id }, select: { proyecto: true } })
   proyecto.proyecto = { ...(vigente?.proyecto || proyecto.proyecto), borradorPlan }
   await prisma.proyecto.update({ where: { id: proyecto.id }, data: { proyecto: proyecto.proyecto } })
   await logEntry(proyecto.id, usuario, 'Borrador de plan generado con IA', `${plan.tareas.length} tareas propuestas (${modelo})`)
+  emitirCambio(proyecto.id)
+  return borradorPlan
+}
+
+const versionDe = (borrador) => borrador?.ajustadoEn || borrador?.generadoEn || null
+
+// Afinar el borrador conversando: la IA recibe el plan actual, lo que se ha
+// pedido antes y la instrucción nueva, y regresa el plan completo corregido.
+export async function ajustarBorradorPlan(proyecto, mensaje, usuario) {
+  const instruccion = typeof mensaje === 'string' ? mensaje.trim() : ''
+  if (!instruccion) throw errorConStatus('Escribe qué ajuste quieres en el plan', 400)
+  if (instruccion.length > MAX_MENSAJE) throw errorConStatus(`El mensaje es muy largo (máximo ${MAX_MENSAJE} caracteres)`, 400)
+  const borrador = proyecto.proyecto?.borradorPlan
+  if (!borrador) throw errorConStatus('No hay un borrador de plan', 404)
+  if (!proyecto.proyecto?.alcance) throw errorConStatus('Primero importa el alcance de la propuesta', 400)
+
+  const [tareasExistentes, plantillas] = await datosParaElModelo(proyecto)
+  const contexto = contextoDelProyecto(proyecto, tareasExistentes, plantillas, { revision: borrador.revisionSitio })
+  const conversacion = Array.isArray(borrador.conversacion) ? borrador.conversacion.slice(-MAX_TURNOS) : []
+  const planActual = { fases: borrador.fases, tareas: borrador.tareas, supuestos: borrador.supuestos, preguntas: borrador.preguntas }
+  const pedido = [
+    `Contexto del proyecto:\n${JSON.stringify(contexto, null, 2)}`,
+    `Plan actual (borrador):\n${JSON.stringify(planActual)}`,
+    conversacion.length ? `Conversación previa sobre este plan:\n${conversacion.map((t) => `${t.rol === 'ia' ? 'IA' : 'Admin'}: ${t.texto}`).join('\n')}` : '',
+    `Ajuste que pide el admin ahora: ${instruccion}`,
+    'Aplica el ajuste al plan actual sin rehacer lo que no se pidió cambiar (conserva los "ref" de las tareas que se quedan) y respeta las reglas. Responde SOLO con JSON válido de esta forma: {"respuesta":"una o dos frases en español de lo que cambiaste","plan":{"fases":[...],"tareas":[...],"supuestos":[...],"preguntas":[...]}}',
+  ].filter(Boolean).join('\n\n')
+
+  const { texto, modelo } = await generarTexto({ sistema: SISTEMA, mensajes: [{ role: 'user', content: pedido }], maxTokens: 12000 })
+  const crudo = extraerJson(texto)
+  const invalido = 'La IA respondió algo que no es un plan válido — el borrador anterior se conserva, intenta de nuevo'
+  if (!crudo?.plan || typeof crudo.plan !== 'object') throw errorConStatus(invalido, 502)
+  const plan = asegurarRevisionLocal(sanitizarPlan(crudo.plan, opcionesDeSanitizado(proyecto, contexto)), borrador.revisionSitio)
+  if (!plan.tareas.length) throw errorConStatus('La IA dejó el plan sin tareas — el borrador anterior se conserva', 502)
+  const respuesta = textoLimpio(crudo.respuesta, 1000).trim() || 'Listo, ajusté el plan.'
+
+  const vigente = await prisma.proyecto.findUnique({ where: { id: proyecto.id }, select: { proyecto: true } })
+  const borradorVigente = vigente?.proyecto?.borradorPlan
+  if (!borradorVigente || versionDe(borradorVigente) !== versionDe(borrador)) {
+    throw errorConStatus('El borrador cambió mientras la IA trabajaba — revisa la versión actual y vuelve a pedir el ajuste', 409)
+  }
+  const ahora = new Date().toISOString()
+  const borradorPlan = {
+    ...borradorVigente,
+    ...plan,
+    modelo,
+    ajustadoEn: ahora,
+    conversacion: [...conversacion, { rol: 'usuario', texto: instruccion, fecha: ahora }, { rol: 'ia', texto: respuesta, fecha: ahora }].slice(-MAX_TURNOS),
+  }
+  proyecto.proyecto = { ...vigente.proyecto, borradorPlan }
+  await prisma.proyecto.update({ where: { id: proyecto.id }, data: { proyecto: proyecto.proyecto } })
+  await logEntry(proyecto.id, usuario, 'Borrador de plan ajustado con IA', instruccion.slice(0, 300))
   emitirCambio(proyecto.id)
   return borradorPlan
 }

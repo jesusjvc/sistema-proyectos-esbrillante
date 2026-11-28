@@ -57,6 +57,12 @@ function condicionesDesdeContexto(ctx) {
   }
 }
 
+function fechaCorta(fecha) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha || '')
+  if (!m) return fecha || ''
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', '')
+}
+
 function textoPlano(html) {
   return String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 }
@@ -101,7 +107,10 @@ export default function NuevoProyecto() {
   const [propuestas, setPropuestas] = useState([])
   const [cargandoPropuestas, setCargandoPropuestas] = useState(false)
   const [errorPropuestas, setErrorPropuestas] = useState('')
+  // '' = sin propuesta; null = hay varias aceptadas y falta elegir una a mano.
   const [propuestaId, setPropuestaId] = useState('')
+  const [canalCliente, setCanalCliente] = useState('whatsapp')
+  const [nombreGrupo, setNombreGrupo] = useState('')
   const [progresoIA, setProgresoIA] = useState(null)
   const [areasProyecto, setAreasProyecto] = useState([])
   const [equipo, setEquipo] = useState({
@@ -166,8 +175,11 @@ export default function NuevoProyecto() {
       .then((lista) => {
         if (!vigente) return
         setPropuestas(lista)
-        const aceptada = lista.find((p) => p.estado === 'aceptada')
-        if (aceptada) setPropuestaId(aceptada.id)
+        // Con varias aceptadas no se adivina: preseleccionar la más reciente ya
+        // armó un plan con la propuesta equivocada.
+        const aceptadas = lista.filter((p) => p.estado === 'aceptada')
+        if (aceptadas.length === 1) setPropuestaId(aceptadas[0].id)
+        else if (aceptadas.length > 1) setPropuestaId(null)
       })
       .catch((err) => { if (vigente) setErrorPropuestas(err.message || 'No se pudieron cargar las propuestas del CRM') })
       .finally(() => { if (vigente) setCargandoPropuestas(false) })
@@ -274,6 +286,8 @@ export default function NuevoProyecto() {
           anticipoConfirmado: esContinuo ? proyectoData.anticipoConfirmado : false,
           descripcion: propuesta ? '' : proyectoData.descripcion.trim(),
           ...(esContinuo ? {} : { contextoTecnico }),
+          canalCliente,
+          ...(canalCliente === 'whatsapp' ? { nombreGrupoWhatsapp: nombreGrupo.trim() } : {}),
           ...(propuesta ? { propuestaId: propuesta.id } : {}),
         },
         condicionesTecnicas,
@@ -318,10 +332,11 @@ export default function NuevoProyecto() {
 
   const esContinuo = tipo === 'continuo'
   const clienteListo = clienteId ? !!cliente.nombreComercial.trim() : (cliente.nombreComercial && cliente.contactoPrincipal && cliente.correo)
-  const valido1 = !!proyectoData.nombre.trim() && clienteListo
+  const canalListo = canalCliente === 'correo' || !!nombreGrupo.trim()
+  const valido1 = !!proyectoData.nombre.trim() && clienteListo && canalListo
   const valido2 = esContinuo
     ? !!proyectoData.paquete
-    : !!propuestaId || !!proyectoData.plantillaId || !!textoPlano(proyectoData.descripcion)
+    : propuestaId !== null && (!!propuestaId || !!proyectoData.plantillaId || !!textoPlano(proyectoData.descripcion))
   const valido3 = true
 
   return (
@@ -420,6 +435,28 @@ export default function NuevoProyecto() {
                 </div>
               </>
             )}
+
+            <Campo label="Comunicación con el cliente">
+              <div className="flex flex-wrap gap-2">
+                {[['whatsapp', 'WhatsApp (grupo)'], ['correo', 'Correo electrónico']].map(([valor, label]) => (
+                  <label
+                    key={valor}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
+                      canalCliente === valor ? 'border-brand-500 bg-brand-50 text-brand-800 font-medium' : 'border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <input type="radio" name="canalCliente" checked={canalCliente === valor} onChange={() => setCanalCliente(valor)} className="accent-brand-500" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              {canalCliente === 'whatsapp' && (
+                <div className="mt-2.5">
+                  <input value={nombreGrupo} onChange={(e) => setNombreGrupo(e.target.value)} className={inputCls} placeholder="Nombre del grupo de WhatsApp *" maxLength={100} />
+                  <p className="text-xs text-slate-400 mt-1">Tal como aparece en WhatsApp — se reconoce por nombre exacto (sin importar mayúsculas).</p>
+                </div>
+              )}
+            </Campo>
 
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -539,17 +576,23 @@ export default function NuevoProyecto() {
                 <div className="space-y-1.5">
                   {propuestas.map((pr) => (
                     <OpcionPropuesta key={pr.id} activa={propuestaId === pr.id} onClick={() => setPropuestaId(pr.id)}>
-                      <span className="flex-1 min-w-0 truncate">{pr.titulo}</span>
-                      {pr.fecha && <span className="text-xs text-slate-400 shrink-0">{pr.fecha}</span>}
+                      <span className="text-xs font-mono text-slate-400 shrink-0">#{pr.id}</span>
+                      <span className="flex-1 min-w-0 truncate" title={pr.titulo}>{pr.titulo}</span>
+                      {pr.fecha && <span className="text-xs text-slate-400 shrink-0">{fechaCorta(pr.fecha)}</span>}
                       <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${pr.estado === 'aceptada' ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500'}`}>
                         {ESTADO_PROPUESTA_LABEL[pr.estado] || pr.estado}
                       </span>
                     </OpcionPropuesta>
                   ))}
-                  <OpcionPropuesta activa={!propuestaId} onClick={() => setPropuestaId('')}>
+                  <OpcionPropuesta activa={propuestaId === ''} onClick={() => setPropuestaId('')}>
                     <span className="flex-1 text-slate-500">Sin propuesta — capturar a mano</span>
                   </OpcionPropuesta>
                 </div>
+                {propuestaId === null && (
+                  <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
+                    <CircleAlert size={13} className="shrink-0" /> Hay varias propuestas aceptadas: elige con cuál se trabaja.
+                  </p>
+                )}
                 {propuestaId && (
                   <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
                     <Sparkles size={13} className="text-brand-600 shrink-0" /> Al crear, se importa la propuesta y la IA arma el plan y la fecha de entrega.
@@ -558,7 +601,7 @@ export default function NuevoProyecto() {
               </Campo>
             )}
 
-            {!propuestaId && !cargandoPropuestas && (
+            {propuestaId === '' && !cargandoPropuestas && (
               <>
                 <Campo label="Descripción del proyecto *">
                   <EditorEnriquecido
@@ -629,7 +672,7 @@ export default function NuevoProyecto() {
               <Campo label="Fecha de inicio">
                 <input type="date" value={proyectoData.fechaInicio} onChange={(e) => setProyectoData({ ...proyectoData, fechaInicio: e.target.value })} className={inputCls} />
               </Campo>
-              {!propuestaId && (
+              {propuestaId === '' && (
                 <Campo label="Fecha estimada de entrega">
                   <input type="date" value={proyectoData.fechaEstimadaEntrega} onChange={(e) => setProyectoData({ ...proyectoData, fechaEstimadaEntrega: e.target.value })} className={inputCls} />
                 </Campo>
