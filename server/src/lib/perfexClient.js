@@ -25,8 +25,9 @@
 //                                     las descripciones pueden traer precios
 // - GET  /proposals/search/{key}    → array (busca por empresa, asunto…); filtrar
 //                                     por rel_type 'customer' y rel_id
-// - Un WAF frontal devuelve 403 con caracteres como & % ? en el término de
-//   búsqueda — por eso terminoSeguro() los elimina antes de armar la URL.
+// - Un WAF frontal devuelve 403 con caracteres como & % ? o espacios en el
+//   término de búsqueda — terminoSeguro() quita los primeros y buscarEn()
+//   busca por una sola palabra (2026-11).
 
 const BASE_URL = process.env.PERFEX_BASE_URL
 const TOKEN = process.env.PERFEX_API_TOKEN
@@ -65,6 +66,26 @@ export function terminoSeguro(q) {
     .slice(0, 64)
 }
 
+function sinAcentos(texto) {
+  return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+}
+
+// El WAF frontal también responde 403 si la URL lleva espacios: se busca por
+// la palabra más larga y, con soloClave=false, se filtra aquí por el resto.
+async function buscarEn(recurso, termino, { soloClave = false } = {}) {
+  const t = terminoSeguro(termino)
+  if (!t) return []
+  const palabras = t.split(' ')
+  const clave = palabras.reduce((a, b) => (b.length > a.length ? b : a))
+  const resultados = (await req('GET', `/${recurso}/search/${encodeURIComponent(clave)}`)) || []
+  if (soloClave || palabras.length === 1) return resultados
+  const buscadas = palabras.map(sinAcentos)
+  return resultados.filter((r) => {
+    const texto = sinAcentos(JSON.stringify(r))
+    return buscadas.every((p) => texto.includes(p))
+  })
+}
+
 export async function obtenerFactura(facturaId) {
   return req('GET', `/invoices/${encodeURIComponent(facturaId)}`)
 }
@@ -73,28 +94,24 @@ export async function obtenerPropuesta(propuestaId) {
   return req('GET', `/proposals/${encodeURIComponent(propuestaId)}`)
 }
 
-export async function buscarPropuestas(termino) {
-  const t = terminoSeguro(termino)
-  if (!t) return []
-  return (await req('GET', `/proposals/search/${encodeURIComponent(t)}`)) || []
+export async function buscarPropuestas(termino, opciones) {
+  return buscarEn('proposals', termino, opciones)
 }
 
 // La API no filtra por cliente: se busca por el nombre de la empresa y se
 // queda solo con lo que pertenece a ese customer del CRM.
 export async function propuestasDeCliente(crmId, nombreEmpresa) {
-  const todas = await buscarPropuestas(nombreEmpresa)
+  const todas = await buscarPropuestas(nombreEmpresa, { soloClave: true })
   return todas.filter((p) => p.rel_type === 'customer' && String(p.rel_id) === String(crmId))
 }
 
 export async function facturasDeCliente(crmId, nombreEmpresa) {
-  const todas = await buscarFacturas(nombreEmpresa)
+  const todas = await buscarFacturas(nombreEmpresa, { soloClave: true })
   return todas.filter((f) => String(f.clientid) === String(crmId))
 }
 
-export async function buscarFacturas(termino) {
-  const t = terminoSeguro(termino)
-  if (!t) return []
-  return (await req('GET', `/invoices/search/${encodeURIComponent(t)}`)) || []
+export async function buscarFacturas(termino, opciones) {
+  return buscarEn('invoices', termino, opciones)
 }
 
 export async function obtenerCustomer(crmId) {
@@ -102,15 +119,11 @@ export async function obtenerCustomer(crmId) {
 }
 
 export async function buscarCustomers(termino) {
-  const t = terminoSeguro(termino)
-  if (!t) return []
-  return (await req('GET', `/customers/search/${encodeURIComponent(t)}`)) || []
+  return buscarEn('customers', termino)
 }
 
 export async function buscarContacts(termino) {
-  const t = terminoSeguro(termino)
-  if (!t) return []
-  return (await req('GET', `/contacts/search/${encodeURIComponent(t)}`)) || []
+  return buscarEn('contacts', termino)
 }
 
 export async function obtenerContacto(contactoId) {
