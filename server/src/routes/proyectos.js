@@ -8,7 +8,7 @@ import { validarYNormalizarEquipo, ROLES_EQUIPO, EQUIPO_NO_APLICA, idsDeRol, usu
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
-import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto, sugerirFacturas } from '../lib/pagosPerfex.js'
+import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto, sugerirFacturas, ligarFacturaDePropuesta } from '../lib/pagosPerfex.js'
 import { crmConfigurado } from '../lib/perfexClient.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
 import { iaConfigurada } from '../lib/ia.js'
@@ -678,7 +678,14 @@ router.post('/:slug/alcance', requireAdmin, async (req, res) => {
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
     if (!crmConfigurado()) return res.status(503).json({ error: 'El CRM no está configurado en el servidor' })
     const alcance = await importarAlcance(p, req.body?.propuesta, req.user.nombre)
-    res.json({ ok: true, alcance })
+    // Si la propuesta ya se convirtió en factura, se liga como anticipo ahora
+    // en vez de esperar a la revisión de cada hora. Mejor esfuerzo.
+    try {
+      await ligarFacturaDePropuesta(p, req.user.nombre)
+    } catch (err) {
+      console.error('No se pudo ligar la factura de la propuesta:', err.message)
+    }
+    res.json({ ok: true, alcance, status: p.status })
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
