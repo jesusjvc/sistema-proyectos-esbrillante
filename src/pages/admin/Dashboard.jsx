@@ -4,7 +4,7 @@ import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import { useAuth } from '../../context/AuthContext'
 import { getProyectos, getMiembros, confirmarAnticipo } from '../../data/api'
-import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva, contarTareasVencidasCliente } from '../../data/storage'
+import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva, contarTareasVencidasCliente, nombreProyecto } from '../../data/storage'
 import { FASES } from '../../data/paquetes'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../../data/kanban'
 import { miembrosDelEquipo } from '../../lib/permisos'
@@ -61,7 +61,7 @@ function ordenSalud(a, b) {
   const pa = PRIORIDAD_SALUD[a.salud?.nivel] ?? 3
   const pb = PRIORIDAD_SALUD[b.salud?.nivel] ?? 3
   if (pa !== pb) return pa - pb
-  return (a.cliente?.nombreComercial || '').localeCompare(b.cliente?.nombreComercial || '')
+  return nombreProyecto(a).localeCompare(nombreProyecto(b))
 }
 
 export default function AdminDashboard() {
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
   const filtrados = proyectos
     .filter((p) => filtro === 'todos' || p.status === filtro)
     .filter((p) => !objetivoArea || !p.areas?.length || p.areas.includes(objetivoArea))
-    .filter((p) => !q || normalizarTexto(p.cliente.nombreComercial).includes(q) || normalizarTexto(p.proyecto.paquete).includes(q))
+    .filter((p) => !q || normalizarTexto(nombreProyecto(p)).includes(q) || normalizarTexto(p.proyecto.paquete).includes(q))
 
   const counts = {
     activo: proyectos.filter((p) => p.status === 'activo').length,
@@ -352,7 +352,7 @@ function AttencionBanner({ proyectos, onIr }) {
         >
           <span className="flex items-center gap-2 min-w-0">
             <Icono size={13} className={`shrink-0 ${color}`} />
-            <span className="text-sm font-semibold text-slate-800 dark:text-ink-100 truncate">{p.cliente.nombreComercial}</span>
+            <span className="text-sm font-semibold text-slate-800 dark:text-ink-100 truncate">{nombreProyecto(p)}</span>
             <span className="text-xs text-slate-500 dark:text-ink-300 truncate">— {motivo}</span>
           </span>
           <ChevronRight size={14} className="text-slate-400 dark:text-ink-400 shrink-0" />
@@ -425,7 +425,7 @@ function ProyectoRow({ proyecto: p, expandido, onToggleMotivos }) {
       <div className="flex items-center gap-3 px-4 py-3 flex-wrap lg:flex-nowrap">
         <div className="min-w-0 flex-1 basis-52">
           <div className="flex items-center gap-2 min-w-0">
-            <h3 className="font-semibold text-slate-800 dark:text-ink-100 text-[15px] truncate">{p.cliente.nombreComercial}</h3>
+            <h3 className="font-semibold text-slate-800 dark:text-ink-100 text-[15px] truncate">{nombreProyecto(p)}</h3>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${cfg.color}`}>
               {cfg.icon}{cfg.label}
             </span>
@@ -688,7 +688,7 @@ function ProyectoCard({ proyecto: p, miembros, avatares, onConfirmarAnticipo }) 
       </div>
 
       <div className="min-w-0">
-        <h3 className="font-semibold text-slate-800 dark:text-ink-100 text-[17px] truncate">{p.cliente.nombreComercial}</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-ink-100 text-[17px] truncate">{nombreProyecto(p)}</h3>
         <p className="text-sm text-slate-500 dark:text-ink-300 truncate">
           {p.proyecto.paquete}
           {p.proyecto.extras?.length > 0 && ` · ${p.proyecto.extras.length} extra${p.proyecto.extras.length > 1 ? 's' : ''}`}

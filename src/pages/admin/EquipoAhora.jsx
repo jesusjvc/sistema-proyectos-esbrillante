@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import Avatar from '../../components/Avatar'
 import { getProyectos, getMiembros } from '../../data/api'
+import { nombreProyecto } from '../../data/storage'
 import { useEventosGlobal } from '../../hooks/useEventos'
 import { bandejaDe, sinAsignarPorProyecto, proyectosDeTrabajo, porPrioridad } from '../../lib/bandejaTareas'
 import { PlayCircle, ChevronRight, Lock, UserX } from 'lucide-react'
@@ -52,7 +53,7 @@ export default function EquipoAhora() {
       const completadas = new Set(p.tareas.filter((t) => t.estado === 'completada').map((t) => t.id))
       return tareas
         .filter((t) => t.estado === 'pendiente' && t.dependencias.every((d) => completadas.has(d)))
-        .map((t) => ({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial }))
+        .map((t) => ({ ...t, proyectoSlug: p.slug, proyectoNombre: nombreProyecto(p) }))
     })
     .sort(porPrioridad)
 

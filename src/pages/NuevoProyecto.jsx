@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
-import { crearProyecto, getMiembros } from '../data/api'
+import { crearProyecto, getClientes, getMiembros } from '../data/api'
+import { nombreProyecto } from '../data/storage'
 import { generarMensajeInicio } from '../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../data/plantillas'
 import { EXTRAS_DISPONIBLES } from '../data/paquetes'
 import { EQUIPO_NO_APLICA } from '../lib/permisos'
 import { AREAS } from '../lib/areas'
 import EditorEnriquecido from '../components/EditorEnriquecido'
+import BuscadorCliente from '../components/BuscadorCliente'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch } from 'lucide-react'
 
 const COND_DEFAULT = {
@@ -21,6 +23,14 @@ const COND_DEFAULT = {
   requierePluginAdicional: false,
   pluginAdicionalNombre: '',
   requiereCapacitacion: true,
+}
+
+const CLIENTE_VACIO = {
+  nombreComercial: '',
+  contactoPrincipal: '',
+  whatsapp: '',
+  correo: '',
+  participantes: [],
 }
 
 export default function NuevoProyecto() {
@@ -38,14 +48,12 @@ export default function NuevoProyecto() {
   const [errorCrear, setErrorCrear] = useState('')
 
   const [tipo, setTipo] = useState('finito')
-  const [cliente, setCliente] = useState({
-    nombreComercial: '',
-    contactoPrincipal: '',
-    whatsapp: '',
-    correo: '',
-    participantes: [],
-  })
+  const [cliente, setCliente] = useState(CLIENTE_VACIO)
+  const [clientesFoco, setClientesFoco] = useState([])
+  const [clienteId, setClienteId] = useState('')
+  const [clienteExterno, setClienteExterno] = useState(false)
   const [proyectoData, setProyectoData] = useState({
+    nombre: '',
     paquete: '',
     plantillaId: '',
     extras: [],
@@ -69,7 +77,47 @@ export default function NuevoProyecto() {
   useEffect(() => {
     getMiembros().then(setMiembros).catch(() => {})
     getPlantillas().then(setPlantillas).catch(() => {})
+    getClientes().then(setClientesFoco).catch(() => {})
   }, [])
+
+  function aplicarCliente(c) {
+    setClienteId(c.id)
+    setCliente({
+      nombreComercial: c.nombreComercial || '',
+      contactoPrincipal: c.contactoNombre || '',
+      whatsapp: c.whatsapp || '',
+      correo: c.correo || '',
+      participantes: (Array.isArray(c.participantes) ? c.participantes : []).map((p) => ({
+        nombre: p.nombre || '',
+        correo: p.correo || '',
+        whatsapp: p.whatsapp || '',
+        rol: p.rol || 'Solo seguimiento',
+      })),
+    })
+  }
+
+  // El buscador avisa del cliente importado del CRM antes de seleccionarlo,
+  // cuando clientesFoco todavía no lo tiene — por eso aquí ya se aplica.
+  function clienteImportado(c) {
+    setClientesFoco((prev) => [...prev, c])
+    aplicarCliente(c)
+  }
+
+  function seleccionarCliente(id) {
+    if (!id) {
+      setClienteId('')
+      setCliente(CLIENTE_VACIO)
+      return
+    }
+    const c = clientesFoco.find((item) => item.id === id)
+    if (c) aplicarCliente(c)
+  }
+
+  function alternarClienteExterno() {
+    setClienteExterno((prev) => !prev)
+    setClienteId('')
+    setCliente(CLIENTE_VACIO)
+  }
 
   useEffect(() => {
     if (user?.id) {
@@ -96,7 +144,7 @@ export default function NuevoProyecto() {
   function agregarParticipante() {
     setCliente((prev) => ({
       ...prev,
-      participantes: [...prev.participantes, { nombre: '', correo: '', rol: 'Solo seguimiento' }],
+      participantes: [...prev.participantes, { nombre: '', correo: '', whatsapp: '', rol: 'Solo seguimiento' }],
     }))
   }
 
@@ -126,7 +174,9 @@ export default function NuevoProyecto() {
       const p = await crearProyecto({
         tipo,
         cliente,
+        ...(clienteId ? { clienteId } : {}),
         proyecto: {
+          nombre: proyectoData.nombre.trim(),
           paquete: proyectoData.paquete,
           plantillaId: esContinuo ? '' : proyectoData.plantillaId,
           fases: esContinuo ? [] : (plantilla?.fases || FASES_WEB),
@@ -160,7 +210,8 @@ export default function NuevoProyecto() {
   }
 
   const esContinuo = tipo === 'continuo'
-  const valido1 = cliente.nombreComercial && cliente.contactoPrincipal && cliente.correo
+  const clienteListo = clienteId ? !!cliente.nombreComercial.trim() : (cliente.nombreComercial && cliente.contactoPrincipal && cliente.correo)
+  const valido1 = !!proyectoData.nombre.trim() && clienteListo
   const valido2 = esContinuo ? !!proyectoData.paquete : (proyectoData.plantillaId && proyectoData.fechaEstimadaEntrega)
   const valido3 = true
 
@@ -224,20 +275,42 @@ export default function NuevoProyecto() {
               </div>
             </Campo>
 
-            <Campo label="Nombre comercial *">
-              <input value={cliente.nombreComercial} onChange={(e) => setCliente({ ...cliente, nombreComercial: e.target.value })} className={inputCls} placeholder="IM Multiservice LLC" />
+            <Campo label="Nombre del proyecto *">
+              <input value={proyectoData.nombre} onChange={(e) => setProyectoData({ ...proyectoData, nombre: e.target.value })} className={inputCls} placeholder="Sitio Web, SEO mensual..." maxLength={80} />
             </Campo>
-            <Campo label="Contacto principal *">
-              <input value={cliente.contactoPrincipal} onChange={(e) => setCliente({ ...cliente, contactoPrincipal: e.target.value })} className={inputCls} placeholder="Ingrid María Martínez Ramos" />
-            </Campo>
-            <div className="grid grid-cols-2 gap-4">
-              <Campo label="WhatsApp">
-                <input value={cliente.whatsapp} onChange={(e) => setCliente({ ...cliente, whatsapp: e.target.value })} className={inputCls} placeholder="+52 55 1234 5678" />
+
+            {!clienteExterno && (
+              <Campo label="Cliente *">
+                <BuscadorCliente
+                  clientes={clientesFoco}
+                  value={clienteId}
+                  onSelect={seleccionarCliente}
+                  onImportado={clienteImportado}
+                />
               </Campo>
-              <Campo label="Correo electrónico *">
-                <input type="email" value={cliente.correo} onChange={(e) => setCliente({ ...cliente, correo: e.target.value })} className={inputCls} placeholder="cliente@empresa.com" />
-              </Campo>
-            </div>
+            )}
+            <button type="button" onClick={alternarClienteExterno} className="text-xs text-brand-700 hover:text-brand-800 underline decoration-dotted">
+              {clienteExterno ? 'Elegir cliente del CRM' : 'Cliente externo (no está en el CRM)'}
+            </button>
+
+            {(clienteExterno || clienteId) && (
+              <>
+                <Campo label={clienteExterno ? 'Nombre comercial *' : 'Nombre comercial'}>
+                  <input value={cliente.nombreComercial} onChange={(e) => setCliente({ ...cliente, nombreComercial: e.target.value })} className={inputCls} placeholder="IM Multiservice LLC" />
+                </Campo>
+                <Campo label={clienteExterno ? 'Contacto principal *' : 'Contacto principal'}>
+                  <input value={cliente.contactoPrincipal} onChange={(e) => setCliente({ ...cliente, contactoPrincipal: e.target.value })} className={inputCls} placeholder="Ingrid María Martínez Ramos" />
+                </Campo>
+                <div className="grid grid-cols-2 gap-4">
+                  <Campo label="WhatsApp">
+                    <input value={cliente.whatsapp} onChange={(e) => setCliente({ ...cliente, whatsapp: e.target.value })} className={inputCls} placeholder="+52 55 1234 5678" />
+                  </Campo>
+                  <Campo label={clienteExterno ? 'Correo electrónico *' : 'Correo electrónico'}>
+                    <input type="email" value={cliente.correo} onChange={(e) => setCliente({ ...cliente, correo: e.target.value })} className={inputCls} placeholder="cliente@empresa.com" />
+                  </Campo>
+                </div>
+              </>
+            )}
 
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -259,6 +332,10 @@ export default function NuevoProyecto() {
                     </div>
                   </div>
                   <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">WhatsApp / teléfono</label>
+                      <input value={p.whatsapp || ''} onChange={(e) => actualizarParticipante(i, 'whatsapp', e.target.value)} className={inputCls} placeholder="+52 55 1234 5678" />
+                    </div>
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-slate-500 mb-1">Rol en el proyecto</label>
                       <select value={p.rol} onChange={(e) => actualizarParticipante(i, 'rol', e.target.value)} className={inputCls}>
@@ -556,7 +633,7 @@ export default function NuevoProyecto() {
               <div className="text-2xl mb-2">🎉</div>
               <h2 className="font-semibold text-emerald-800 text-lg">¡Proyecto creado!</h2>
               <p className="text-emerald-700 text-sm mt-1">
-                {proyectoCreado.cliente.nombreComercial} — {proyectoCreado.proyecto.paquete}
+                {nombreProyecto(proyectoCreado)} — {proyectoCreado.proyecto.paquete}
               </p>
               {!proyectoCreado.proyecto.anticipoConfirmado && (
                 <p className="text-amber-700 text-sm mt-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">

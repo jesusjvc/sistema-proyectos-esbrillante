@@ -106,7 +106,7 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 
 | Tool | Uso |
 |---|---|
-| `listar_proyectos` | Ver todos los proyectos (slug, cliente, paquete, etiquetas, status, tipo, avance o columnas Kanban, pendientes del cliente) con un `salud` compacto (`nivel`, `diasSinActividad`) por proyecto |
+| `listar_proyectos` | Ver todos los proyectos (slug, cliente, nombre del proyecto si tiene, paquete, etiquetas, status, tipo, avance o columnas Kanban, pendientes del cliente) con un `salud` compacto (`nivel`, `diasSinActividad`) por proyecto |
 | `ver_salud_proyectos(estado?)` | Clasifica los proyectos activos en `atrasado` (tareas de cliente vencidas o del equipo con fecha límite pasada), `estancado` (7+ días sin movimiento) o `avanza`, con los motivos concretos por proyecto (títulos, días, tareas sin fecha, tareas sin responsable). La tool para "¿qué está atrasado y por qué?" y para armar resúmenes de status |
 | `crear_proyecto(clienteNombre, ..., anticipoConfirmado)` | Dar de alta un proyecto nuevo sin pasar por el wizard admin |
 | `mi_siguiente_actividad(slug?)` | Qué te toca a ti (identidad OAuth o API key personal): `enCurso` (lo que ya marcaste en proceso) y `disponibles` (pendientes, con dependencias resueltas, que te corresponden por rol o asignación), con `queHacer`/`queEntregas` resumidos. Con `slug` filtra a un proyecto y agrega `sinAsignar` (responsable "equipo"). Con la API key compartida `slug` es obligatorio. Es la primera llamada que hace un agente al empezar a trabajar (ver §5) |
@@ -127,7 +127,7 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `nota_status(slug, texto)` | Nota en el hilo de "Status" del proyecto (tab Status, visible al equipo) — la bitácora de qué ha pasado y por qué sigue atorado |
 | `listar_plantillas` | Checklists base por paquete (fases, tareas, dependencias) — consultar antes de crear un proyecto de un paquete conocido |
 | `cambiar_tipo_proyecto(slug, tipo)` | Convertir un proyecto entre `finito` (fases) y `continuo` (tablero Kanban) |
-| `editar_proyecto(slug, descripcion?, fechaEstimadaEntrega?, infoClave?)` | Actualizar la descripción, la fecha estimada o la info clave (dominio, grupoWhatsapp, extras) |
+| `editar_proyecto(slug, nombre?, descripcion?, fechaEstimadaEntrega?, infoClave?)` | Renombrar el proyecto (ej. "Sitio Web"; se muestra como "Cliente · Nombre"), actualizar la descripción, la fecha estimada o la info clave (dominio, grupoWhatsapp, extras) |
 | `mover_a_revision(slug, tareaId)` | (Solo continuos) mover una tarjeta del Kanban a la columna Revisión |
 | `crear_solicitud_interna(slug, titulo, ...)` | Registrar un ticket llegado por fuera del portal (WhatsApp, teléfono, detectado por el equipo) en la cola de un proyecto continuo |
 | `comentar_actividad(slug, tareaId, mensaje, mencionar?)` | Comentario interno sobre una tarea (nunca visible al cliente); con `mencionar` notifica por correo |
