@@ -384,6 +384,10 @@ export default function DetalleProyecto() {
   }
 
   const esContinuo = proyecto.tipo === 'continuo'
+  // Proyecto recién creado: en vez de una lista vacía, se invita a armar el
+  // plan (o a revisar el borrador que ya generó la IA).
+  const sinTareas = !proyecto.tareas.some((t) => t.estado !== 'omitida')
+  const sinPlan = sinTareas || !!proyecto.proyecto?.borradorPlan
   const fases = proyecto.proyecto?.fases || FASES_WEB
   const tareasPorFase = fases.map((f) => ({
     ...f,
@@ -819,7 +823,28 @@ export default function DetalleProyecto() {
         </div>
       )}
 
-      {tab === 'tareas' && !esContinuo && (
+      {tab === 'tareas' && !esContinuo && sinPlan && (
+        <div className="bg-white dark:bg-ink-800 rounded-xl border border-slate-200 dark:border-ink-500 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-brand-600" />
+            <h3 className="font-semibold text-slate-800 dark:text-ink-100 text-sm">
+              {proyecto.proyecto?.borradorPlan ? 'Hay un plan de trabajo por revisar' : 'Aún no hay un plan de trabajo'}
+            </h3>
+          </div>
+          {!esAdminRol ? (
+            <p className="text-sm text-slate-500 dark:text-ink-300">El coordinador todavía no arma las actividades de este proyecto.</p>
+          ) : proyecto.proyecto?.alcance ? (
+            <PanelPlanIA proyecto={proyecto} onCambio={refresh} />
+          ) : (
+            <>
+              <p className="text-sm text-slate-500 dark:text-ink-300">Importa la propuesta de Perfex y la IA arma el plan a partir de lo contratado.</p>
+              <PanelAlcance proyecto={proyecto} esAdmin={esAdminRol} onCambio={refresh} />
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === 'tareas' && !esContinuo && !sinTareas && (
         <div className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="inline-flex h-[52px] md:h-10 p-1 bg-slate-100 dark:bg-ink-900 rounded-lg" aria-label="Vista de tareas">
