@@ -197,7 +197,10 @@ export async function generarBorradorPlan(proyecto, usuario) {
   if (!plan.tareas.length) throw errorConStatus('La IA no propuso ninguna tarea — intenta de nuevo', 502)
 
   const borradorPlan = { generadoEn: new Date().toISOString(), generadoPor: usuario, modelo, ...plan }
-  proyecto.proyecto = { ...proyecto.proyecto, borradorPlan }
+  // La IA puede tardar minutos: se relee el proyecto para no pisar lo que
+  // cambió mientras tanto (pagos, alcance, info clave).
+  const vigente = await prisma.proyecto.findUnique({ where: { id: proyecto.id }, select: { proyecto: true } })
+  proyecto.proyecto = { ...(vigente?.proyecto || proyecto.proyecto), borradorPlan }
   await prisma.proyecto.update({ where: { id: proyecto.id }, data: { proyecto: proyecto.proyecto } })
   await logEntry(proyecto.id, usuario, 'Borrador de plan generado con IA', `${plan.tareas.length} tareas propuestas (${modelo})`)
   emitirCambio(proyecto.id)
@@ -205,62 +208,66 @@ export async function generarBorradorPlan(proyecto, usuario) {
 }
 
 export async function aplicarBorradorPlan(proyecto, { excluirRefs = [] } = {}, usuario) {
-  const actual = await prisma.proyecto.findUnique({ where: { id: proyecto.id }, include: { tareas: true } })
-  const borrador = actual?.proyecto?.borradorPlan
-  if (!borrador) throw errorConStatus('No hay un borrador de plan para aplicar', 400)
+  // Todo dentro de una transacción con la fila bloqueada: dos "aplicar" al
+  // mismo tiempo (panel y MCP) no deben crear las tareas dos veces.
+  const { filas, datosProyecto } = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT 1 FROM "proyectos" WHERE id = ${proyecto.id} FOR UPDATE`
+    const actual = await tx.proyecto.findUnique({ where: { id: proyecto.id }, include: { tareas: true } })
+    const borrador = actual?.proyecto?.borradorPlan
+    if (!borrador) throw errorConStatus('No hay un borrador de plan para aplicar', 400)
 
-  const excluidas = new Set((Array.isArray(excluirRefs) ? excluirRefs : []).map(String))
-  const elegidas = borrador.tareas.filter((t) => !excluidas.has(t.ref))
-  if (!elegidas.length) throw errorConStatus('No quedan tareas por crear — quitaste todas del borrador', 400)
+    const excluidas = new Set((Array.isArray(excluirRefs) ? excluirRefs : []).map(String))
+    const elegidas = borrador.tareas.filter((t) => !excluidas.has(t.ref))
+    if (!elegidas.length) throw errorConStatus('No quedan tareas por crear — quitaste todas del borrador', 400)
 
-  const esContinuo = actual.tipo === 'continuo'
-  const idPorRef = new Map(elegidas.map((t) => [t.ref, randomUUID()]))
+    const esContinuo = actual.tipo === 'continuo'
+    const idPorRef = new Map(elegidas.map((t) => [t.ref, randomUUID()]))
 
-  let fases = actual.proyecto?.fases || []
-  if (!esContinuo) {
-    const existentes = new Set(fases.map((f) => f.numero))
-    const nuevas = borrador.fases.filter((f) => !existentes.has(f.numero))
-    if (nuevas.length) fases = [...fases, ...nuevas].sort((a, b) => a.numero - b.numero)
-  }
-
-  const siguienteOrden = new Map()
-  const filas = elegidas.map((t) => {
-    const fase = esContinuo ? 1 : t.fase
-    const orden = siguienteOrden.has(fase)
-      ? siguienteOrden.get(fase)
-      : ordenAlFinal(actual.tareas.filter((x) => x.fase === fase))
-    siguienteOrden.set(fase, orden + 1)
-    return {
-      id: idPorRef.get(t.ref),
-      proyectoId: actual.id,
-      fase,
-      orden,
-      titulo: t.titulo,
-      responsable: t.esCliente ? 'cliente' : t.responsable,
-      esCliente: t.esCliente,
-      descripcion: t.descripcion || '',
-      queEntregas: t.queEntregas || '',
-      queHacer: t.agenteSugerido ? `Agente sugerido: ${t.agenteSugerido}` : '',
-      instruccionesCliente: t.instruccionesCliente || '',
-      dependencias: t.dependencias.filter((d) => idPorRef.has(d)).map((d) => idPorRef.get(d)),
-      ejecutor: t.ejecutor,
-      duracionDias: t.duracionDias,
-      // Sin plantilla detrás: se pueden borrar a mano si sobran.
-      custom: true,
-      estado: 'pendiente',
+    let fases = actual.proyecto?.fases || []
+    if (!esContinuo) {
+      const existentes = new Set(fases.map((f) => f.numero))
+      const nuevas = borrador.fases.filter((f) => !existentes.has(f.numero))
+      if (nuevas.length) fases = [...fases, ...nuevas].sort((a, b) => a.numero - b.numero)
     }
-  })
 
-  const { borradorPlan: _descartado, ...resto } = actual.proyecto
-  const datosProyecto = esContinuo ? resto : { ...resto, fases }
-  await prisma.$transaction([
-    prisma.tarea.createMany({ data: filas }),
-    prisma.proyecto.update({ where: { id: actual.id }, data: { proyecto: datosProyecto } }),
-  ])
+    const siguienteOrden = new Map()
+    const filas = elegidas.map((t) => {
+      const fase = esContinuo ? 1 : t.fase
+      const orden = siguienteOrden.has(fase)
+        ? siguienteOrden.get(fase)
+        : ordenAlFinal(actual.tareas.filter((x) => x.fase === fase))
+      siguienteOrden.set(fase, orden + 1)
+      return {
+        id: idPorRef.get(t.ref),
+        proyectoId: actual.id,
+        fase,
+        orden,
+        titulo: t.titulo,
+        responsable: t.esCliente ? 'cliente' : t.responsable,
+        esCliente: t.esCliente,
+        descripcion: t.descripcion || '',
+        queEntregas: t.queEntregas || '',
+        queHacer: t.agenteSugerido ? `Agente sugerido: ${t.agenteSugerido}` : '',
+        instruccionesCliente: t.instruccionesCliente || '',
+        dependencias: t.dependencias.filter((d) => idPorRef.has(d)).map((d) => idPorRef.get(d)),
+        ejecutor: t.ejecutor,
+        duracionDias: t.duracionDias,
+        // Sin plantilla detrás: se pueden borrar a mano si sobran.
+        custom: true,
+        estado: 'pendiente',
+      }
+    })
+
+    const { borradorPlan: _descartado, ...resto } = actual.proyecto
+    const datosProyecto = esContinuo ? resto : { ...resto, fases }
+    await tx.tarea.createMany({ data: filas })
+    await tx.proyecto.update({ where: { id: actual.id }, data: { proyecto: datosProyecto } })
+    return { filas, datosProyecto }
+  })
   proyecto.proyecto = datosProyecto
-  await activarTareasClienteDisponibles(actual.id)
-  await logEntry(actual.id, usuario, 'Plan aplicado desde borrador IA', `${filas.length} tareas`)
-  emitirCambio(actual.id)
+  await activarTareasClienteDisponibles(proyecto.id)
+  await logEntry(proyecto.id, usuario, 'Plan aplicado desde borrador IA', `${filas.length} tareas`)
+  emitirCambio(proyecto.id)
   return { creadas: filas.length }
 }
 

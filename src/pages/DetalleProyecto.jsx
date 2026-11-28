@@ -1085,7 +1085,7 @@ export default function DetalleProyecto() {
             <PanelAlcance proyecto={proyecto} esAdmin={esAdminRol} onCambio={refresh} />
           </InfoCard>
 
-          {esAdminRol && (
+          {esAdminRol && proyecto.proyecto?.alcance && (
             <InfoCard titulo="Plan de trabajo con IA" icono={<Sparkles size={14} />} fullWidth>
               <PanelPlanIA proyecto={proyecto} onCambio={refresh} />
             </InfoCard>
