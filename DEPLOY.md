@@ -30,7 +30,7 @@ Se aplican solas: el backend arranca con `prisma migrate deploy && node src/app.
 ## Variables de entorno
 
 - El `.env` del repo no se sube solo: `levelrail-cli env set|push <app> ...`, luego `levelrail-cli apps restart <app>` para que el proceso las tome (`apps apply` puede reiniciar sin las env nuevas).
-- `DATABASE_URL` la inyecta LevelRail al ligar la base (`databases link`); no aparece en `env get`. Los valores sensibles van como secret (`secret_env`), no como env plana.
+- `DATABASE_URL` la inyecta LevelRail al ligar la base (`databases link`); no aparece en `env get`. Los valores sensibles van como secret (`secret_env`), no como env plana: credencial nueva → `levelrail-cli apps secrets set <app> KEY valor --apply`; una que ya está como env plana → `levelrail-cli apps env convert-to-secret <app> KEY` (la mueve del lado del servidor sin revelar el valor) y luego `levelrail-cli apps restart <app>`. No usar `secrets set` sobre una env plana existente: deja las dos copias.
 - `CLIENT_URL` lleva los dos dominios del panel separados por coma (CORS).
 - El frontend recibe `VITE_API_URL` y `VITE_GOOGLE_CLIENT_ID` como build args (ver `Dockerfile.frontend`).
 
