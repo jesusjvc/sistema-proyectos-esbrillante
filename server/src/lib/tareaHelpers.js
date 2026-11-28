@@ -42,7 +42,8 @@ export async function destinatariosDeTarea(tarea, equipo) {
   if (responsable === 'equipo') {
     const ids = new Set([
       ...(Array.isArray(equipo?.miembros) ? equipo.miembros : []),
-      ...ROLES_EQUIPO.flatMap((rol) => idsDeRol(equipo, rol)),
+      // El asistente puede operar las tareas pero no recibe avisos de cada una.
+      ...ROLES_EQUIPO.filter((rol) => rol !== 'asistente').flatMap((rol) => idsDeRol(equipo, rol)),
     ])
     return [...ids]
   }
