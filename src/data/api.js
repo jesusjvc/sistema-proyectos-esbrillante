@@ -46,6 +46,8 @@ export const vincularFactura = (slug, numero, destino) => req('POST', `/api/proy
 export const desvincularFactura = (slug, facturaId) => req('DELETE', `/api/proyectos/${slug}/pagos/${facturaId}`)
 export const sincronizarPagos = (slug) => req('POST', `/api/proyectos/${slug}/pagos/sincronizar`)
 export const marcarPagadoDesdeInicio = (slug) => req('POST', `/api/proyectos/${slug}/pagado-desde-inicio`)
+export const importarAlcance = (slug, propuesta) => req('POST', `/api/proyectos/${slug}/alcance`, { propuesta })
+export const actualizarConceptoAlcance = (slug, conceptoId, estado) => req('PUT', `/api/proyectos/${slug}/alcance/conceptos/${conceptoId}`, { estado })
 export const iniciarPausa = (slug, fase) => req('POST', `/api/proyectos/${slug}/pausa`, { fase })
 export const terminarPausa = (slug) => req('DELETE', `/api/proyectos/${slug}/pausa`)
 export const cerrarProyecto = (slug) => req('POST', `/api/proyectos/${slug}/cerrar`)

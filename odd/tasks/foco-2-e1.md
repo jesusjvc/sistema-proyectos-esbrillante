@@ -12,8 +12,8 @@ Piloto: Juárez Asociados (propuesta Perfex PROEB-000467).
 ## Tasks
 | ID | Specs | Ruta | Estado | Commit |
 |---|---|---|---|---|
-| T1 | S1 | inline | hecho | (este commit) |
-| T2 | S2 | inline | pendiente | — |
+| T1 | S1 | inline | hecho | a932d38 (PR #29, desplegado) |
+| T2 | S2 | inline | hecho | (este commit) |
 | T3 | S3 | inline | pendiente (requiere llave de API de IA) | — |
 | T4 | S4 | inline | pendiente | — |
 | T5 | S5 | inline | pendiente | — |
@@ -25,3 +25,4 @@ Pronóstico: ~2000 líneas en total → varios PRs, uno por tarea.
 - **L2** Riesgo T1/T2: no se conoce la forma exacta de las respuestas de `/api/invoices`, `/api/payments` y `/api/proposals` del módulo REST de Perfex; hay que verlas antes de programar contra ellas.
 - **L3** (2026-11-27) API de Perfex inspeccionada con un token de prueba (archivo borrado al terminar): `/invoices/{id}` trae `status` (1 pendiente, 2 pagada, 3 parcial, 4 vencida, 5 cancelada, 6 borrador), `total`, `total_left_to_pay`, `clientid`, `formatted_number`; `/invoices/search/{EB-…}` busca por número; `/proposals/{id}` trae `items` con `is_optional`/`is_selected` y descripciones que incluyen precios (quitarlos al importar en T2).
 - **L4** T1: `server/src/lib/pagosPerfex.js` (estado y % sin montos en `proyecto.pagos`; anticipo pagado → `confirmarAnticipo`, ahora compartido con el botón manual; fase pagada → `pagoConfirmado`; nunca revierte; rechaza facturas de otro cliente del CRM); rutas `POST/DELETE /api/proyectos/:slug/pagos`, `/pagos/sincronizar`, `/pagado-desde-inicio`; revisión horaria en `app.js`; tool MCP `vincular_factura`; bloque "Pagos" en la pestaña Info. Sin migración (vive en el JSON `proyecto`). Evidencia: 13 escenarios contra la base local con Perfex simulado OK, imports OK, `vite build` OK. Cambio de comportamiento: "Confirmar anticipo" ya no saca de pausa ni reactiva un proyecto completado. Risk: item 3 (comportamiento compartido del anticipo).
+- **L5** T2: `server/src/lib/alcancePerfex.js` importa la propuesta (id, `PROEB-000467` o link) a `proyecto.alcance` sin precios: quita solo frases con montos (`$1,200`, "precio", "+ IVA", MXN) y conserva alcance como "pasarela de pago". Base = `incluido`, opcionales = `por_confirmar` (se señala si el cliente lo marcó en Perfex); reimportar conserva confirmados/descartados; rechaza propuestas de otro cliente. Rutas `POST /api/proyectos/:slug/alcance`, `PUT .../alcance/conceptos/:id`; tools MCP `importar_alcance`, `actualizar_alcance`; `ver_proyecto` incluye alcance y pagos; tarjeta "Alcance contratado" en Info. Evidencia: 8 casos unitarios + 8 escenarios en base local OK, `vite build` OK.

@@ -119,6 +119,8 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `cancelar_actividad(slug, tareaId, motivo?)` | Cancelar una actividad o solicitud que ya no aplica — queda omitida, no se borra |
 | `actualizar_fase(slug, numero, fechaEstimada?, requierePago?, pagoConfirmado?)` | Ajustar la fecha estimada o el estado de pago de una fase — útil en proyectos con pagos parciales por fase, donde una sola "fecha de entrega" no refleja la realidad |
 | `vincular_factura(slug, numero?, destino?, pagadoDesdeInicio?)` | Ligar una factura de Perfex (ej. `EB-002481`) al `anticipo` o a `fase:<n>`. Foco guarda solo estado y % pagado, revisa Perfex cada hora y confirma solo el anticipo (activa el proyecto) o la fase (la desbloquea). `pagadoDesdeInicio=true` marca todo como pagado. Solo admins |
+| `importar_alcance(slug, propuesta)` | Traer de Perfex lo que el cliente contrató (número `PROEB-000467`, id o link de la propuesta), **sin precios**. Los addons opcionales quedan `por_confirmar`. Es la base para armar el plan. Solo admins |
+| `actualizar_alcance(slug, conceptoId, estado)` | Confirmar o descartar un addon del alcance (`confirmado`, `descartado`, `por_confirmar`). `ver_proyecto` muestra el alcance y los pagos. Solo admins |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
 | `nota_status(slug, texto)` | Nota en el hilo de "Status" del proyecto (tab Status, visible al equipo) — la bitácora de qué ha pasado y por qué sigue atorado |
 | `listar_plantillas` | Checklists base por paquete (fases, tareas, dependencias) — consultar antes de crear un proyecto de un paquete conocido |

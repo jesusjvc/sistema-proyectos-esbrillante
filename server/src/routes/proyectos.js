@@ -10,6 +10,7 @@ import { calcularSalud } from '../lib/salud.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
 import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto } from '../lib/pagosPerfex.js'
 import { crmConfigurado } from '../lib/perfexClient.js'
+import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
 import tareasRouter from './tareas.js'
 import solicitudesRouter from './solicitudes.js'
 import notasRouter from './notas.js'
@@ -568,6 +569,37 @@ router.post('/:slug/pagos/sincronizar', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error consultando las facturas en el CRM' })
+  }
+})
+
+// POST /api/proyectos/:slug/alcance — importa de Perfex lo contratado, sin
+// precios: { propuesta } con su número (PROEB-000467), id o link.
+router.post('/:slug/alcance', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!crmConfigurado()) return res.status(503).json({ error: 'El CRM no está configurado en el servidor' })
+    const alcance = await importarAlcance(p, req.body?.propuesta, req.user.nombre)
+    res.json({ ok: true, alcance })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error consultando la propuesta en el CRM' })
+  }
+})
+
+// PUT /api/proyectos/:slug/alcance/conceptos/:conceptoId — confirma o
+// descarta un addon opcional: { estado }.
+router.put('/:slug/alcance/conceptos/:conceptoId', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const concepto = await cambiarEstadoConcepto(p, req.params.conceptoId, req.body?.estado, req.user.nombre)
+    res.json({ ok: true, concepto })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
   }
 })
 
