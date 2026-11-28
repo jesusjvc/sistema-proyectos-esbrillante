@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin, requireAdminOrApiKey, requireAuthOrApiKey } 
 import { generarSlug } from '../lib/slug.js'
 import { generarPasswordSimple, generarAccessToken } from '../lib/passwords.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { validarYNormalizarEquipo, ROLES_EQUIPO, EQUIPO_NO_APLICA, idsDeRol } from '../lib/permisos.js'
+import { validarYNormalizarEquipo, ROLES_EQUIPO, EQUIPO_NO_APLICA, idsDeRol, usuarioCoordinaProyecto } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
@@ -364,6 +364,11 @@ router.put('/:slug/equipo', requireAuth, async (req, res) => {
   try {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    // Coordinar da acceso a todas las tareas del proyecto: nadie puede
+    // ponerse a sí mismo en el equipo si no lo coordina ya.
+    if (req.user.rol !== 'ADMIN' && !usuarioCoordinaProyecto(p.equipo, req.user.id)) {
+      return res.status(403).json({ error: 'Solo un admin o quien coordina el proyecto puede cambiar su equipo' })
+    }
 
     // `miembros` no se edita en el panel: son quienes entraron al proyecto al
     // asignarles una tarea directa, y no deben perderse al guardar el equipo.

@@ -26,7 +26,7 @@ import useEscape from '../hooks/useEscape'
 import MedidorCircular from '../components/MedidorCircular'
 import AdjuntosTarea from '../components/AdjuntosTarea'
 import TarjetaTarea from '../components/TarjetaTarea'
-import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
+import { EQUIPO_NO_APLICA, infoResponsable, usuarioCoordinaProyecto } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
 import { etiquetasPersonas } from '../lib/nombresPersonas'
 import { esUrl } from '../lib/texto'
@@ -1174,9 +1174,11 @@ export default function DetalleProyecto() {
                 {nombreEquipo(proyecto.equipo.asistente, miembrosPorId) && (
                   <InfoRow label="Asistente" valor={nombreEquipo(proyecto.equipo.asistente, miembrosPorId)} />
                 )}
-                <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium mt-1">
-                  Editar equipo
-                </button>
+                {(esAdminRol || usuarioCoordinaProyecto(proyecto.equipo, user?.id)) && (
+                  <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium mt-1">
+                    Editar equipo
+                  </button>
+                )}
               </>
             )}
           </InfoCard>
