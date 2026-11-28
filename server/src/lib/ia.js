@@ -1,9 +1,14 @@
+import { randomUUID } from 'crypto'
+
 // Cliente del gateway de OpenCode (plan Go por defecto). Recorre la lista de
 // modelos en orden: si uno falla, prueba el siguiente.
 
 const BASE_POR_DEFECTO = 'https://opencode.ai/inference/go'
 const MODELOS_POR_DEFECTO = 'glm-5.3,glm-5.3-flash,kimi-k3'
 const TIEMPO_LIMITE_MS = 90_000
+// El plan Go rechaza (400 MissingSessionID) peticiones sin una sesión estable
+// y pide que el cliente se identifique con su propio user agent.
+const USER_AGENT = 'foco-coordinador/1.0'
 
 function llave() {
   return process.env.OPENCODE_API_KEY || process.env.ANTHROPIC_API_KEY || ''
@@ -41,18 +46,27 @@ function pedido(modelo, { sistema, mensajes, maxTokens }) {
   }
 }
 
-async function llamar(modelo, opciones) {
+async function llamar(modelo, opciones, sesion) {
   const { ruta, cuerpo, leer } = pedido(modelo, opciones)
   const control = new AbortController()
   const temporizador = setTimeout(() => control.abort(), TIEMPO_LIMITE_MS)
   try {
     const res = await fetch(`${base()}${ruta}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${llave()}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${llave()}`,
+        'User-Agent': USER_AGENT,
+        'x-opencode-session': sesion,
+      },
       body: JSON.stringify(cuerpo),
       signal: control.signal,
     })
-    if (!res.ok) return { codigo: String(res.status) }
+    if (!res.ok) {
+      // El mensaje del proveedor dice qué rechazó; nunca incluye la llave.
+      const detalle = await res.json().then((j) => j?.error?.message || j?.message || '').catch(() => '')
+      return { codigo: detalle ? `${res.status} ${String(detalle).slice(0, 120)}` : String(res.status) }
+    }
     const texto = String(leer(await res.json().catch(() => ({}))) || '').trim()
     return texto ? { texto } : { codigo: 'vacío' }
   } catch (err) {
@@ -69,8 +83,9 @@ export async function generarTexto({ sistema, mensajes, maxTokens = 8000 }) {
     throw error
   }
   const fallas = []
+  const sesion = randomUUID()
   for (const modelo of modelos()) {
-    const resultado = await llamar(modelo, { sistema, mensajes, maxTokens })
+    const resultado = await llamar(modelo, { sistema, mensajes, maxTokens }, sesion)
     if (resultado.texto) return { texto: resultado.texto, modelo }
     fallas.push(`${modelo}: ${resultado.codigo}`)
   }
