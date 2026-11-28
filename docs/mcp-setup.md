@@ -145,7 +145,7 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 
 ## 5. Para que el reporte sea automático, no manual
 
-El MCP no reporta nada por sí solo — necesita que el agente (Claude Code, OpenCode, etc.) lo invoque. Las reglas del juego viven en la skill `foco-reporte` (`skills/foco-reporte/SKILL.md` de este repo; instálala copiándola a `~/.claude/skills/foco-reporte/` o al directorio de skills de tu agente). Además, agrega algo así al `CLAUDE.md` (o `AGENTS.md`) de cada repo cliente:
+El MCP no reporta nada por sí solo — necesita que el agente (Claude Code, OpenCode, etc.) lo invoque. Las reglas del juego viven en la skill `foco-reporte` (`skills/foco-reporte/SKILL.md` de este repo; la sección "Instalación" de ese archivo y la página MCP del panel traen el comando de instalación para macOS/Linux, Windows y claude.ai). Además, agrega algo así al `CLAUDE.md` (o `AGENTS.md`) de cada repo cliente:
 
 ```markdown
 # Reporte de avance

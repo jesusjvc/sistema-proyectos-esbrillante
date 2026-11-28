@@ -37,6 +37,8 @@ export default function McpSetupGuide() {
       {tab === 'cowork' && <TabCowork />}
       {tab === 'cli' && <TabCli />}
 
+      <InstalarSkillReporte />
+
       <ToolsTable />
     </div>
   )
@@ -148,6 +150,82 @@ function TabCli() {
   )
 }
 
+const SKILL_URL = 'https://raw.githubusercontent.com/jesusjvc/sistema-proyectos-esbrillante/main/skills/foco-reporte/SKILL.md'
+
+// OpenCode también lee ~/.claude/skills, así que el mismo destino sirve para ambos agentes.
+const INSTALAR_SKILL = {
+  unix: {
+    label: 'macOS / Linux',
+    cmd: `mkdir -p ~/.claude/skills/foco-reporte && \\\n  curl -fsSL ${SKILL_URL} -o ~/.claude/skills/foco-reporte/SKILL.md`,
+  },
+  windows: {
+    label: 'Windows (PowerShell)',
+    cmd: `New-Item -ItemType Directory -Force "$HOME\\.claude\\skills\\foco-reporte" | Out-Null\nInvoke-WebRequest ${SKILL_URL} -OutFile "$HOME\\.claude\\skills\\foco-reporte\\SKILL.md"`,
+  },
+}
+
+const SNIPPET_REPO = `# Reporte de avance
+
+Este proyecto se reporta en Foco vía el MCP \`esbrillante-seguimiento\`.
+El slug de este proyecto es: \`<slug-del-proyecto>\`.
+Sigue la skill \`foco-reporte\`.`
+
+function InstalarSkillReporte() {
+  const [so, setSo] = useState('unix')
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800">Que tu agente reporte solo: instala la skill de reporte</h3>
+        <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+          Conectar el MCP le da las herramientas a tu agente; la skill <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">foco-reporte</code> le
+          dice cuándo usarlas: marcar en proceso al empezar, comentar el avance y completar al terminar, sin que se lo pidas.
+          Funciona con Claude Code y OpenCode.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-1.5 text-xs flex-wrap">
+        {Object.entries(INSTALAR_SKILL).map(([k, { label }]) => (
+          <button
+            key={k}
+            onClick={() => setSo(k)}
+            className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+              so === k ? 'bg-brand-500 text-slate-900' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <ol className="space-y-3">
+        <PasoItem n={1}>
+          Instala la skill una sola vez en tu computadora (queda disponible en todos tus repos):
+          <CopyBlock value={INSTALAR_SKILL[so].cmd} className="mt-2" multiline />
+          <p className="text-xs text-slate-400 mt-1.5">Vuelve a correrlo cuando quieras actualizarla a la última versión.</p>
+        </PasoItem>
+        <PasoItem n={2}>
+          En el repo de cada cliente, agrega esto a su <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">CLAUDE.md</code> (o{' '}
+          <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">AGENTS.md</code>) con el slug del proyecto en Foco
+          (es la última parte de la dirección cuando abres el proyecto, ej. <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">/equipo/proyecto/juarez-asociados</code>):
+          <CopyBlock value={SNIPPET_REPO} className="mt-2" multiline />
+        </PasoItem>
+        <PasoItem n={3}>
+          Abre una sesión nueva en ese repo y pregúntale a tu agente <em>"¿qué me toca en Foco?"</em>. Debe responder con
+          tus tareas en curso y las siguientes disponibles.
+        </PasoItem>
+      </ol>
+
+      <p className="text-xs text-slate-400 leading-relaxed">
+        ¿Usas Claude Cowork o claude.ai? Descarga el{' '}
+        <a href={SKILL_URL} target="_blank" rel="noreferrer" className="text-brand-700 underline">SKILL.md</a>, guárdalo
+        dentro de una carpeta llamada <code className="bg-slate-100 px-1 py-0.5 rounded">foco-reporte</code>, comprímela en .zip y súbela
+        en Configuración → Capacidades → Skills.
+      </p>
+    </div>
+  )
+}
+
 function PasoItem({ n, children }) {
   return (
     <li className="flex gap-3">
@@ -178,7 +256,7 @@ function CopyBlock({ value, className = '', multiline = false }) {
         className="absolute top-2 right-2 p-1.5 rounded-md bg-white border border-slate-200 hover:border-brand-300 text-slate-500 hover:text-brand-700 transition-colors"
         title="Copiar"
       >
-        {copiado ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+        {copiado ? <Check size={13} className="text-brand-600" /> : <Copy size={13} />}
       </button>
     </div>
   )
