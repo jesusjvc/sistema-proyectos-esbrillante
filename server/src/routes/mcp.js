@@ -9,6 +9,7 @@ import { requireMcpAuth } from '../middleware/auth.js'
 import { tareaLeCorresponde, validarYNormalizarEquipo } from '../lib/permisos.js'
 import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
 import { vincularFactura, marcarPagadoDesdeInicio } from '../lib/pagosPerfex.js'
+import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
 import { calcularAvance, getFaseActual, contarPendientesCliente, tieneRespuestaNueva } from '../lib/avance.js'
 import { calcularSalud, DIAS_INACTIVIDAD } from '../lib/salud.js'
 import { contarPorColumna, estadoDeColumna } from '../lib/kanban.js'
@@ -568,6 +569,56 @@ function buildServer(usuario, baseProto) {
   )
 
   server.registerTool(
+    'importar_alcance',
+    {
+      title: 'Importar lo contratado desde la propuesta de Perfex',
+      description: 'Trae al proyecto lo que el cliente contrató según su propuesta en Perfex, SIN precios: cada concepto con su descripción y detalle. Los addons opcionales quedan "por_confirmar" hasta confirmarlos o descartarlos con actualizar_alcance. Es la base para armar el plan de trabajo. Reimportar conserva lo ya confirmado o descartado. Solo admins.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        propuesta: z.string().describe('Número de la propuesta (ej. "PROEB-000467"), su id ("467") o su link del CRM'),
+      },
+    },
+    async ({ slug, propuesta }) => {
+      if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede importar el alcance.')
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      if (!crmConfigurado()) return fail('El CRM no está configurado en el servidor.')
+      try {
+        const alcance = await importarAlcance(p, propuesta, usuario.nombre)
+        return ok(JSON.stringify(alcance, null, 2))
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
+    },
+  )
+
+  server.registerTool(
+    'actualizar_alcance',
+    {
+      title: 'Confirmar o descartar un addon del alcance',
+      description: 'Cambia el estado de un concepto opcional (addon) del alcance importado de Perfex: "confirmado" si el cliente sí lo contrató, "descartado" si no, o "por_confirmar" para regresarlo. Los conceptos base no se cambian. Ver los ids con ver_proyecto (campo alcance). Solo admins.',
+      inputSchema: {
+        slug: z.string().describe('Slug o ID del proyecto'),
+        conceptoId: z.string().describe('id del concepto, tal como aparece en alcance.conceptos de ver_proyecto'),
+        estado: z.enum(['confirmado', 'descartado', 'por_confirmar']).describe('Nuevo estado del addon'),
+      },
+    },
+    async ({ slug, conceptoId, estado }) => {
+      if (usuario.rol !== 'ADMIN') return fail('Solo un admin puede actualizar el alcance.')
+      const p = await getProyecto(slug)
+      if (!p) return fail(`No se encontró un proyecto con slug "${slug}".`)
+      try {
+        const concepto = await cambiarEstadoConcepto(p, conceptoId, estado, usuario.nombre)
+        return ok(`"${concepto.descripcion}" quedó ${estado.replace('_', ' ')}.`)
+      } catch (err) {
+        if (err.status) return fail(err.message)
+        throw err
+      }
+    },
+  )
+
+  server.registerTool(
     'vincular_factura',
     {
       title: 'Ligar una factura de Perfex al anticipo o a una fase',
@@ -714,6 +765,10 @@ function buildServer(usuario, baseProto) {
         // (ver crear_proyecto/editar_proyecto con driveFolderId, o
         // listar_archivos_drive_proyecto para ver su contenido).
         ...(p.driveRespuestasId ? { driveFolderUrl: `https://drive.google.com/drive/folders/${p.driveRespuestasId}` } : {}),
+        // Lo contratado (de la propuesta de Perfex, sin precios) y el estado
+        // de los pagos ligados — se omiten si el proyecto no los tiene.
+        ...(p.proyecto?.alcance ? { alcance: { titulo: p.proyecto.alcance.titulo, conceptos: p.proyecto.alcance.conceptos.map(({ id, descripcion, detalle, estado }) => ({ id, descripcion, detalle, estado })) } } : {}),
+        ...(p.proyecto?.pagos?.length ? { pagos: p.proyecto.pagos.map(({ numero, destino, estado, porcentaje }) => ({ numero, destino, estado, porcentaje })) } : {}),
       }
 
       if (p.tipo === 'continuo') {

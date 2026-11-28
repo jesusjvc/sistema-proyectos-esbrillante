@@ -39,12 +39,13 @@ import DescripcionProyecto from '../components/DescripcionProyecto'
 import EtiquetasProyecto from '../components/EtiquetasProyecto'
 import FechaEntregaProyecto from '../components/FechaEntregaProyecto'
 import PanelPagos from '../components/PanelPagos'
+import PanelAlcance from '../components/PanelAlcance'
 import HiloComentarios from '../components/HiloComentarios'
 import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import IconGoogleDrive from '../components/IconGoogleDrive'
 import { normalizarTexto } from '../lib/texto'
 import {
-  CheckCircle2, Circle, Lock, AlertCircle, CreditCard, Copy, Check, Play, Pause, PlayCircle,
+  CheckCircle2, Circle, Lock, AlertCircle, CreditCard, FileText, Copy, Check, Play, Pause, PlayCircle,
   ChevronDown, ChevronUp, XCircle, Pencil, Plus, Trash2, X, ExternalLink, Link2,
   FolderOpen, Loader2, Users, Settings2, Sparkles, UserCircle2, Clock3, MessageCircle, Globe, Paperclip,
   AlertTriangle, Flag, UserX, RefreshCw, Tag, LayoutList, Columns3, Search, ListChecks, Layers,
@@ -1077,6 +1078,10 @@ export default function DetalleProyecto() {
               infoClave={proyecto.proyecto?.infoClave || { dominio: null, grupoWhatsapp: null, extras: [] }}
               onGuardar={async (infoClave) => { await actualizarInfoClave(proyecto.slug, infoClave); await refresh() }}
             />
+          </InfoCard>
+
+          <InfoCard titulo="Alcance contratado" icono={<FileText size={14} />} fullWidth>
+            <PanelAlcance proyecto={proyecto} esAdmin={esAdminRol} onCambio={refresh} />
           </InfoCard>
 
           <InfoCard titulo="Pagos" icono={<CreditCard size={14} />} fullWidth>

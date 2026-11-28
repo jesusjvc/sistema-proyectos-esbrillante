@@ -20,6 +20,9 @@
 // - GET  /invoices/{id}             → factura con status (1 sin pagar, 2 pagada,
 //                                     3 parcial, 4 vencida, 5 cancelada, 6 borrador),
 //                                     total y total_left_to_pay (2026-11)
+// - GET  /proposals/{id}            → propuesta con items [{description,
+//                                     long_description, is_optional, is_selected}];
+//                                     las descripciones pueden traer precios
 // - Un WAF frontal devuelve 403 con caracteres como & % ? en el término de
 //   búsqueda — por eso terminoSeguro() los elimina antes de armar la URL.
 
@@ -62,6 +65,10 @@ export function terminoSeguro(q) {
 
 export async function obtenerFactura(facturaId) {
   return req('GET', `/invoices/${encodeURIComponent(facturaId)}`)
+}
+
+export async function obtenerPropuesta(propuestaId) {
+  return req('GET', `/proposals/${encodeURIComponent(propuestaId)}`)
 }
 
 export async function buscarFacturas(termino) {
