@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
-import { crearProyecto, getClientes, getMiembros } from '../data/api'
+import { crearProyecto, getClientes, getMiembros, getPropuestasCliente, importarAlcance, generarBorradorPlan } from '../data/api'
 import { nombreProyecto } from '../data/storage'
 import { generarMensajeInicio } from '../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../data/plantillas'
-import { EXTRAS_DISPONIBLES } from '../data/paquetes'
 import { EQUIPO_NO_APLICA } from '../lib/permisos'
 import { AREAS } from '../lib/areas'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import BuscadorCliente from '../components/BuscadorCliente'
-import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch } from 'lucide-react'
+import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch, CircleAlert, Sparkles } from 'lucide-react'
 
 const COND_DEFAULT = {
   tieneDominio: false,
@@ -23,6 +22,41 @@ const COND_DEFAULT = {
   requierePluginAdicional: false,
   pluginAdicionalNombre: '',
   requiereCapacitacion: true,
+}
+
+const CONTEXTO_DEFAULT = {
+  yaEsCliente: false,
+  sitioActual: '',
+  tieneDominio: false,
+  dominio: '',
+  hosting: 'nosotros',
+}
+
+const OPCIONES_HOSTING = [
+  ['nosotros', 'Con nosotros (incluye Cloudflare)'],
+  ['propio', 'Conserva su hosting'],
+  ['migra', 'Migra con nosotros'],
+]
+
+const ESTADO_PROPUESTA_LABEL = {
+  aceptada: 'Aceptada', enviada: 'Enviada', abierta: 'Abierta', revisada: 'Revisada', borrador: 'Borrador', rechazada: 'Rechazada',
+}
+
+// Los proyectos finitos ya no capturan condiciones técnicas: se derivan del
+// contexto técnico porque las plantillas y el mensaje de inicio las siguen usando.
+function condicionesDesdeContexto(ctx) {
+  return {
+    ...COND_DEFAULT,
+    tieneDominio: ctx.tieneDominio,
+    tieneHosting: ctx.hosting === 'propio',
+    requiereCloudflare: ctx.hosting !== 'propio',
+    requiereAnalytics: true,
+    requiereSearchConsole: true,
+  }
+}
+
+function textoPlano(html) {
+  return String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 }
 
 const CLIENTE_VACIO = {
@@ -56,13 +90,17 @@ export default function NuevoProyecto() {
     nombre: '',
     paquete: '',
     plantillaId: '',
-    extras: [],
     descripcion: '',
     fechaInicio: new Date().toISOString().split('T')[0],
     fechaEstimadaEntrega: '',
     anticipoConfirmado: false,
   })
-  const [condiciones, setCondiciones] = useState(COND_DEFAULT)
+  const [contextoTecnico, setContextoTecnico] = useState(CONTEXTO_DEFAULT)
+  const [propuestas, setPropuestas] = useState([])
+  const [cargandoPropuestas, setCargandoPropuestas] = useState(false)
+  const [errorPropuestas, setErrorPropuestas] = useState('')
+  const [propuestaId, setPropuestaId] = useState('')
+  const [progresoIA, setProgresoIA] = useState(null)
   const [areasProyecto, setAreasProyecto] = useState([])
   const [equipo, setEquipo] = useState({
     copy: [],
@@ -113,6 +151,25 @@ export default function NuevoProyecto() {
     if (c) aplicarCliente(c)
   }
 
+  useEffect(() => {
+    setPropuestas([])
+    setPropuestaId('')
+    setErrorPropuestas('')
+    if (!clienteId) return
+    let vigente = true
+    setCargandoPropuestas(true)
+    getPropuestasCliente(clienteId)
+      .then((lista) => {
+        if (!vigente) return
+        setPropuestas(lista)
+        const aceptada = lista.find((p) => p.estado === 'aceptada')
+        if (aceptada) setPropuestaId(aceptada.id)
+      })
+      .catch((err) => { if (vigente) setErrorPropuestas(err.message || 'No se pudieron cargar las propuestas del CRM') })
+      .finally(() => { if (vigente) setCargandoPropuestas(false) })
+    return () => { vigente = false }
+  }, [clienteId])
+
   function alternarClienteExterno() {
     setClienteExterno((prev) => !prev)
     setClienteId('')
@@ -130,15 +187,6 @@ export default function NuevoProyecto() {
 
   function toggleArea(area) {
     setAreasProyecto((prev) => (prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]))
-  }
-
-  function toggleExtra(extra) {
-    setProyectoData((prev) => ({
-      ...prev,
-      extras: prev.extras.includes(extra)
-        ? prev.extras.filter((e) => e !== extra)
-        : [...prev.extras, extra],
-    }))
   }
 
   function agregarParticipante() {
@@ -168,8 +216,11 @@ export default function NuevoProyecto() {
     setCreando(true)
     try {
       const esContinuo = tipo === 'continuo'
-      const plantilla = esContinuo ? null : await getPlantilla(proyectoData.plantillaId)
-      const tareas = esContinuo ? [] : await copiarTareasDesde(proyectoData.plantillaId, condiciones, proyectoData.extras)
+      const propuesta = esContinuo ? null : propuestas.find((p) => p.id === propuestaId) || null
+      const plantillaId = esContinuo || propuesta ? '' : proyectoData.plantillaId
+      const condicionesTecnicas = esContinuo ? COND_DEFAULT : condicionesDesdeContexto(contextoTecnico)
+      const plantilla = plantillaId ? await getPlantilla(plantillaId) : null
+      const tareas = plantillaId ? await copiarTareasDesde(plantillaId, condicionesTecnicas, []) : []
 
       const p = await crearProyecto({
         tipo,
@@ -177,16 +228,19 @@ export default function NuevoProyecto() {
         ...(clienteId ? { clienteId } : {}),
         proyecto: {
           nombre: proyectoData.nombre.trim(),
-          paquete: proyectoData.paquete,
-          plantillaId: esContinuo ? '' : proyectoData.plantillaId,
-          fases: esContinuo ? [] : (plantilla?.fases || FASES_WEB),
-          extras: esContinuo ? [] : proyectoData.extras,
+          paquete: esContinuo ? proyectoData.paquete : (propuesta?.titulo || plantilla?.nombre || ''),
+          plantillaId,
+          // Con propuesta, las fases las propone la IA junto con el plan.
+          fases: esContinuo || propuesta ? [] : (plantilla?.fases || FASES_WEB),
+          extras: [],
           fechaInicio: proyectoData.fechaInicio,
-          fechaEstimadaEntrega: esContinuo ? null : proyectoData.fechaEstimadaEntrega,
-          anticipoConfirmado: proyectoData.anticipoConfirmado,
-          descripcion: proyectoData.descripcion.trim(),
+          fechaEstimadaEntrega: esContinuo || propuesta ? null : (proyectoData.fechaEstimadaEntrega || null),
+          anticipoConfirmado: esContinuo ? proyectoData.anticipoConfirmado : false,
+          descripcion: propuesta ? '' : proyectoData.descripcion.trim(),
+          ...(esContinuo ? {} : { contextoTecnico }),
+          ...(propuesta ? { propuestaId: propuesta.id } : {}),
         },
-        condicionesTecnicas: condiciones,
+        condicionesTecnicas,
         equipo: { ...equipo, programador: programadorNoAplica ? EQUIPO_NO_APLICA : equipo.programador },
         areas: areasProyecto,
         passwordCliente,
@@ -195,10 +249,27 @@ export default function NuevoProyecto() {
       })
       setProyectoCreado(p)
       setPaso(4)
+      if (propuesta) prepararPlan(p.slug, propuesta.id)
     } catch (err) {
       setErrorCrear(err.message || 'Error al crear el proyecto')
     } finally {
       setCreando(false)
+    }
+  }
+
+  async function prepararPlan(slug, idPropuesta) {
+    if (user?.rol !== 'admin') {
+      setProgresoIA({ etapa: 'sin_permiso' })
+      return
+    }
+    setProgresoIA({ etapa: 'alcance' })
+    try {
+      await importarAlcance(slug, idPropuesta)
+      setProgresoIA({ etapa: 'plan' })
+      await generarBorradorPlan(slug)
+      setProgresoIA({ etapa: 'listo' })
+    } catch (err) {
+      setProgresoIA((prev) => ({ etapa: 'error', fallo: prev?.etapa, mensaje: err.message || 'Algo falló' }))
     }
   }
 
@@ -212,7 +283,9 @@ export default function NuevoProyecto() {
   const esContinuo = tipo === 'continuo'
   const clienteListo = clienteId ? !!cliente.nombreComercial.trim() : (cliente.nombreComercial && cliente.contactoPrincipal && cliente.correo)
   const valido1 = !!proyectoData.nombre.trim() && clienteListo
-  const valido2 = esContinuo ? !!proyectoData.paquete : (proyectoData.plantillaId && proyectoData.fechaEstimadaEntrega)
+  const valido2 = esContinuo
+    ? !!proyectoData.paquete
+    : !!propuestaId || !!proyectoData.plantillaId || !!textoPlano(proyectoData.descripcion)
   const valido3 = true
 
   return (
@@ -418,128 +491,120 @@ export default function NuevoProyecto() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
             <h2 className="font-semibold text-slate-800">Datos del proyecto</h2>
 
-            <Campo label="Paquete base *">
-              {Object.entries(
-                plantillas.reduce((acc, p) => { if (!acc[p.area]) acc[p.area] = []; acc[p.area].push(p); return acc }, {})
-              ).map(([area, pqs]) => (
-                <div key={area} className="mb-3">
-                  <div className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">{area}</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {pqs.map((pq) => (
-                      <button
-                        key={pq.id}
-                        onClick={() => setProyectoData({ ...proyectoData, paquete: pq.nombre, plantillaId: pq.id })}
-                        className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
-                          proyectoData.plantillaId === pq.id
-                            ? 'border-brand-500 bg-brand-50 text-brand-800 font-medium'
-                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
-                        }`}
-                      >
-                        <div className="font-medium">{pq.nombre}</div>
-                        {pq.descripcion && <div className="text-xs text-slate-400 mt-0.5 line-clamp-1">{pq.descripcion}</div>}
-                        <div className="text-xs text-slate-300 mt-0.5">{pq.tareas.length} actividades</div>
-                      </button>
-                    ))}
-                  </div>
+            {cargandoPropuestas && (
+              <p className="flex items-center gap-2 text-sm text-slate-500"><Loader2 size={14} className="animate-spin" /> Buscando sus propuestas en el CRM…</p>
+            )}
+            {errorPropuestas && (
+              <p className="flex items-center gap-2 text-xs text-slate-500"><CircleAlert size={13} className="shrink-0" /> {errorPropuestas} — puedes capturarlo a mano.</p>
+            )}
+
+            {propuestas.length > 0 && (
+              <Campo label="Propuesta del CRM">
+                <div className="space-y-1.5">
+                  {propuestas.map((pr) => (
+                    <OpcionPropuesta key={pr.id} activa={propuestaId === pr.id} onClick={() => setPropuestaId(pr.id)}>
+                      <span className="flex-1 min-w-0 truncate">{pr.titulo}</span>
+                      {pr.fecha && <span className="text-xs text-slate-400 shrink-0">{pr.fecha}</span>}
+                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${pr.estado === 'aceptada' ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-500'}`}>
+                        {ESTADO_PROPUESTA_LABEL[pr.estado] || pr.estado}
+                      </span>
+                    </OpcionPropuesta>
+                  ))}
+                  <OpcionPropuesta activa={!propuestaId} onClick={() => setPropuestaId('')}>
+                    <span className="flex-1 text-slate-500">Sin propuesta — capturar a mano</span>
+                  </OpcionPropuesta>
                 </div>
-              ))}
-            </Campo>
+                {propuestaId && (
+                  <p className="flex items-center gap-1.5 text-xs text-slate-500 mt-2">
+                    <Sparkles size={13} className="text-brand-600 shrink-0" /> Al crear, se importa la propuesta y la IA arma el plan y la fecha de entrega.
+                  </p>
+                )}
+              </Campo>
+            )}
+
+            {!propuestaId && !cargandoPropuestas && (
+              <>
+                <Campo label="Descripción del proyecto *">
+                  <EditorEnriquecido
+                    value={proyectoData.descripcion}
+                    onChange={(html) => setProyectoData({ ...proyectoData, descripcion: html })}
+                    placeholder="Qué se va a hacer y qué se busca lograr"
+                  />
+                </Campo>
+                {plantillas.length > 0 && (
+                  <Campo label="Plantilla de actividades (opcional)">
+                    <select
+                      value={proyectoData.plantillaId}
+                      onChange={(e) => {
+                        const pl = plantillas.find((x) => x.id === e.target.value)
+                        setProyectoData({ ...proyectoData, plantillaId: e.target.value, paquete: pl?.nombre || '' })
+                      }}
+                      className={inputCls}
+                    >
+                      <option value="">Sin plantilla</option>
+                      {Object.entries(
+                        plantillas.reduce((acc, pl) => { (acc[pl.area] ||= []).push(pl); return acc }, {})
+                      ).map(([area, pls]) => (
+                        <optgroup key={area} label={area}>
+                          {pls.map((pl) => <option key={pl.id} value={pl.id}>{pl.nombre} ({pl.tareas.length} actividades)</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </Campo>
+                )}
+              </>
+            )}
 
             <SelectorAreas areasProyecto={areasProyecto} onToggle={toggleArea} />
 
-            <Campo label="Extras">
-              <div className="grid grid-cols-2 gap-2">
-                {EXTRAS_DISPONIBLES.map((e) => (
-                  <label key={e} className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={proyectoData.extras.includes(e)}
-                      onChange={() => toggleExtra(e)}
-                      className="mt-0.5 accent-brand-500"
-                    />
-                    <span className="text-sm text-slate-700">{e}</span>
-                  </label>
-                ))}
+            <Campo label="Contexto técnico">
+              <div className="space-y-2.5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={contextoTecnico.yaEsCliente} onChange={(e) => setContextoTecnico({ ...contextoTecnico, yaEsCliente: e.target.checked })} className="accent-brand-500 w-4 h-4" />
+                  <span className="text-sm text-slate-700">Ya es cliente (tiene un sitio con nosotros)</span>
+                </label>
+                {contextoTecnico.yaEsCliente && (
+                  <input value={contextoTecnico.sitioActual} onChange={(e) => setContextoTecnico({ ...contextoTecnico, sitioActual: e.target.value })} className={inputCls} placeholder="https://sitio-actual.com" />
+                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={contextoTecnico.tieneDominio} onChange={(e) => setContextoTecnico({ ...contextoTecnico, tieneDominio: e.target.checked })} className="accent-brand-500 w-4 h-4" />
+                  <span className="text-sm text-slate-700">Ya tiene dominio</span>
+                </label>
+                {contextoTecnico.tieneDominio && (
+                  <input value={contextoTecnico.dominio} onChange={(e) => setContextoTecnico({ ...contextoTecnico, dominio: e.target.value })} className={inputCls} placeholder="empresa.com" />
+                )}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {OPCIONES_HOSTING.map(([valor, label]) => (
+                    <label
+                      key={valor}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
+                        contextoTecnico.hosting === valor ? 'border-brand-500 bg-brand-50 text-brand-800 font-medium' : 'border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <input type="radio" name="hosting" checked={contextoTecnico.hosting === valor} onChange={() => setContextoTecnico({ ...contextoTecnico, hosting: valor })} className="accent-brand-500" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </Campo>
-
-            <Campo label="Descripción del proyecto (opcional)">
-              <EditorEnriquecido
-                value={proyectoData.descripcion}
-                onChange={(html) => setProyectoData({ ...proyectoData, descripcion: html })}
-                placeholder="De qué trata el proyecto y qué se busca lograr — le da contexto al equipo"
-              />
             </Campo>
 
             <div className="grid grid-cols-2 gap-4">
               <Campo label="Fecha de inicio">
                 <input type="date" value={proyectoData.fechaInicio} onChange={(e) => setProyectoData({ ...proyectoData, fechaInicio: e.target.value })} className={inputCls} />
               </Campo>
-              <Campo label="Fecha estimada de entrega *">
-                <input type="date" value={proyectoData.fechaEstimadaEntrega} onChange={(e) => setProyectoData({ ...proyectoData, fechaEstimadaEntrega: e.target.value })} className={inputCls} />
-              </Campo>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={proyectoData.anticipoConfirmado}
-                onChange={(e) => setProyectoData({ ...proyectoData, anticipoConfirmado: e.target.checked })}
-                className="accent-brand-500 w-4 h-4"
-              />
-              <span className="text-sm font-medium text-slate-700">Anticipo confirmado</span>
-              {!proyectoData.anticipoConfirmado && (
-                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">El proyecto no se activará sin anticipo</span>
+              {!propuestaId && (
+                <Campo label="Fecha estimada de entrega">
+                  <input type="date" value={proyectoData.fechaEstimadaEntrega} onChange={(e) => setProyectoData({ ...proyectoData, fechaEstimadaEntrega: e.target.value })} className={inputCls} />
+                </Campo>
               )}
-            </label>
-
-            <h3 className="font-semibold text-slate-800 pt-2">Condiciones técnicas</h3>
-
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ['tieneDominio', '¿Ya tiene dominio?'],
-                ['tieneHosting', '¿Ya tiene hosting?'],
-                ['requiereCorreos', '¿Requiere correos corporativos?'],
-                ['requiereCloudflare', '¿Requiere Cloudflare?'],
-                ['requiereAnalytics', '¿Requiere Google Analytics?'],
-                ['requiereSearchConsole', '¿Requiere Search Console?'],
-                ['requiereCapacitacion', '¿Requiere capacitación?'],
-              ].map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={condiciones[key]}
-                    onChange={(e) => setCondiciones({ ...condiciones, [key]: e.target.checked })}
-                    className="accent-brand-500 w-4 h-4"
-                  />
-                  <span className="text-sm text-slate-700">{label}</span>
-                </label>
-              ))}
             </div>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={condiciones.requierePluginAdicional}
-                onChange={(e) => setCondiciones({ ...condiciones, requierePluginAdicional: e.target.checked })}
-                className="accent-brand-500 w-4 h-4"
-              />
-              <span className="text-sm text-slate-700">¿Requiere plugin adicional?</span>
-            </label>
-            {condiciones.requierePluginAdicional && (
-              <input
-                value={condiciones.pluginAdicionalNombre}
-                onChange={(e) => setCondiciones({ ...condiciones, pluginAdicionalNombre: e.target.value })}
-                className={inputCls}
-                placeholder="Nombre del plugin..."
-              />
-            )}
 
             <div className="flex justify-between pt-2">
               <button onClick={() => setPaso(1)} className="text-slate-500 hover:text-slate-700 text-sm px-4 py-2">← Atrás</button>
               <button
                 onClick={() => setPaso(3)}
-                disabled={!valido2}
+                disabled={!valido2 || cargandoPropuestas}
                 className="bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-slate-900 px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
               >
                 Siguiente →
@@ -633,7 +698,7 @@ export default function NuevoProyecto() {
               <div className="text-2xl mb-2">🎉</div>
               <h2 className="font-semibold text-emerald-800 text-lg">¡Proyecto creado!</h2>
               <p className="text-emerald-700 text-sm mt-1">
-                {nombreProyecto(proyectoCreado)} — {proyectoCreado.proyecto.paquete}
+                {nombreProyecto(proyectoCreado)}{proyectoCreado.proyecto.paquete ? ` — ${proyectoCreado.proyecto.paquete}` : ''}
               </p>
               {!proyectoCreado.proyecto.anticipoConfirmado && (
                 <p className="text-amber-700 text-sm mt-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
@@ -641,6 +706,13 @@ export default function NuevoProyecto() {
                 </p>
               )}
             </div>
+
+            {progresoIA && (
+              <ProgresoPlan
+                progreso={progresoIA}
+                onAbrir={() => navigate(`${base}/proyecto/${proyectoCreado.slug}`, { state: { tab: 'info' } })}
+              />
+            )}
 
             {proyectoCreado.driveRespuestasId && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-emerald-700">
@@ -713,6 +785,56 @@ export default function NuevoProyecto() {
         )}
       </div>
     </Layout>
+  )
+}
+
+function OpcionPropuesta({ activa, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+        activa ? 'border-brand-500 bg-brand-50 text-brand-800 font-medium' : 'border-slate-200 hover:border-slate-300 text-slate-700'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ProgresoPlan({ progreso, onAbrir }) {
+  const { etapa, fallo, mensaje } = progreso
+  const lineas = [
+    ['alcance', 'Importando la propuesta…', 'Propuesta importada'],
+    ['plan', 'La IA está armando el plan… (puede tardar un par de minutos)', 'Borrador del plan listo para revisar'],
+  ]
+  const orden = { alcance: 0, plan: 1, listo: 2 }
+  const actual = etapa === 'error' ? orden[fallo] : orden[etapa]
+  const terminado = etapa === 'listo' || etapa === 'error' || etapa === 'sin_permiso'
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-2">
+      <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Sparkles size={15} className="text-brand-600" /> Plan de trabajo</h3>
+      {etapa === 'sin_permiso' ? (
+        <p className="text-sm text-slate-500">Un admin puede importar la propuesta y generar el plan desde la pestaña Info del proyecto.</p>
+      ) : (
+        lineas.map(([clave, enCurso, hecho], i) => {
+          if (i > actual) return null
+          const falloAqui = etapa === 'error' && i === actual
+          return (
+            <p key={clave} className="flex items-center gap-2 text-sm text-slate-600">
+              {falloAqui ? <CircleAlert size={14} className="shrink-0" /> : i < actual ? <Check size={14} className="text-brand-700 shrink-0" /> : <Loader2 size={14} className="animate-spin shrink-0" />}
+              {falloAqui ? mensaje : i < actual ? hecho : enCurso}
+            </p>
+          )
+        })
+      )}
+      {etapa === 'error' && <p className="text-xs text-slate-400">Puedes reintentarlo desde la pestaña Info del proyecto.</p>}
+      {terminado && (
+        <button onClick={onAbrir} className="mt-1 bg-brand-500 hover:bg-brand-600 text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+          {etapa === 'listo' ? 'Revisar el plan →' : 'Abrir el proyecto →'}
+        </button>
+      )}
+    </div>
   )
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { RefreshCw, X, CheckCircle2 } from 'lucide-react'
-import { vincularFactura, desvincularFactura, sincronizarPagos, marcarPagadoDesdeInicio } from '../data/api'
+import { RefreshCw, X, CheckCircle2, Search } from 'lucide-react'
+import { vincularFactura, desvincularFactura, sincronizarPagos, marcarPagadoDesdeInicio, sugerenciasFacturas } from '../data/api'
 
 const ETIQUETA_ESTADO = {
   pendiente: 'Pendiente',
@@ -27,6 +27,9 @@ export default function PanelPagos({ proyecto, esAdmin, onCambio }) {
   const [destino, setDestino] = useState('anticipo')
   const [ocupado, setOcupado] = useState(false)
   const [error, setError] = useState('')
+  const [sugerencias, setSugerencias] = useState(null)
+  const [destinoSugerida, setDestinoSugerida] = useState({})
+  const sinAnticipo = !pagos.some((pg) => pg.destino === 'anticipo') && !proyecto.proyecto?.anticipoConfirmado && !pagadoDesdeInicio
 
   async function ejecutar(accion) {
     setOcupado(true)
@@ -47,6 +50,26 @@ export default function PanelPagos({ proyecto, esAdmin, onCambio }) {
     await ejecutar(async () => {
       await vincularFactura(proyecto.slug, numero.trim(), destino)
       setNumero('')
+    })
+  }
+
+  async function buscarSugerencias() {
+    setOcupado(true)
+    setError('')
+    try {
+      const { sugerencias: lista } = await sugerenciasFacturas(proyecto.slug)
+      setSugerencias(lista || [])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function ligarSugerida(facturaId) {
+    await ejecutar(async () => {
+      await vincularFactura(proyecto.slug, facturaId, destinoSugerida[facturaId] || 'anticipo')
+      setSugerencias((prev) => (prev || []).filter((s) => s.facturaId !== facturaId))
     })
   }
 
@@ -86,6 +109,53 @@ export default function PanelPagos({ proyecto, esAdmin, onCambio }) {
         <p className="text-sm text-slate-400 dark:text-ink-400">
           Liga la factura de Perfex del anticipo (y de las etapas que requieren pago) y Foco confirmará cada pago solo.
         </p>
+      )}
+
+      {esAdmin && sinAnticipo && sugerencias === null && (
+        <button onClick={buscarSugerencias} disabled={ocupado} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:text-ink-300">
+          <Search size={12} /> Buscar facturas del cliente
+        </button>
+      )}
+
+      {esAdmin && sinAnticipo && sugerencias?.length === 0 && (
+        <p className="text-xs text-slate-400 dark:text-ink-400">No encontré facturas recientes de este cliente en Perfex.</p>
+      )}
+
+      {esAdmin && sinAnticipo && sugerencias?.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-slate-500 dark:text-ink-300">Facturas sugeridas</p>
+          <ul className="divide-y divide-slate-100 dark:divide-ink-600">
+            {sugerencias.map((s) => (
+              <li key={s.facturaId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
+                <span className="font-medium text-slate-800 dark:text-ink-100">{s.numero}</span>
+                {s.fecha && <span className="text-xs text-slate-400 dark:text-ink-400">{s.fecha}</span>}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-ink-700 dark:text-ink-300">
+                  {ETIQUETA_ESTADO[s.estado] || s.estado}{s.estado === 'parcial' ? ` · ${s.porcentaje}%` : ''}
+                </span>
+                <span className="basis-full text-xs text-slate-500 dark:text-ink-300">{s.motivo}</span>
+                <div className="basis-full flex items-center gap-2">
+                  {fases.length > 0 && (
+                    <select
+                      value={destinoSugerida[s.facturaId] || 'anticipo'}
+                      onChange={(e) => setDestinoSugerida((prev) => ({ ...prev, [s.facturaId]: e.target.value }))}
+                      className="text-xs border border-slate-200 dark:border-ink-500 dark:bg-ink-900 rounded-lg px-2 py-1"
+                    >
+                      <option value="anticipo">Anticipo</option>
+                      {fases.map((f) => <option key={f.numero} value={`fase:${f.numero}`}>Etapa {f.numero} — {f.nombre}</option>)}
+                    </select>
+                  )}
+                  <button
+                    onClick={() => ligarSugerida(s.facturaId)}
+                    disabled={ocupado}
+                    className="text-xs bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-slate-900 font-medium px-2.5 py-1 rounded-lg"
+                  >
+                    {(destinoSugerida[s.facturaId] || 'anticipo') === 'anticipo' ? 'Ligar como anticipo' : 'Ligar a la etapa'}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {esAdmin && (

@@ -8,7 +8,7 @@ import { validarYNormalizarEquipo } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
-import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto } from '../lib/pagosPerfex.js'
+import { confirmarAnticipo, vincularFactura, desvincularFactura, marcarPagadoDesdeInicio, sincronizarPagosProyecto, sugerirFacturas } from '../lib/pagosPerfex.js'
 import { crmConfigurado } from '../lib/perfexClient.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
 import { iaConfigurada } from '../lib/ia.js'
@@ -87,8 +87,26 @@ router.get('/:slug', requireAuth, async (req, res) => {
   }
 })
 
+const HOSTING_VALIDOS = ['nosotros', 'propio', 'migra']
+
+function contextoTecnicoValido(valor) {
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return null
+  const texto = (v) => (typeof v === 'string' ? v.trim().slice(0, 200) : '')
+  const yaEsCliente = valor.yaEsCliente === true
+  const tieneDominio = valor.tieneDominio === true
+  const hosting = valor.hosting === undefined ? 'nosotros' : valor.hosting
+  if (!HOSTING_VALIDOS.includes(hosting)) return null
+  return {
+    yaEsCliente,
+    sitioActual: yaEsCliente ? texto(valor.sitioActual) : '',
+    tieneDominio,
+    dominio: tieneDominio ? texto(valor.dominio) : '',
+    hosting,
+  }
+}
+
 // POST /api/proyectos
-router.post('/', requireAuthOrApiKey, async (req, res) => {
+router.post('/',requireAuthOrApiKey, async (req, res) => {
   const { tipo, cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor, areas } = req.body
   if (areas !== undefined && !areasValidas(areas)) return res.status(400).json({ error: `areas inválido — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
   const { clienteId } = req.body
@@ -99,6 +117,21 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
     else delete proyecto.nombre
   } else if (proyecto) {
     delete proyecto.nombre
+  }
+  if (proyecto) {
+    if (proyecto.contextoTecnico !== undefined) {
+      const contexto = contextoTecnicoValido(proyecto.contextoTecnico)
+      if (!contexto) return res.status(400).json({ error: 'contextoTecnico inválido' })
+      proyecto.contextoTecnico = contexto
+    }
+    if (proyecto.propuestaId !== undefined && proyecto.propuestaId !== null && proyecto.propuestaId !== '') {
+      if (typeof proyecto.propuestaId !== 'string' || !/^\d{1,12}$/.test(proyecto.propuestaId.trim())) {
+        return res.status(400).json({ error: 'propuestaId inválido' })
+      }
+      proyecto.propuestaId = proyecto.propuestaId.trim()
+    } else {
+      delete proyecto.propuestaId
+    }
   }
   const slug = generarSlug(cliente.nombreComercial)
 
@@ -169,7 +202,9 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
           proyectoId: p.id,
           usuario: creadoPor || 'Admin',
           accion: 'Proyecto creado',
-          detalle: `Paquete: ${proyecto.paquete}`,
+          detalle: proyecto.paquete
+            ? `Paquete: ${proyecto.paquete}`
+            : proyecto.propuestaId ? `Desde la propuesta ${proyecto.propuestaId} del CRM` : (proyecto.nombre || ''),
         },
       })
 
@@ -557,6 +592,21 @@ router.post('/:slug/pagos', requireAdmin, async (req, res) => {
     if (err.status) return res.status(err.status).json({ error: err.message })
     console.error(err)
     res.status(500).json({ error: 'Error consultando la factura en el CRM' })
+  }
+})
+
+// GET /api/proyectos/:slug/pagos/sugerencias — facturas recientes del
+// cliente en Perfex que podrían ser el anticipo, ordenadas por coincidencia.
+router.get('/:slug/pagos/sugerencias', requireAdmin, async (req, res) => {
+  try {
+    const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
+    if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    if (!crmConfigurado()) return res.status(503).json({ error: 'El CRM no está configurado en el servidor' })
+    res.json({ sugerencias: await sugerirFacturas(p) })
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Error consultando las facturas en el CRM' })
   }
 })
 
