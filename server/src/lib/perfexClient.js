@@ -23,6 +23,8 @@
 // - GET  /proposals/{id}            → propuesta con items [{description,
 //                                     long_description, is_optional, is_selected}];
 //                                     las descripciones pueden traer precios
+// - GET  /proposals/search/{key}    → array (busca por empresa, asunto…); filtrar
+//                                     por rel_type 'customer' y rel_id
 // - Un WAF frontal devuelve 403 con caracteres como & % ? en el término de
 //   búsqueda — por eso terminoSeguro() los elimina antes de armar la URL.
 
@@ -69,6 +71,24 @@ export async function obtenerFactura(facturaId) {
 
 export async function obtenerPropuesta(propuestaId) {
   return req('GET', `/proposals/${encodeURIComponent(propuestaId)}`)
+}
+
+export async function buscarPropuestas(termino) {
+  const t = terminoSeguro(termino)
+  if (!t) return []
+  return (await req('GET', `/proposals/search/${encodeURIComponent(t)}`)) || []
+}
+
+// La API no filtra por cliente: se busca por el nombre de la empresa y se
+// queda solo con lo que pertenece a ese customer del CRM.
+export async function propuestasDeCliente(crmId, nombreEmpresa) {
+  const todas = await buscarPropuestas(nombreEmpresa)
+  return todas.filter((p) => p.rel_type === 'customer' && String(p.rel_id) === String(crmId))
+}
+
+export async function facturasDeCliente(crmId, nombreEmpresa) {
+  const todas = await buscarFacturas(nombreEmpresa)
+  return todas.filter((f) => String(f.clientid) === String(crmId))
 }
 
 export async function buscarFacturas(termino) {

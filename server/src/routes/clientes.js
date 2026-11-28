@@ -15,7 +15,9 @@ import {
   crearContacto,
   listarCustomers,
   invalidarCacheCustomers,
+  propuestasDeCliente,
 } from '../lib/perfexClient.js'
+import { quitarPrecios } from '../lib/alcancePerfex.js'
 
 const router = Router()
 
@@ -249,6 +251,38 @@ router.get('/:id', requireAuth, async (req, res) => {
     })
     if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' })
     res.json(cliente)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Error interno' })
+  }
+})
+
+const ESTADO_PROPUESTA = { 1: 'abierta', 2: 'rechazada', 3: 'aceptada', 4: 'enviada', 5: 'revisada', 6: 'borrador' }
+
+// GET /api/clientes/:id/propuestas — propuestas del cliente en Perfex para
+// elegir con cuál se arma el proyecto. Foco no maneja precios: sin totales.
+router.get('/:id/propuestas', requireAuth, async (req, res) => {
+  if (!crmConfigurado()) return crmNoConfigurado(res)
+  try {
+    const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id }, select: { crmId: true, nombreComercial: true } })
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' })
+    if (!cliente.crmId) return res.json([])
+    let propuestas
+    try {
+      propuestas = await propuestasDeCliente(cliente.crmId, cliente.nombreComercial)
+    } catch (err) {
+      console.error('Error consultando propuestas en el CRM:', err.message)
+      return res.status(502).json({ error: 'No se pudieron consultar las propuestas en el CRM' })
+    }
+    const lista = (propuestas || [])
+      .map((p) => ({
+        id: String(p.id),
+        titulo: quitarPrecios(p.subject || '') || `Propuesta ${p.id}`,
+        fecha: p.date || null,
+        estado: ESTADO_PROPUESTA[Number(p.status)] || 'desconocido',
+      }))
+      .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || Number(b.id) - Number(a.id))
+    res.json(lista)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Error interno' })

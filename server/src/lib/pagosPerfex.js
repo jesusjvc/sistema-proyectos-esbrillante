@@ -1,5 +1,5 @@
 import prisma from './prisma.js'
-import { obtenerFactura, buscarFacturas } from './perfexClient.js'
+import { obtenerFactura, buscarFacturas, obtenerPropuesta, facturasDeCliente, obtenerCustomer } from './perfexClient.js'
 import { activarTareasClienteDisponibles } from './tareaHelpers.js'
 import { logEntry } from './logEntry.js'
 import { emitirCambio } from './eventos.js'
@@ -57,16 +57,21 @@ export async function confirmarAnticipo(proyecto, usuario, detalle = '') {
   await activarTareasClienteDisponibles(proyecto.id)
 }
 
-// Aplica los efectos de las facturas ya pagadas: anticipo → proyecto activo;
-// fase → pagoConfirmado. Nunca revierte un pago ya confirmado aunque la
-// factura cambie después en Perfex.
+// Aplica los efectos de las facturas pagadas: anticipo → proyecto activo;
+// fase → pagoConfirmado. El anticipo basta con el primer abono, porque a veces
+// una sola factura se va pagando en partes hasta finiquitar; una fase sí
+// espera a que su factura quede pagada. Nunca revierte un pago ya confirmado
+// aunque la factura cambie después en Perfex.
 async function aplicarPagos(proyecto, usuario) {
   const pagos = proyecto.proyecto?.pagos || []
   let cambio = false
 
-  const anticipoPagado = pagos.find((pg) => pg.destino === 'anticipo' && pg.estado === 'pagada')
+  const anticipoPagado = pagos.find((pg) => pg.destino === 'anticipo' && pg.estado !== 'cancelada' && (pg.estado === 'pagada' || pg.porcentaje > 0))
   if (anticipoPagado && !proyecto.proyecto.anticipoConfirmado) {
-    await confirmarAnticipo(proyecto, usuario, `Factura ${anticipoPagado.numero} pagada en Perfex`)
+    const detalle = anticipoPagado.estado === 'pagada'
+      ? `Factura ${anticipoPagado.numero} pagada en Perfex`
+      : `Factura ${anticipoPagado.numero}: primer pago registrado en Perfex`
+    await confirmarAnticipo(proyecto, usuario, detalle)
     cambio = true
   }
 
@@ -181,11 +186,132 @@ export async function sincronizarPagosProyecto(proyecto, usuario = 'Perfex') {
 export async function sincronizarPagosPerfex() {
   const proyectos = await prisma.proyecto.findMany({ where: { status: { in: ['pendiente_anticipo', 'activo', 'en_pausa'] } } })
   for (const p of proyectos) {
-    if (!(p.proyecto?.pagos || []).length) continue
     try {
+      if (p.status === 'pendiente_anticipo') await ligarFacturaDePropuesta(p)
+      if (!(p.proyecto?.pagos || []).length) continue
       await sincronizarPagosProyecto(p)
     } catch (err) {
       console.error(`Error sincronizando pagos de Perfex en ${p.slug}:`, err.message)
     }
   }
+}
+
+function propuestaDelProyecto(proyecto) {
+  return proyecto.proyecto?.alcance?.propuestaId || proyecto.proyecto?.propuestaId || null
+}
+
+// Cuando la propuesta se convierte en factura desde Perfex, la propuesta
+// guarda su invoice_id: esa es la factura del anticipo, sin que nadie la ligue.
+export async function ligarFacturaDePropuesta(proyecto, usuario = 'Perfex') {
+  const pagos = proyecto.proyecto?.pagos || []
+  if (proyecto.proyecto?.anticipoConfirmado || pagos.some((pg) => pg.destino === 'anticipo')) return null
+  const propuestaId = propuestaDelProyecto(proyecto)
+  if (!propuestaId) return null
+  const propuesta = await obtenerPropuesta(propuestaId)
+  const facturaId = propuesta?.invoice_id ? String(propuesta.invoice_id) : ''
+  if (!facturaId || facturaId === '0' || pagos.some((pg) => pg.facturaId === facturaId)) return null
+  return vincularFactura(proyecto, { numero: facturaId, destino: 'anticipo' }, usuario)
+}
+
+const FRACCIONES_ANTICIPO = [0.5, 0.3, 0.4, 0.6, 0.7]
+const MAX_DETALLES = 10
+const MAX_SUGERENCIAS = 5
+
+function palabrasClave(items) {
+  const palabras = new Set()
+  for (const it of items || []) {
+    const texto = `${it.description || ''} ${it.long_description || ''}`
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    for (const p of texto.split(/[^a-z0-9]+/)) {
+      // Fuera números y palabras cortas: los precios y "de/con/para" no dicen nada.
+      if (p.length >= 4 && !/^\d+$/.test(p)) palabras.add(p)
+    }
+  }
+  return palabras
+}
+
+function cercano(valor, esperado) {
+  return esperado > 0 && Math.abs(valor - esperado) <= esperado * 0.01
+}
+
+// Heurística determinista para encontrar la factura del anticipo cuando no
+// salió de convertir la propuesta (p. ej. creada aparte desde el MCP). Los
+// montos solo se comparan aquí: nunca salen en la respuesta.
+export async function sugerirFacturas(proyecto) {
+  if (!proyecto.clienteId) return []
+  const cliente = await prisma.cliente.findUnique({ where: { id: proyecto.clienteId }, select: { crmId: true, nombreComercial: true } })
+  if (!cliente?.crmId) return []
+  const crmId = String(cliente.crmId)
+
+  let lista = await facturasDeCliente(crmId, cliente.nombreComercial)
+  if (!lista.length) {
+    // El nombre en Foco puede no coincidir con la empresa en Perfex.
+    const customer = await obtenerCustomer(crmId).catch(() => null)
+    if (customer?.company && customer.company !== cliente.nombreComercial) lista = await facturasDeCliente(crmId, customer.company)
+  }
+
+  const ligadas = new Set((proyecto.proyecto?.pagos || []).map((pg) => String(pg.facturaId)))
+  const candidatas = lista
+    .filter((f) => !ligadas.has(String(f.id)))
+    .filter((f) => !['cancelada', 'borrador'].includes(estadoFactura(f).estado))
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || Number(b.id) - Number(a.id))
+    .slice(0, MAX_DETALLES)
+  if (!candidatas.length) return []
+
+  const propuestaId = propuestaDelProyecto(proyecto)
+  const propuesta = propuestaId ? await obtenerPropuesta(propuestaId).catch(() => null) : null
+  const totalPropuesta = Number(propuesta?.total) || 0
+  const fechaPropuesta = propuesta?.date ? String(propuesta.date).slice(0, 10) : ''
+  const palabrasPropuesta = palabrasClave(propuesta?.items)
+
+  const detalles = await Promise.all(candidatas.map((f) => obtenerFactura(f.id).catch(() => null)))
+  const puntuadas = candidatas.map((resumen, i) => {
+    const f = detalles[i] || resumen
+    const total = Number(f.total) || 0
+    const fecha = String(f.date || resumen.date || '').slice(0, 10)
+    const motivos = []
+    let puntos = 0
+
+    if (totalPropuesta > 0 && cercano(total, totalPropuesta)) {
+      puntos += 3
+      motivos.push('Mismo total que la propuesta')
+    } else if (totalPropuesta > 0) {
+      const fraccion = FRACCIONES_ANTICIPO.find((fr) => cercano(total, totalPropuesta * fr))
+      if (fraccion) {
+        puntos += 2
+        motivos.push(`Coincide con el ${Math.round(fraccion * 100)}% de la propuesta`)
+      }
+    }
+
+    if (palabrasPropuesta.size) {
+      const propias = palabrasClave(f.items)
+      const comunes = [...propias].filter((p) => palabrasPropuesta.has(p)).length
+      const parecido = propias.size ? comunes / Math.min(propias.size, palabrasPropuesta.size) : 0
+      if (comunes >= 2 && parecido >= 0.3) {
+        puntos += 1 + parecido
+        motivos.push(motivos.length ? 'conceptos parecidos' : 'Conceptos parecidos a la propuesta')
+      }
+    }
+
+    const posterior = !fechaPropuesta || !fecha || fecha >= fechaPropuesta
+    if (!posterior) motivos.push(motivos.length ? 'anterior a la propuesta' : 'Anterior a la propuesta')
+    if (!motivos.length) motivos.push('Factura reciente del cliente')
+
+    return {
+      puntos,
+      posterior,
+      sugerencia: {
+        facturaId: String(f.id),
+        numero: f.formatted_number || String(f.id),
+        fecha,
+        ...estadoFactura(f),
+        motivo: motivos.join(' · '),
+      },
+    }
+  })
+
+  return puntuadas
+    .sort((a, b) => (b.posterior - a.posterior) || (b.puntos - a.puntos) || b.sugerencia.fecha.localeCompare(a.sugerencia.fecha))
+    .slice(0, MAX_SUGERENCIAS)
+    .map((p) => p.sugerencia)
 }

@@ -38,6 +38,15 @@ Reglas:
 - Si el proyecto ya tiene fases, usa esos números de fase. Si no, propón fases cortas y claras. Si el proyecto es continuo, usa solo la fase 1.
 - No repitas tareas que ya existen en el proyecto.
 - Lista en "supuestos" lo que diste por hecho y en "preguntas" lo que hay que confirmar con el cliente o con el admin.
+- La agencia ya construye los sitios con Astro y stacks modernos, no con WordPress: no propongas tareas de WordPress (plugins, temas, instalación) salvo que el alcance lo pida.
+
+Contexto técnico ("contextoTecnico") en proyectos web:
+- Siempre incluye dar de alta Google Analytics (GA4) y Search Console, aunque el alcance no lo mencione.
+- hosting "nosotros": incluye configurar el sitio en nuestro hosting con Cloudflare (DNS, SSL).
+- hosting "migra": incluye migrar el hosting y el dominio del cliente a nuestros servidores (con Cloudflare).
+- hosting "propio": no incluyas tareas de hosting, pero sí una tarea para coordinar con el cliente el acceso a su DNS.
+- yaEsCliente=true: su sitio actual (sitioActual) es el punto de partida — es migración o rediseño: incluye extraer y reutilizar su contenido.
+- tieneDominio=false: incluye proponerle opciones de dominio y registrarlo; el cliente elige (tarea del cliente para elegir).
 
 Responde SOLO con JSON válido, sin texto adicional, con esta forma:
 {"fases":[{"numero":1,"nombre":"..."}],"tareas":[{"ref":"t1","titulo":"...","fase":1,"responsable":"programador","esCliente":false,"descripcion":"...","queEntregas":"...","instruccionesCliente":"","dependencias":[],"duracionDias":2,"ejecutor":"humano","agenteSugerido":""}],"supuestos":["..."],"preguntas":["..."]}`
@@ -67,6 +76,7 @@ function contextoDelProyecto(proyecto, tareasExistentes, plantillas) {
     pendientesDeConfirmar_noPlanearTodavia: conceptos.filter((c) => c.estado === 'por_confirmar').map(texto),
     fasesExistentes: esContinuo ? [] : (proyecto.proyecto?.fases || []).map(({ numero, nombre }) => ({ numero, nombre })),
     tareasQueYaExisten: tareasExistentes.slice(0, 80).map((t) => t.titulo),
+    contextoTecnico: proyecto.proyecto?.contextoTecnico || null,
     plantillasDeLaAgencia: plantillas,
   }
 }
@@ -207,6 +217,84 @@ export async function generarBorradorPlan(proyecto, usuario) {
   return borradorPlan
 }
 
+function esDiaHabil(fecha) {
+  const dia = fecha.getUTCDay()
+  return dia !== 0 && dia !== 6
+}
+
+function hoyEnMexico() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
+}
+
+// Fecha del n-ésimo día hábil contando `inicio` como el día 1 (si cae en fin
+// de semana, el día 1 es el lunes siguiente).
+function diaHabil(inicio, n) {
+  const fecha = new Date(`${inicio}T00:00:00Z`)
+  while (!esDiaHabil(fecha)) fecha.setUTCDate(fecha.getUTCDate() + 1)
+  for (let restantes = n - 1; restantes > 0;) {
+    fecha.setUTCDate(fecha.getUTCDate() + 1)
+    if (esDiaHabil(fecha)) restantes--
+  }
+  return fecha.toISOString().slice(0, 10)
+}
+
+// Camino crítico: cada tarea termina `duracionDias` hábiles después de que
+// termina la última de sus dependencias. Acepta tareas con `id` o `ref`.
+export function calcularFechasPlan(tareas, inicio) {
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(inicio || '') ? inicio : hoyEnMexico()
+  const porId = new Map((tareas || []).map((t) => [String(t.id ?? t.ref), t]))
+  const dias = new Map()
+  const enCurso = new Set()
+  function diasHasta(id) {
+    if (dias.has(id)) return dias.get(id)
+    if (enCurso.has(id)) return 0
+    enCurso.add(id)
+    const t = porId.get(id)
+    const previas = (t.dependencias || []).map(String).filter((d) => porId.has(d)).map(diasHasta)
+    const total = Math.max(0, ...previas) + Math.max(1, Math.round(Number(t.duracionDias) || 1))
+    enCurso.delete(id)
+    dias.set(id, total)
+    return total
+  }
+  const porTarea = {}
+  let maximo = 0
+  for (const id of porId.keys()) {
+    const total = diasHasta(id)
+    porTarea[id] = diaHabil(base, total)
+    maximo = Math.max(maximo, total)
+  }
+  return { inicio: base, porTarea, fin: maximo ? diaHabil(base, maximo) : null }
+}
+
+// Solo se llenan fechas vacías o que siguen siendo las que se calcularon la
+// vez anterior (`fechasCalculadas`); una fecha que puso una persona no se toca.
+function fechasEstimadasDelPlan(datos, filas) {
+  const { porTarea, fin } = calcularFechasPlan(filas, datos.fechaInicio)
+  if (!fin) return datos
+  const previas = datos.fechasCalculadas && typeof datos.fechasCalculadas === 'object' ? datos.fechasCalculadas : {}
+  const libre = (actual, calculadaAntes) => !actual || actual === calculadaAntes
+  const calculadas = { entrega: previas.entrega || null, fases: { ...(previas.fases || {}) } }
+  const resultado = { ...datos }
+
+  if (libre(datos.fechaEstimadaEntrega, previas.entrega)) {
+    resultado.fechaEstimadaEntrega = fin
+    calculadas.entrega = fin
+  }
+  const finPorFase = new Map()
+  for (const f of filas) {
+    const fecha = porTarea[String(f.id)]
+    if (fecha && (!finPorFase.has(f.fase) || fecha > finPorFase.get(f.fase))) finPorFase.set(f.fase, fecha)
+  }
+  resultado.fases = (datos.fases || []).map((fase) => {
+    const fecha = finPorFase.get(fase.numero)
+    if (!fecha || !libre(fase.fechaEstimada, calculadas.fases[fase.numero])) return fase
+    calculadas.fases[fase.numero] = fecha
+    return { ...fase, fechaEstimada: fecha }
+  })
+  resultado.fechasCalculadas = calculadas
+  return resultado
+}
+
 export async function aplicarBorradorPlan(proyecto, { excluirRefs = [] } = {}, usuario) {
   // Todo dentro de una transacción con la fila bloqueada: dos "aplicar" al
   // mismo tiempo (panel y MCP) no deben crear las tareas dos veces.
@@ -259,7 +347,7 @@ export async function aplicarBorradorPlan(proyecto, { excluirRefs = [] } = {}, u
     })
 
     const { borradorPlan: _descartado, ...resto } = actual.proyecto
-    const datosProyecto = esContinuo ? resto : { ...resto, fases }
+    const datosProyecto = esContinuo ? resto : fechasEstimadasDelPlan({ ...resto, fases }, filas)
     await tx.tarea.createMany({ data: filas })
     await tx.proyecto.update({ where: { id: actual.id }, data: { proyecto: datosProyecto } })
     return { filas, datosProyecto }

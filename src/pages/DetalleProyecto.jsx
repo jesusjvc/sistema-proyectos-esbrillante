@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import Layout from '../components/Layout'
 import SelectorProyecto from '../components/SelectorProyecto'
 import { useAuth } from '../context/AuthContext'
@@ -60,7 +60,8 @@ export default function DetalleProyecto() {
   const [faseAbierta, setFaseAbierta] = useState(null)
   const [faseOcultarCompletadas, setFaseOcultarCompletadas] = useState({})
   const [buscarTarea, setBuscarTarea] = useState('')
-  const [tab, setTab] = useState('tareas')
+  const location = useLocation()
+  const [tab, setTab] = useState(location.state?.tab || 'tareas')
   const [notas, setNotas] = useState([])
   const [faseNuevaVisible, setFaseNuevaVisible] = useState(false)
   const [nombreFaseNueva, setNombreFaseNueva] = useState('')

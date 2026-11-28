@@ -45,6 +45,7 @@ export const confirmarAnticipo = (slug) => req('POST', `/api/proyectos/${slug}/a
 export const vincularFactura = (slug, numero, destino) => req('POST', `/api/proyectos/${slug}/pagos`, { numero, destino })
 export const desvincularFactura = (slug, facturaId) => req('DELETE', `/api/proyectos/${slug}/pagos/${facturaId}`)
 export const sincronizarPagos = (slug) => req('POST', `/api/proyectos/${slug}/pagos/sincronizar`)
+export const sugerenciasFacturas = (slug) => req('GET', `/api/proyectos/${slug}/pagos/sugerencias`)
 export const marcarPagadoDesdeInicio = (slug) => req('POST', `/api/proyectos/${slug}/pagado-desde-inicio`)
 export const importarAlcance = (slug, propuesta) => req('POST', `/api/proyectos/${slug}/alcance`, { propuesta })
 export const actualizarConceptoAlcance = (slug, conceptoId, estado) => req('PUT', `/api/proyectos/${slug}/alcance/conceptos/${conceptoId}`, { estado })
@@ -72,6 +73,7 @@ export const asignarCorreo = (id, data) => req('POST', `/api/integraciones/corre
 export const descartarCorreo = (id) => req('POST', `/api/integraciones/correo/${id}/descartar`)
 export const getClientes = () => req('GET', '/api/clientes')
 export const getCliente = (id) => req('GET', `/api/clientes/${id}`)
+export const getPropuestasCliente = (id) => req('GET', `/api/clientes/${id}/propuestas`)
 // El CRM es la fuente obligatoria de clientes: buscar en el CRM,
 // importar de ahí, o dar de alta primero en el CRM y luego vincular.
 export const buscarClientesCrm = (q) => req('GET', `/api/clientes/crm/buscar?q=${encodeURIComponent(q)}`)
