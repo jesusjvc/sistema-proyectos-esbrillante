@@ -27,6 +27,9 @@ function MetaTarea({ tarea, equipo, miembrosPorId, esperaA }) {
       ) : (
         <span className="px-1.5 py-0.5 rounded bg-brand-100 dark:bg-brand-500/15 text-brand-800 dark:text-brand-300 font-medium">Nosotros</span>
       )}
+      {!tarea.esCliente && tarea.ejecutor === 'agente' && (
+        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-white dark:bg-ink-600 dark:text-ink-100 font-medium">Agente</span>
+      )}
       {responsable?.label && (
         <span className="text-slate-500 dark:text-ink-300">{responsable.nombre || responsable.label}</span>
       )}

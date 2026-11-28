@@ -40,6 +40,7 @@ import EtiquetasProyecto from '../components/EtiquetasProyecto'
 import FechaEntregaProyecto from '../components/FechaEntregaProyecto'
 import PanelPagos from '../components/PanelPagos'
 import PanelAlcance from '../components/PanelAlcance'
+import PanelPlanIA from '../components/PanelPlanIA'
 import HiloComentarios from '../components/HiloComentarios'
 import SelectorResponsableRapido from '../components/SelectorResponsableRapido'
 import IconGoogleDrive from '../components/IconGoogleDrive'
@@ -1083,6 +1084,12 @@ export default function DetalleProyecto() {
           <InfoCard titulo="Alcance contratado" icono={<FileText size={14} />} fullWidth>
             <PanelAlcance proyecto={proyecto} esAdmin={esAdminRol} onCambio={refresh} />
           </InfoCard>
+
+          {esAdminRol && proyecto.proyecto?.alcance && (
+            <InfoCard titulo="Plan de trabajo con IA" icono={<Sparkles size={14} />} fullWidth>
+              <PanelPlanIA proyecto={proyecto} onCambio={refresh} />
+            </InfoCard>
+          )}
 
           <InfoCard titulo="Pagos" icono={<CreditCard size={14} />} fullWidth>
             <PanelPagos proyecto={proyecto} esAdmin={esAdminRol} onCambio={refresh} />

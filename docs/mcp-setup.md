@@ -121,6 +121,8 @@ Guarda el slug que devuelva — todas las demás tools lo piden como primer argu
 | `vincular_factura(slug, numero?, destino?, pagadoDesdeInicio?)` | Ligar una factura de Perfex (ej. `EB-002481`) al `anticipo` o a `fase:<n>`. Foco guarda solo estado y % pagado, revisa Perfex cada hora y confirma solo el anticipo (activa el proyecto) o la fase (la desbloquea). `pagadoDesdeInicio=true` marca todo como pagado. Solo admins |
 | `importar_alcance(slug, propuesta)` | Traer de Perfex lo que el cliente contrató (número `PROEB-000467`, id o link de la propuesta), **sin precios**. Los addons opcionales quedan `por_confirmar`. Es la base para armar el plan. Solo admins |
 | `actualizar_alcance(slug, conceptoId, estado)` | Confirmar o descartar un addon del alcance (`confirmado`, `descartado`, `por_confirmar`). `ver_proyecto` muestra el alcance y los pagos. Solo admins |
+| `generar_plan_ia(slug)` | La IA interna propone el plan de trabajo desde el alcance contratado: fases, tareas con dependencias, cliente o equipo, si la ejecuta un agente (Claude Code, OpenCode), días, supuestos y preguntas. Solo deja un **borrador**, no crea tareas. Solo admins |
+| `aplicar_plan_ia(slug, excluirRefs?)` | Crear las tareas del borrador, dejando fuera las refs indicadas; agrega las fases que falten y borra el borrador. Solo admins |
 | `nota_interna(slug, mensaje)` | Nota libre solo para el panel admin, nunca visible al cliente |
 | `nota_status(slug, texto)` | Nota en el hilo de "Status" del proyecto (tab Status, visible al equipo) — la bitácora de qué ha pasado y por qué sigue atorado |
 | `listar_plantillas` | Checklists base por paquete (fases, tareas, dependencias) — consultar antes de crear un proyecto de un paquete conocido |
