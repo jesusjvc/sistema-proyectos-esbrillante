@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { calcularAvance, getFaseActual, calcularTiempos, formatoDuracion, formatFecha, formatFechaHora, statusBadge, statusLabel, contarPendientesCliente } from '../data/storage'
+import { calcularAvance, getFaseActual, calcularTiempos, formatoDuracion, formatFecha, formatFechaHora, statusBadge, statusLabel, contarPendientesCliente, nombreProyecto } from '../data/storage'
 import { FASES_WEB } from '../data/plantillas'
 import { KANBAN_COLUMNAS, contarPorColumna } from '../data/kanban'
 import { generarMensajeInicio } from '../data/mensajes'
@@ -1053,7 +1053,7 @@ export default function DetalleProyecto() {
       {/* ─── Modal: Eliminar proyecto ─── */}
       {modalEliminar && (
         <ModalEliminarProyecto
-          nombre={proyecto.cliente.nombreComercial}
+          nombre={nombreProyecto(proyecto)}
           onConfirmar={handleEliminarProyecto}
           onCerrar={() => setModalEliminar(false)}
         />

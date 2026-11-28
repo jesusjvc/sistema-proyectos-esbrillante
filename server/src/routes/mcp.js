@@ -302,7 +302,7 @@ function buildServer(usuario, baseProto) {
     'listar_proyectos',
     {
       title: 'Listar proyectos',
-      description: 'Lista los proyectos activos (excluye los que aún no confirman anticipo) con su slug, cliente, paquete, status, tipo, cuántas tareas tiene pendientes el cliente y si respondió algo que el admin todavía no ha visto — útil para priorizar en qué proyecto hace falta dar seguimiento. Proyectos "finito" incluyen % de avance; proyectos "continuo" incluyen en su lugar el conteo de tarjetas por columna del tablero Kanban (columnas).',
+      description: 'Lista los proyectos activos (excluye los que aún no confirman anticipo) con su slug, cliente, nombre del proyecto (si tiene), paquete, status, tipo, cuántas tareas tiene pendientes el cliente y si respondió algo que el admin todavía no ha visto — útil para priorizar en qué proyecto hace falta dar seguimiento. Proyectos "finito" incluyen % de avance; proyectos "continuo" incluyen en su lugar el conteo de tarjetas por columna del tablero Kanban (columnas).',
       inputSchema: {},
     },
     async () => {
@@ -321,6 +321,7 @@ function buildServer(usuario, baseProto) {
         return {
           slug: p.slug,
           cliente: p.cliente?.nombreComercial || '(sin nombre)',
+          ...(p.proyecto?.nombre ? { nombre: p.proyecto.nombre } : {}),
           paquete: p.proyecto?.paquete || '(sin paquete)',
           etiquetas: p.etiquetas,
           status: p.status,
@@ -342,6 +343,7 @@ function buildServer(usuario, baseProto) {
       description: 'Da de alta un proyecto nuevo en el Sistema de Seguimiento para poder empezar a reportarle avance. No confirma pagos ni cierra proyectos: anticipoConfirmado es solo informativo (si es false, el proyecto queda en status "pendiente_anticipo" hasta que se confirme desde el panel admin). La respuesta incluye el slug, la contraseña del portal del cliente, y urlPortalCliente — el link PRINCIPAL para compartir con el cliente: YA incluye el token de acceso directo, así que entra sin pedir contraseña (ej. "https://proyectosweb.esbrillante.mx/cliente/{slug}?token=..."). urlPortalClienteConContrasena es el link alterno sin token, para cuando prefieras compartir usuario+contraseña en vez de un link. No hace falta construir ninguno manualmente. Soporta dos tipos de proyecto (parámetro tipo): "finito" (default, con fases y fecha de entrega) o "continuo" (servicio recurrente sin fecha de cierre, gestionado con un tablero Kanban de columnas Todo/Doing/Revisión/Done — en ese caso se ignoran fases y fechaEstimadaEntrega; usa registrar_actividad/solicitar_al_cliente con el parámetro columna, y mover_a_revision, para trabajar sobre el tablero). Para un proyecto que corresponda a un paquete conocido (no un caso muy a medida), usa listar_plantillas primero y pasa plantillaId aquí — así el proyecto arranca con el checklist real de actividades core y sus dependencias correctas, en vez de tener que inventarlas una por una con registrar_actividad/solicitar_al_cliente después.',
       inputSchema: {
         clienteNombre: z.string().describe('Nombre comercial del cliente'),
+        nombre: z.string().optional().describe('Nombre del proyecto, distinto del cliente (ej. "Sitio Web", "SEO mensual"). Se muestra como "Cliente · Nombre" y distingue varios proyectos del mismo cliente.'),
         contactoNombre: z.string().optional().describe('Nombre del contacto principal del cliente'),
         correo: z.string().optional().describe('Correo del contacto principal'),
         paquete: z.string().optional().describe('Nombre del paquete/tipo de proyecto. Default: "Personalizado"'),
@@ -373,7 +375,7 @@ function buildServer(usuario, baseProto) {
         driveFolderId: z.string().optional().describe('ID de una carpeta de Drive YA EXISTENTE para usar como carpeta del proyecto (ej. si el cliente ya compartió una carpeta propia) — si se omite, el sistema crea una carpeta nueva automáticamente (requiere Drive configurado en el servidor). Es el ID de la carpeta, no la URL completa. Visible después con ver_proyecto como driveFolderUrl, y listable con listar_archivos_drive_proyecto.'),
       },
     },
-    async ({ clienteNombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo, areas, driveFolderId }) => {
+    async ({ clienteNombre, nombre, contactoNombre, correo, paquete, descripcion, tipo, fases, fechaInicio, fechaEstimadaEntrega, anticipoConfirmado, passwordCliente, plantillaId, condicionesTecnicas, extras, equipo, areas, driveFolderId }) => {
       const slug = generarSlug(clienteNombre)
       const tipoFinal = tipo === 'continuo' ? 'continuo' : 'finito'
       const password = passwordCliente || generarPasswordSimple()
@@ -414,6 +416,7 @@ function buildServer(usuario, baseProto) {
             cliente: { nombreComercial: clienteNombre, contactoNombre: contactoNombre || '', correo: correo || '', whatsapp: '', participantes: [] },
             proyecto: {
               paquete: paqueteFinal,
+              ...(nombre?.trim() ? { nombre: nombre.trim().slice(0, 80) } : {}),
               descripcion: descripcion || '',
               fases: fasesFinal,
               extras: extras || [],
@@ -705,10 +708,11 @@ function buildServer(usuario, baseProto) {
   server.registerTool(
     'editar_proyecto',
     {
-      title: 'Editar descripción, info clave, fecha de entrega o carpeta de Drive del proyecto',
-      description: 'Actualiza la descripción libre del proyecto, su información clave, su fecha estimada de entrega y/o su carpeta de Drive asociada. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). infoClave reemplaza por completo la info clave (dominio, grupoWhatsapp, extras) — lee ver_proyecto primero y manda el objeto completo. fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
+      title: 'Editar nombre, descripción, info clave, fecha de entrega o carpeta de Drive del proyecto',
+      description: 'Actualiza el nombre del proyecto (ej. "Sitio Web", se muestra como "Cliente · Nombre"), la descripción libre del proyecto, su información clave, su fecha estimada de entrega y/o su carpeta de Drive asociada. Manda solo los campos que quieras cambiar — no toca los que omitas. La descripción se sobreescribe por completo (no se concatena). infoClave reemplaza por completo la info clave (dominio, grupoWhatsapp, extras) — lee ver_proyecto primero y manda el objeto completo. fechaEstimadaEntrega no aplica a proyectos "continuo" (no tienen fecha de cierre); para la fecha de una fase puntual usa actualizar_fase.',
       inputSchema: {
         slug: z.string().describe('Slug o ID del proyecto'),
+        nombre: z.string().optional().describe('Nuevo nombre del proyecto, sin el nombre del cliente (ej. "Sitio Web", "SEO mensual"), máx. 80 caracteres. Pasa "" para quitarlo y mostrar solo el nombre del cliente.'),
         descripcion: z.string().optional().describe('Nueva descripción del proyecto'),
         fechaEstimadaEntrega: z.string().optional().describe('Nueva fecha estimada de entrega, formato YYYY-MM-DD. Solo aplica a proyectos "finito".'),
         infoClave: z.object({
@@ -725,9 +729,9 @@ function buildServer(usuario, baseProto) {
         driveFolderId: z.string().nullable().optional().describe('ID de la carpeta de Drive del proyecto (no la URL completa). Pasa "" o null para quitar la asociación actual. No crea la carpeta — solo la vincula; para crear una automáticamente, omite este campo al usar crear_proyecto.'),
       },
     },
-    async ({ slug, descripcion, fechaEstimadaEntrega, infoClave, driveFolderId }) => {
-      if (descripcion === undefined && fechaEstimadaEntrega === undefined && infoClave === undefined && driveFolderId === undefined) {
-        return fail('Manda al menos descripcion, fechaEstimadaEntrega, infoClave o driveFolderId.')
+    async ({ slug, nombre, descripcion, fechaEstimadaEntrega, infoClave, driveFolderId }) => {
+      if (nombre === undefined && descripcion === undefined && fechaEstimadaEntrega === undefined && infoClave === undefined && driveFolderId === undefined) {
+        return fail('Manda al menos nombre, descripcion, fechaEstimadaEntrega, infoClave o driveFolderId.')
       }
       if (infoClave?.grupos !== undefined) {
         const invalidos = infoClave.grupos.filter((g) => !g || !String(g.nombre || '').trim())
@@ -741,6 +745,7 @@ function buildServer(usuario, baseProto) {
       }
 
       const cambios = {}
+      if (nombre !== undefined) cambios.nombre = nombre.trim().slice(0, 80)
       if (descripcion !== undefined) cambios.descripcion = descripcion
       if (fechaEstimadaEntrega !== undefined) cambios.fechaEstimadaEntrega = fechaEstimadaEntrega
       if (infoClave !== undefined) {
@@ -772,7 +777,7 @@ function buildServer(usuario, baseProto) {
         },
       })
 
-      const detalleCampos = Object.keys(cambios).map((c) => c === 'descripcion' ? 'descripción' : c === 'infoClave' ? 'info clave' : `entrega → ${fechaEstimadaEntrega}`)
+      const detalleCampos = Object.keys(cambios).map((c) => c === 'nombre' ? `nombre → ${cambios.nombre || '(sin nombre)'}` : c === 'descripcion' ? 'descripción' : c === 'infoClave' ? 'info clave' : `entrega → ${fechaEstimadaEntrega}`)
       if (driveFolderId !== undefined) detalleCampos.push(driveFolderId ? 'carpeta de Drive' : 'carpeta de Drive removida')
       const detalle = detalleCampos.join(', ')
       await logEntry(p.id, usuario.nombre, 'Proyecto editado', detalle)
@@ -809,6 +814,7 @@ function buildServer(usuario, baseProto) {
         urlPortalClienteConContrasena: urlPortalClienteConContrasena(p.slug),
         tipo: p.tipo,
         cliente: p.cliente?.nombreComercial || '(sin nombre)',
+        ...(p.proyecto?.nombre ? { nombre: p.proyecto.nombre } : {}),
         paquete: p.proyecto?.paquete || '(sin paquete)',
         etiquetas: p.etiquetas,
         descripcion: p.proyecto?.descripcion || null,

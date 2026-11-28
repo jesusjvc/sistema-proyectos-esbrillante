@@ -621,3 +621,9 @@ export function statusLabel(status) {
   const m = { activo: 'Activo', en_pausa: 'En pausa', pendiente_anticipo: 'Pendiente anticipo', completado: 'Completado', cancelado: 'Cancelado' }
   return m[status] || status
 }
+
+export function nombreProyecto(proyecto) {
+  const cliente = proyecto?.cliente?.nombreComercial || ''
+  const nombre = proyecto?.proyecto?.nombre?.trim()
+  return nombre ? `${cliente} · ${nombre}` : cliente
+}

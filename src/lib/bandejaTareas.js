@@ -1,3 +1,4 @@
+import { nombreProyecto } from '../data/storage'
 import { tareaLeCorresponde, tareaAsignadaDirectamente, idsDeRol } from './permisos'
 
 // Roles que se resuelven contra el equipo del proyecto — una tarea con uno de
@@ -43,7 +44,7 @@ export function bandejaDe(usuarioObjetivo, proyectosTrabajo) {
       if (esAdminObjetivo ? !tareaAsignadaDirectamente(t, usuarioObjetivo.id) : !tareaLeCorresponde(t, p.equipo, usuarioObjetivo)) return
 
       if (t.estado === 'en_proceso') {
-        if (t.asignadoA === usuarioObjetivo.nombre) enProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial })
+        if (t.asignadoA === usuarioObjetivo.nombre) enProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: nombreProyecto(p) })
         return
       }
       const pendientes = t.dependencias.filter((d) => !completadasIds.has(d))
@@ -51,7 +52,7 @@ export function bandejaDe(usuarioObjetivo, proyectosTrabajo) {
         bloqueadas.push({
           ...t,
           proyectoSlug: p.slug,
-          proyectoNombre: p.cliente.nombreComercial,
+          proyectoNombre: nombreProyecto(p),
           faltaPor: pendientes.map((d) => titulosPorId.get(d) || d),
         })
         return
@@ -66,7 +67,7 @@ export function bandejaDe(usuarioObjetivo, proyectosTrabajo) {
           .map((id) => p.tareas.find((x) => x.id === id))
           .filter((x) => x && x.esCliente && (x.respuestaTexto || x.respuestaArchivoUrl || x.driveFolderUrl))
           .map((x) => ({ titulo: x.titulo, respuestaTexto: x.respuestaTexto, respuestaArchivoUrl: x.respuestaArchivoUrl, driveFolderUrl: x.driveFolderUrl }))
-        asignadas.push({ ...t, proyectoSlug: p.slug, proyectoNombre: p.cliente.nombreComercial, infoCliente })
+        asignadas.push({ ...t, proyectoSlug: p.slug, proyectoNombre: nombreProyecto(p), infoCliente })
       }
     })
   })

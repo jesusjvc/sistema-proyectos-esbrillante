@@ -91,9 +91,22 @@ router.get('/:slug', requireAuth, async (req, res) => {
 router.post('/', requireAuthOrApiKey, async (req, res) => {
   const { tipo, cliente, proyecto, condicionesTecnicas, equipo, passwordCliente, tareas, creadoPor, areas } = req.body
   if (areas !== undefined && !areasValidas(areas)) return res.status(400).json({ error: `areas inválido — valores permitidos: ${AREAS_VALIDAS.join(', ')}` })
+  const { clienteId } = req.body
+  if (clienteId !== undefined && clienteId !== null && typeof clienteId !== 'string') return res.status(400).json({ error: 'clienteId inválido' })
+  if (proyecto && typeof proyecto.nombre === 'string') {
+    const nombre = proyecto.nombre.trim().slice(0, 80)
+    if (nombre) proyecto.nombre = nombre
+    else delete proyecto.nombre
+  } else if (proyecto) {
+    delete proyecto.nombre
+  }
   const slug = generarSlug(cliente.nombreComercial)
 
   try {
+    if (clienteId) {
+      const existe = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { id: true } })
+      if (!existe) return res.status(400).json({ error: 'El cliente seleccionado no existe' })
+    }
     const result = await prisma.$transaction(async (tx) => {
       const p = await tx.proyecto.create({
         data: {
@@ -101,6 +114,7 @@ router.post('/', requireAuthOrApiKey, async (req, res) => {
           tipo: tipo === 'continuo' ? 'continuo' : 'finito',
           status: proyecto.anticipoConfirmado ? 'activo' : 'pendiente_anticipo',
           cliente,
+          clienteId: clienteId || null,
           proyecto,
           condicionesTecnicas,
           equipo,

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, Search, Check } from 'lucide-react'
 import { getProyectos } from '../data/api'
-import { statusBadge, statusLabel } from '../data/storage'
+import { statusBadge, statusLabel, nombreProyecto } from '../data/storage'
 import { normalizarTexto } from '../lib/texto'
 
 // Selector rápido de proyecto en el header de DetalleProyecto — evita tener
@@ -66,8 +66,8 @@ export default function SelectorProyecto({ proyectoActual, base }) {
   const q = normalizarTexto(busqueda)
   const lista = (proyectos || [])
     .filter((p) => p.status !== 'cancelado')
-    .filter((p) => !q || normalizarTexto(p.cliente.nombreComercial).includes(q))
-    .sort((a, b) => a.cliente.nombreComercial.localeCompare(b.cliente.nombreComercial))
+    .filter((p) => !q || normalizarTexto(nombreProyecto(p)).includes(q))
+    .sort((a, b) => nombreProyecto(a).localeCompare(nombreProyecto(b)))
 
   return (
     <>
@@ -76,7 +76,7 @@ export default function SelectorProyecto({ proyectoActual, base }) {
         onClick={() => setAbierto((v) => !v)}
         className="flex items-center gap-1 min-w-0 hover:opacity-80 transition-opacity"
       >
-        <span className="truncate">{proyectoActual.cliente.nombreComercial}</span>
+        <span className="truncate">{nombreProyecto(proyectoActual)}</span>
         <ChevronDown size={16} className="shrink-0 text-slate-400 dark:text-ink-400" />
       </button>
 
@@ -119,7 +119,7 @@ export default function SelectorProyecto({ proyectoActual, base }) {
                     }`}
                   >
                     {esActual ? <Check size={14} className="text-brand-700 dark:text-brand-400 shrink-0" /> : <span className="w-3.5 shrink-0" />}
-                    <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-ink-100">{p.cliente.nombreComercial}</span>
+                    <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-ink-100">{nombreProyecto(p)}</span>
                     <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${statusBadge(p.status)}`}>
                       {statusLabel(p.status)}
                     </span>

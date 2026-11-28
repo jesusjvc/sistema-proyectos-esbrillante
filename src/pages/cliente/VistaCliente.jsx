@@ -162,6 +162,7 @@ export default function VistaCliente() {
           <img src={logo} alt="Foco" className="h-8 w-auto shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-white text-lg truncate">{proyecto.cliente.nombreComercial}</div>
+            {proyecto.proyecto?.nombre && <div className="text-sm text-slate-200 truncate">{proyecto.proyecto.nombre}</div>}
             <div className="text-sm text-slate-400">Seguimiento de proyecto · by EsBrillante</div>
           </div>
           {enPausa && <span className="text-sm bg-amber-400/15 text-amber-300 px-2 py-1 rounded-full shrink-0">En pausa</span>}
