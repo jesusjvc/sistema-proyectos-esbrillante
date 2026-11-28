@@ -1,12 +1,22 @@
 // Reglas de "quién puede operar qué tarea" según el equipo asignado al
-// proyecto (proyecto.equipo: { copy, disenador, programador, redes, adminProyecto },
+// proyecto (proyecto.equipo: { copy, disenador, programador, redes, adminProyecto, asistente },
 // cada valor un array de userId — o el sentinel EQUIPO_NO_APLICA). Duplicado
 // (no importado) en src/lib/permisos.js del frontend porque frontend y
 // backend se despliegan como apps separadas en Coolify.
 
 // Sentinel para "este rol no aplica en este proyecto" — ver src/lib/permisos.js (frontend).
 export const EQUIPO_NO_APLICA = 'no_aplica'
-export const ROLES_EQUIPO = ['copy', 'disenador', 'programador', 'redes', 'adminProyecto']
+export const ROLES_EQUIPO = ['copy', 'disenador', 'programador', 'redes', 'adminProyecto', 'asistente']
+
+// Coordinador y asistente pueden operar cualquier tarea del equipo de su proyecto
+// (no solo las de su rol). `asistente` no es valor de `responsable`: a ese rol no
+// se le asignan tareas, solo da acceso para dar seguimiento y hacer ajustes.
+export const ROLES_COORDINACION = ['adminProyecto', 'asistente']
+
+export function usuarioCoordinaProyecto(equipo, userId) {
+  if (!equipo || !userId) return false
+  return ROLES_COORDINACION.some((rol) => idsDeRol(equipo, rol).includes(userId))
+}
 
 // Valores de `responsable` que son roles (se resuelven contra proyecto.equipo
 // o son especiales). Cualquier otro valor se trata como el userId de una
@@ -81,6 +91,21 @@ export function conMiembroAgregado(equipo, userId) {
 
 // user: req.user del JWT — { id, rol: 'ADMIN'|'EQUIPO', esKarla }
 export function tareaLeCorresponde(tarea, equipo, user) {
+  if (!user) return false
+  if (user.rol === 'ADMIN') return true
+
+  const { responsable } = tarea
+  if (responsable === 'admin' || responsable === 'cliente') return false
+  if (responsable === 'karla') return !!user.esKarla
+  if (usuarioCoordinaProyecto(equipo, user.id)) return true
+  return tareaLeTocaPorAsignacion(tarea, equipo, user)
+}
+
+// Lo que tareaLeCorresponde respondía antes de existir el acceso de coordinación:
+// a quién le toca la tarea por su rol o asignación directa. Las bandejas tipo
+// "Mis tareas" usan esta, para que el coordinador/asistente no vea como suyas
+// todas las tareas del proyecto.
+export function tareaLeTocaPorAsignacion(tarea, equipo, user) {
   if (!user) return false
   if (user.rol === 'ADMIN') return true
 

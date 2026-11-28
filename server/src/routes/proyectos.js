@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin, requireAdminOrApiKey, requireAuthOrApiKey } 
 import { generarSlug } from '../lib/slug.js'
 import { generarPasswordSimple, generarAccessToken } from '../lib/passwords.js'
 import { emitirCambio } from '../lib/eventos.js'
-import { validarYNormalizarEquipo } from '../lib/permisos.js'
+import { validarYNormalizarEquipo, ROLES_EQUIPO, EQUIPO_NO_APLICA, idsDeRol } from '../lib/permisos.js'
 import { obtenerOCrearCarpetaProyecto, driveConfigurado } from '../lib/drive.js'
 import { calcularSalud } from '../lib/salud.js'
 import { activarTareasClienteDisponibles } from '../lib/tareaHelpers.js'
@@ -334,6 +334,28 @@ router.put('/:slug/fecha-entrega', requireAuth, async (req, res) => {
   }
 })
 
+const ETIQUETA_ROL_EQUIPO = {
+  copy: 'Copy', disenador: 'Diseñador', programador: 'Programador', redes: 'Redes', adminProyecto: 'Coordinador', asistente: 'Asistente',
+}
+
+// "Rol: nombres" solo de los roles que cambiaron, para el Historial.
+async function detalleCambioEquipo(anterior, nuevo) {
+  const cambiados = ROLES_EQUIPO.filter((rol) => {
+    const antes = anterior?.[rol] === EQUIPO_NO_APLICA ? EQUIPO_NO_APLICA : idsDeRol(anterior, rol).slice().sort().join(',')
+    const despues = nuevo[rol] === EQUIPO_NO_APLICA ? EQUIPO_NO_APLICA : idsDeRol(nuevo, rol).slice().sort().join(',')
+    return antes !== despues
+  })
+  if (!cambiados.length) return ''
+  const ids = [...new Set(cambiados.flatMap((rol) => idsDeRol(nuevo, rol)))]
+  const usuarios = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true } }) : []
+  const nombrePorId = Object.fromEntries(usuarios.map((u) => [u.id, u.nombre]))
+  return cambiados.map((rol) => {
+    if (nuevo[rol] === EQUIPO_NO_APLICA) return `${ETIQUETA_ROL_EQUIPO[rol]}: no aplica`
+    const nombres = idsDeRol(nuevo, rol).map((id) => nombrePorId[id] || id)
+    return `${ETIQUETA_ROL_EQUIPO[rol]}: ${nombres.length ? nombres.join(', ') : 'nadie'}`
+  }).join(' · ')
+}
+
 // PUT /api/proyectos/:slug/equipo
 router.put('/:slug/equipo', requireAuth, async (req, res) => {
   const { equipo } = req.body
@@ -343,8 +365,13 @@ router.put('/:slug/equipo', requireAuth, async (req, res) => {
     const p = await prisma.proyecto.findFirst({ where: { OR: [{ slug: req.params.slug }, { id: req.params.slug }] } })
     if (!p) return res.status(404).json({ error: 'Proyecto no encontrado' })
 
-    const nuevoEquipo = await validarYNormalizarEquipo(prisma, equipo)
+    // `miembros` no se edita en el panel: son quienes entraron al proyecto al
+    // asignarles una tarea directa, y no deben perderse al guardar el equipo.
+    const miembros = Array.isArray(p.equipo?.miembros) ? p.equipo.miembros : []
+    const nuevoEquipo = { ...(await validarYNormalizarEquipo(prisma, equipo)), ...(miembros.length ? { miembros } : {}) }
     await prisma.proyecto.update({ where: { id: p.id }, data: { equipo: nuevoEquipo } })
+    const detalle = await detalleCambioEquipo(p.equipo, nuevoEquipo)
+    if (detalle) await logEntry(p.id, req.user.nombre, 'Equipo actualizado', detalle)
     emitirCambio(p.id)
     res.json({ ok: true, equipo: nuevoEquipo })
   } catch (err) {

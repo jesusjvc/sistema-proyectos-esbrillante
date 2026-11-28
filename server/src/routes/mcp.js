@@ -6,7 +6,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import prisma from '../lib/prisma.js'
 import { requireMcpAuth } from '../middleware/auth.js'
-import { tareaLeCorresponde, validarYNormalizarEquipo } from '../lib/permisos.js'
+import { tareaLeCorresponde, tareaLeTocaPorAsignacion, validarYNormalizarEquipo } from '../lib/permisos.js'
 import { materializarTareasDesdePlantilla } from '../lib/plantillaHelpers.js'
 import { vincularFactura, marcarPagadoDesdeInicio } from '../lib/pagosPerfex.js'
 import { importarAlcance, cambiarEstadoConcepto } from '../lib/alcancePerfex.js'
@@ -262,7 +262,8 @@ function resumenSiguiente(p, t) {
 
 // Misma selección que la bandeja "Mis tareas" del frontend (src/lib/bandejaTareas.js):
 // un admin solo ve lo asignado a su persona — tareaLeCorresponde le da acceso total
-// porque sirve para autorizar, no para armar una bandeja. Las tareas con responsable
+// (y al coordinador/asistente sobre su proyecto) porque sirve para autorizar, no para
+// armar una bandeja. Las tareas con responsable
 // "equipo" quedan "al aire" y solo se listan aparte cuando se filtra por un proyecto.
 // identidadCompartida: con MCP_API_KEY no hay persona, así que se listan todas las
 // tareas del equipo del proyecto.
@@ -276,7 +277,7 @@ export function siguienteActividadDe(proyectos, usuario, { identidadCompartida =
       if (t.esCliente || t.estado === 'completada' || t.estado === 'omitida') continue
       if (!identidadCompartida) {
         if (t.soloKarlaOAdmin && !usuario.esKarla && !esAdmin) continue
-        if (esAdmin ? t.responsable !== usuario.id : !tareaLeCorresponde(t, p.equipo, usuario)) continue
+        if (esAdmin ? t.responsable !== usuario.id : !tareaLeTocaPorAsignacion(t, p.equipo, usuario)) continue
       }
       if (t.estado === 'en_proceso') {
         if (identidadCompartida || t.asignadoA === usuario.nombre) enCurso.push({ ...resumenSiguiente(p, t), asignadoA: t.asignadoA })
@@ -370,6 +371,7 @@ function buildServer(usuario, baseProto) {
           programador: z.union([z.string(), z.array(z.string())]).optional().describe('userId (o varios) de quien programa, o "no_aplica" si el proyecto no lo requiere'),
           redes: z.union([z.string(), z.array(z.string())]).optional().describe('userId (o varios) de quien lleva redes sociales en este proyecto'),
           adminProyecto: z.union([z.string(), z.array(z.string())]).optional().describe('userId (o varios) de quien administra/coordina el proyecto'),
+          asistente: z.union([z.string(), z.array(z.string())]).optional().describe('userId (o varios) de quien asiste al coordinador: puede ver y ajustar cualquier tarea del equipo de este proyecto (iniciar, completar, editar, reasignar), igual que el coordinador. No se le asignan tareas por rol.'),
         }).optional().describe('Quiénes participan en el equipo de este proyecto, por rol (userId de un usuario real del sistema — un rol puede tener más de una persona, ej. dos diseñadores). Importante definirlo desde la creación: sin esto, las tareas de rol genérico (responsable=copy/disenador/programador/redes) no le aparecen a nadie en "Mis tareas" hasta que se asigne después.'),
         areas: z.array(z.enum(['web', 'diseno_grafico', 'redes_sociales'])).optional().describe('Área(s) de trabajo a las que pertenece el proyecto — determina a quién le aparece por defecto en su dashboard (cada admin ve por defecto solo los proyectos de su área). Un proyecto integral que cruza varias áreas lleva varias en el arreglo. Si se omite, el proyecto queda visible en cualquier filtro de área.'),
         driveFolderId: z.string().optional().describe('ID de una carpeta de Drive YA EXISTENTE para usar como carpeta del proyecto (ej. si el cliente ya compartió una carpeta propia) — si se omite, el sistema crea una carpeta nueva automáticamente (requiere Drive configurado en el servidor). Es el ID de la carpeta, no la URL completa. Visible después con ver_proyecto como driveFolderUrl, y listable con listar_archivos_drive_proyecto.'),

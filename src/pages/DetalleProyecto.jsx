@@ -28,6 +28,7 @@ import AdjuntosTarea from '../components/AdjuntosTarea'
 import TarjetaTarea from '../components/TarjetaTarea'
 import { EQUIPO_NO_APLICA, infoResponsable } from '../lib/permisos'
 import { AREAS, AREA_LABEL, AREA_COLOR } from '../lib/areas'
+import { etiquetasPersonas } from '../lib/nombresPersonas'
 import { esUrl } from '../lib/texto'
 import KanbanBoard from '../components/KanbanBoard'
 import TablaTareasContinuas from '../components/TablaTareasContinuas'
@@ -1170,6 +1171,9 @@ export default function DetalleProyecto() {
                 <InfoRow label="Programador" valor={nombreEquipo(proyecto.equipo.programador, miembrosPorId)} />
                 <InfoRow label="Redes" valor={nombreEquipo(proyecto.equipo.redes, miembrosPorId)} />
                 <InfoRow label="Coordinador" valor={nombreEquipo(proyecto.equipo.adminProyecto, miembrosPorId)} />
+                {nombreEquipo(proyecto.equipo.asistente, miembrosPorId) && (
+                  <InfoRow label="Asistente" valor={nombreEquipo(proyecto.equipo.asistente, miembrosPorId)} />
+                )}
                 <button onClick={() => setEditandoEquipo(true)} className="text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium mt-1">
                   Editar equipo
                 </button>
@@ -1643,6 +1647,7 @@ const ROLES_EQUIPO_FORM = [
   ['programador', 'Programador'],
   ['redes', 'Redes'],
   ['adminProyecto', 'Coordinador'],
+  ['asistente', 'Asistente'],
 ]
 
 function EditorAreas({ areasIniciales, onGuardar, onCancelar }) {
@@ -1705,6 +1710,7 @@ function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
     Object.fromEntries(ROLES_EQUIPO_FORM.map(([key]) => [key, equipo[key] === EQUIPO_NO_APLICA])),
   )
   const [guardando, setGuardando] = useState(false)
+  const etiquetaPersona = etiquetasPersonas(miembros)
 
   function toggle(rol, id) {
     setForm((prev) => ({
@@ -1758,7 +1764,7 @@ function EquipoEditor({ equipo, miembros, onGuardar, onCancelar }) {
                       : 'border-slate-200 dark:border-ink-500 text-slate-500 dark:text-ink-300 hover:bg-slate-50 dark:hover:bg-ink-700'
                   }`}
                 >
-                  {m.nombre}
+                  {etiquetaPersona[m.id]}
                 </button>
               ))}
             </div>

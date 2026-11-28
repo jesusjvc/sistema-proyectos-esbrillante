@@ -1,5 +1,5 @@
 import { nombreProyecto } from '../data/storage'
-import { tareaLeCorresponde, tareaAsignadaDirectamente, idsDeRol } from './permisos'
+import { tareaLeTocaPorAsignacion, tareaAsignadaDirectamente, idsDeRol } from './permisos'
 
 // Roles que se resuelven contra el equipo del proyecto — una tarea con uno de
 // estos roles y NADIE cubriéndolo en el proyecto está igual "al aire" que una
@@ -39,9 +39,10 @@ export function bandejaDe(usuarioObjetivo, proyectosTrabajo) {
       if (t.estado === 'completada' || t.estado === 'omitida' || t.esCliente) return
       if (t.soloKarlaOAdmin && !usuarioObjetivo.esKarla && !esAdminObjetivo) return
       // Un admin ve solo lo que tiene asignado a su persona directamente — no
-      // "todo" (tareaLeCorresponde da acceso total a cualquier admin porque esa
-      // función sirve para autorizar operaciones, no para armar esta bandeja).
-      if (esAdminObjetivo ? !tareaAsignadaDirectamente(t, usuarioObjetivo.id) : !tareaLeCorresponde(t, p.equipo, usuarioObjetivo)) return
+      // "todo" (tareaLeCorresponde da acceso total a cualquier admin, y al
+      // coordinador/asistente sobre su proyecto, porque sirve para autorizar
+      // operaciones, no para armar esta bandeja).
+      if (esAdminObjetivo ? !tareaAsignadaDirectamente(t, usuarioObjetivo.id) : !tareaLeTocaPorAsignacion(t, p.equipo, usuarioObjetivo)) return
 
       if (t.estado === 'en_proceso') {
         if (t.asignadoA === usuarioObjetivo.nombre) enProceso.push({ ...t, proyectoSlug: p.slug, proyectoNombre: nombreProyecto(p) })

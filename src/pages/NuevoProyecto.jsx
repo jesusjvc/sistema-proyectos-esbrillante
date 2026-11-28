@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
@@ -8,6 +8,7 @@ import { generarMensajeInicio } from '../data/mensajes'
 import { getPlantillas, getPlantilla, copiarTareasDesde, FASES_WEB } from '../data/plantillas'
 import { EQUIPO_NO_APLICA } from '../lib/permisos'
 import { AREAS } from '../lib/areas'
+import { etiquetasPersonas, miembroActivoPorNombre } from '../lib/nombresPersonas'
 import EditorEnriquecido from '../components/EditorEnriquecido'
 import BuscadorCliente from '../components/BuscadorCliente'
 import { Copy, Check, Plus, Trash2, FolderOpen, Loader2, Kanban, GitBranch, CircleAlert, Sparkles } from 'lucide-react'
@@ -108,7 +109,9 @@ export default function NuevoProyecto() {
     programador: [],
     redes: [],
     adminProyecto: [],
+    asistente: [],
   })
+  const defaultsEquipoAplicados = useRef(false)
   const [programadorNoAplica, setProgramadorNoAplica] = useState(false)
   const [passwordCliente, setPasswordCliente] = useState(generarPasswordSimple())
 
@@ -185,6 +188,38 @@ export default function NuevoProyecto() {
     }
   }, [user])
 
+  const rolesVisibles = rolesEquipoDeAreas(areasProyecto)
+  const miembrosSeleccionables = miembros.filter((m) => m.activo !== false || Object.values(equipo).some((ids) => ids.includes(m.id)))
+  const etiquetaPersona = etiquetasPersonas(miembrosSeleccionables)
+
+  // Valores por defecto del equipo, solo la primera vez que se abre el paso 3
+  // (después respeta lo que se haya cambiado a mano).
+  useEffect(() => {
+    if (paso !== 3 || defaultsEquipoAplicados.current || !miembros.length) return
+    defaultsEquipoAplicados.current = true
+    const visibles = rolesEquipoDeAreas(areasProyecto).map(([key]) => key)
+    const mario = miembroActivoPorNombre(miembros, 'Mario')
+    const melisa = miembroActivoPorNombre(miembros, 'Melisa')
+    setEquipo((prev) => {
+      const sig = { ...prev }
+      if (mario) {
+        if (visibles.includes('programador') && !sig.programador.length) sig.programador = [mario.id]
+        if (visibles.includes('disenador') && !sig.disenador.length) sig.disenador = [mario.id]
+      }
+      if (melisa && !sig.asistente.length) sig.asistente = [melisa.id]
+      return sig
+    })
+  }, [paso, miembros, areasProyecto])
+
+  // Los roles que el filtro de áreas oculta se mandan vacíos, aunque se hayan
+  // marcado antes de cambiar de área.
+  function equipoParaGuardar() {
+    const visibles = rolesVisibles.map(([key]) => key)
+    const data = Object.fromEntries(Object.entries(equipo).map(([key, ids]) => [key, visibles.includes(key) ? ids : []]))
+    if (visibles.includes('programador') && programadorNoAplica) data.programador = EQUIPO_NO_APLICA
+    return data
+  }
+
   function toggleArea(area) {
     setAreasProyecto((prev) => (prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]))
   }
@@ -241,7 +276,7 @@ export default function NuevoProyecto() {
           ...(propuesta ? { propuestaId: propuesta.id } : {}),
         },
         condicionesTecnicas,
-        equipo: { ...equipo, programador: programadorNoAplica ? EQUIPO_NO_APLICA : equipo.programador },
+        equipo: equipoParaGuardar(),
         areas: areasProyecto,
         passwordCliente,
         tareas,
@@ -618,13 +653,7 @@ export default function NuevoProyecto() {
           <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
             <h2 className="font-semibold text-slate-800">Equipo asignado</h2>
 
-            {[
-              ['copy', 'Copy'],
-              ['disenador', 'Diseñador'],
-              ['programador', 'Programador'],
-              ['redes', 'Redes'],
-              ['adminProyecto', 'Coordinador del proyecto'],
-            ].map(([key, label]) => (
+            {rolesVisibles.map(([key, label]) => (
               <Campo key={key} label={label}>
                 {key === 'programador' && (
                   <label className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
@@ -634,7 +663,7 @@ export default function NuevoProyecto() {
                 )}
                 {!(key === 'programador' && programadorNoAplica) && (
                   <div className="flex flex-wrap gap-1.5">
-                    {miembros.map((m) => (
+                    {miembrosSeleccionables.map((m) => (
                       <button
                         key={m.id}
                         type="button"
@@ -648,7 +677,7 @@ export default function NuevoProyecto() {
                             : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                         }`}
                       >
-                        {m.nombre}
+                        {etiquetaPersona[m.id]}
                       </button>
                     ))}
                   </div>
@@ -857,6 +886,28 @@ function SelectorAreas({ areasProyecto, onToggle }) {
       <p className="text-xs text-slate-400 mt-1.5">Un proyecto integral puede marcar varias áreas. Sin ninguna marcada, le aparece a todos.</p>
     </Campo>
   )
+}
+
+const ROLES_EQUIPO_ALTA = [
+  ['copy', 'Copy'],
+  ['disenador', 'Diseñador'],
+  ['programador', 'Programador'],
+  ['redes', 'Redes'],
+  ['adminProyecto', 'Coordinador del proyecto'],
+  ['asistente', 'Asistente'],
+]
+
+const ROLES_POR_AREA = {
+  web: ['programador', 'disenador', 'copy'],
+  diseno_grafico: ['disenador'],
+  redes_sociales: ['redes'],
+}
+
+// Sin área elegida se muestran todos los roles; coordinador y asistente siempre.
+function rolesEquipoDeAreas(areas) {
+  if (!areas.length) return ROLES_EQUIPO_ALTA
+  const permitidos = new Set(['adminProyecto', 'asistente', ...areas.flatMap((a) => ROLES_POR_AREA[a] || [])])
+  return ROLES_EQUIPO_ALTA.filter(([key]) => permitidos.has(key))
 }
 
 function Campo({ label, children }) {
