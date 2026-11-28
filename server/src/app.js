@@ -26,6 +26,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import { revisarRecordatoriosVencidos } from './lib/recordatorios.js'
 import { sincronizarGoogleChat } from './lib/chatSync.js'
+import { sincronizarPagosPerfex } from './lib/pagosPerfex.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -107,4 +108,11 @@ setInterval(() => {
 sincronizarGoogleChat().catch((err) => console.error('Error sincronizando Google Chat:', err))
 setInterval(() => {
   sincronizarGoogleChat().catch((err) => console.error('Error sincronizando Google Chat:', err))
+}, 60 * 60 * 1000)
+
+// Pagos: revisa cada hora en Perfex las facturas ligadas a proyectos que aún
+// no están pagadas; un anticipo o fase pagada se confirma sola.
+sincronizarPagosPerfex().catch((err) => console.error('Error sincronizando pagos de Perfex:', err))
+setInterval(() => {
+  sincronizarPagosPerfex().catch((err) => console.error('Error sincronizando pagos de Perfex:', err))
 }, 60 * 60 * 1000)
